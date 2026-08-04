@@ -1,0 +1,13 @@
+provider,baseURL,apiKeyEnv,modelsEndpoint
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,https://api.kilo.ai/api/gateway/models
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,https://integrate.api.nvidia.com/v1/models
+Mistral,https://api.mistral.ai/v1/chat/completions,MISTRAL_API_KEY,https://api.mistral.ai/v1/models
+Codestral,https://codestral.mistral.ai/v1/chat/completions,CODESTRAL_API_KEY,https://api.mistral.ai/v1/models
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,https://router.huggingface.co/v1/models
+Zen,https://api.z.ai/api/v1/chat/completions,ZEN_API_KEY,https://api.z.ai/api/v1/models
+Cerebras,https://api.cerebras.ai/v1/chat/completions,CEREBRAS_API_KEY,https://api.cerebras.ai/v1/models
+Groq,https://api.groq.com/v1/chat/completions,GROQ_API_KEY,https://api.groq.com/openai/v1/models
+Cohere,https://api.cohere.com/v1/chat,COHERE_API_KEY,https://api.cohere.com/v1/models
+Fireworks,https://api.fireworks.ai/inference/v1/chat/completions,FIREWORKS_API_KEY,https://api.fireworks.ai/inference/v1/models
+Command,https://api.commandcode.ai/provider/v1/chat/completions,COMMAND_API_KEY,https://api.commandcode.ai/provider/v1/models
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,https://ai-gateway.vercel.sh/v1/models

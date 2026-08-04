@@ -1,0 +1,53 @@
+provider,baseURL,apiKeyEnv,model,enabled
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,deepseek-v4-pro:discounted,true
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,deepseek-v4-flash-latest,true
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,nemotron-3-ultra-550b-a55b:free,true
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,nemotron-3-super-120b-a12b:free,true
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,step-3.7-flash:free,true
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,yi-large,true
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,fuyu-8b,true
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,jamba-1.5-large-instruct,true
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,sea-lion-7b-instruct,true
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,bge-m3,true
+Mistral,https://api.mistral.ai/v1/chat/completions,MISTRAL_API_KEY,mistral-medium-2505,true
+Mistral,https://api.mistral.ai/v1/chat/completions,MISTRAL_API_KEY,mistral-medium-2508,true
+Mistral,https://api.mistral.ai/v1/chat/completions,MISTRAL_API_KEY,codestral-2508,true
+Mistral,https://api.mistral.ai/v1/chat/completions,MISTRAL_API_KEY,codestral-latest,true
+Mistral,https://api.mistral.ai/v1/chat/completions,MISTRAL_API_KEY,mistral-code-latest,true
+Codestral,https://codestral.mistral.ai/v1/chat/completions,CODESTRAL_API_KEY,mistral-medium-2505,true
+Codestral,https://codestral.mistral.ai/v1/chat/completions,CODESTRAL_API_KEY,mistral-medium-2508,true
+Codestral,https://codestral.mistral.ai/v1/chat/completions,CODESTRAL_API_KEY,codestral-2508,true
+Codestral,https://codestral.mistral.ai/v1/chat/completions,CODESTRAL_API_KEY,codestral-latest,true
+Codestral,https://codestral.mistral.ai/v1/chat/completions,CODESTRAL_API_KEY,mistral-code-latest,true
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,Kimi-K3,true
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,DeepSeek-V4-Flash-0731,true
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,Inkling-Small,true
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,GLM-5.2,true
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,DeepSeek-V4-Flash,true
+Zen,https://api.z.ai/api/v1/chat/completions,ZEN_API_KEY,code,true
+Zen,https://api.z.ai/api/v1/chat/completions,ZEN_API_KEY,msg,true
+Zen,https://api.z.ai/api/v1/chat/completions,ZEN_API_KEY,success,true
+Cerebras,https://api.cerebras.ai/v1/chat/completions,CEREBRAS_API_KEY,zai-glm-4.7,true
+Cerebras,https://api.cerebras.ai/v1/chat/completions,CEREBRAS_API_KEY,gpt-oss-120b,true
+Cerebras,https://api.cerebras.ai/v1/chat/completions,CEREBRAS_API_KEY,gemma-4-31b,true
+Groq,https://api.groq.com/v1/chat/completions,GROQ_API_KEY,allam-2-7b,true
+Groq,https://api.groq.com/v1/chat/completions,GROQ_API_KEY,llama-3.3-70b-versatile,true
+Groq,https://api.groq.com/v1/chat/completions,GROQ_API_KEY,qwen3.6-27b,true
+Groq,https://api.groq.com/v1/chat/completions,GROQ_API_KEY,compound,true
+Groq,https://api.groq.com/v1/chat/completions,GROQ_API_KEY,gpt-oss-20b,true
+Cohere,https://api.cohere.com/v1/chat,COHERE_API_KEY,command-r-plus,true
+Cohere,https://api.cohere.com/v1/chat,COHERE_API_KEY,command-r,true
+Cohere,https://api.cohere.com/v1/chat,COHERE_API_KEY,command,true
+Fireworks,https://api.fireworks.ai/inference/v1/chat/completions,FIREWORKS_API_KEY,accounts/fireworks/models/llama-v3p1-405b-instruct,true
+Fireworks,https://api.fireworks.ai/inference/v1/chat/completions,FIREWORKS_API_KEY,accounts/fireworks/models/llama-v3p1-70b-instruct,true
+Fireworks,https://api.fireworks.ai/inference/v1/chat/completions,FIREWORKS_API_KEY,accounts/fireworks/models/mixtral-8x7b-instruct,true
+Command,https://api.commandcode.ai/provider/v1/chat/completions,COMMAND_API_KEY,claude-sonnet-5,true
+Command,https://api.commandcode.ai/provider/v1/chat/completions,COMMAND_API_KEY,claude-sonnet-4-6,true
+Command,https://api.commandcode.ai/provider/v1/chat/completions,COMMAND_API_KEY,claude-fable-5,true
+Command,https://api.commandcode.ai/provider/v1/chat/completions,COMMAND_API_KEY,claude-opus-5,true
+Command,https://api.commandcode.ai/provider/v1/chat/completions,COMMAND_API_KEY,claude-opus-4-8,true
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,qwen-3-14b,true
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,qwen-3-235b,true
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,qwen-3-30b,true
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,qwen-3-32b,true
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,qwen-3.6-max-preview,true

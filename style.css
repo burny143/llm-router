@@ -1,0 +1,229 @@
+body {
+  font-family: Arial, sans-serif;
+  margin: 0;
+  padding: 10px;
+}
+.tabs {
+  display: flex;
+  gap: 5px;
+  margin-bottom: 15px;
+}
+.tab-btn {
+  padding: 8px 16px;
+  cursor: pointer;
+  background: #eee;
+  border: none;
+  border-radius: 4px 4px 0 0;
+}
+.tab-btn.active {
+  background: #007bff;
+  color: white;
+}
+.tab-content {
+  display: none;
+  padding: 10px;
+  padding-bottom: 40px;
+  border: 1px solid #ccc;
+}
+.tab-content.active {
+  display: block;
+}
+.control-panel {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+.status {
+  font-weight: bold;
+  margin: 10px 0;
+}
+.status.running {
+  color: green;
+}
+.status.stopped {
+  color: red;
+}
+.dev-logs {
+  height: 200px;
+  border: 1px solid #aaa;
+  overflow-y: auto;
+  padding: 10px;
+  margin-bottom: 10px;
+  background: #1e1e1e;
+  color: #d4d4d4;
+  font-family: Consolas, monospace;
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.dev-logs .log-error {
+  color: #ff6b6b;
+}
+.dev-logs .log-warn {
+  color: #ffd93d;
+}
+.dev-logs .log-success {
+  color: #6bcb77;
+}
+.log-controls {
+  margin-bottom: 5px;
+}
+.log-controls button {
+  padding: 3px 8px;
+  font-size: 12px;
+}
+#chatMessages {
+  height: 200px;
+  border: 1px solid #aaa;
+  overflow-y: auto;
+  padding: 10px;
+  margin-bottom: 10px;
+  background: #f9f9f9;
+}
+.chat-meta {
+  color: #888;
+  font-size: 11px;
+  font-style: italic;
+  margin: 2px 0 8px 0;
+  text-align: left;
+}
+.meta-provider {
+  font-style: normal;
+  font-weight: bold;
+  color: #666;
+}
+.chat-input-area {
+  display: flex;
+  gap: 5px;
+}
+#chatInput {
+  flex: 1;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 10px 0;
+}
+th, td {
+  border: 1px solid #ddd;
+  padding: 8px;
+}
+th {
+  background: #f2f2f2;
+}
+button {
+  padding: 5px 10px;
+}
+button.btn-danger {
+  background: #dc3545;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 8px 16px;
+  cursor: pointer;
+}
+button.btn-danger:hover {
+  background: #c82333;
+}
+button.btn-primary {
+  background: #007bff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 8px 16px;
+  cursor: pointer;
+  float: right;
+}
+button.btn-primary:hover {
+  background: #0056b3;
+}
+.modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.modal-box {
+  background: white;
+  border-radius: 8px;
+  padding: 24px;
+  max-width: 500px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.2);
+}
+.modal-box h3 {
+  color: #dc3545;
+  margin-top: 0;
+}
+.modal-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+  justify-content: flex-end;
+}
+.model-file-label {
+  margin-left: 10px;
+  color: #555;
+  font-size: 12px;
+  vertical-align: middle;
+  word-break: break-all;
+}
+.progress-bar-container {
+  width: 200px;
+  height: 8px;
+  background: #e0e0e0;
+  border-radius: 4px;
+  overflow: hidden;
+  display: inline-block;
+  vertical-align: middle;
+  margin-left: 10px;
+}
+.progress-bar-fill {
+  width: 0%;
+  height: 100%;
+  background: #28a745;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+  animation: progress-indeterminate 1.5s ease-in-out infinite;
+}
+@keyframes progress-indeterminate {
+  0% { width: 0%; margin-left: 0%; }
+  50% { width: 60%; margin-left: 20%; }
+  100% { width: 0%; margin-left: 100%; }
+}
+.health-log {
+  width: 100%;
+  height: 250px;
+  font-family: 'Consolas', 'Courier New', monospace;
+  font-size: 11px;
+  line-height: 1.4;
+  background: #fafafa;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 8px;
+  margin-bottom: 12px;
+  resize: vertical;
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: #333;
+}
+#healthResults h3 {
+  margin: 12px 0 4px 0;
+  font-size: 14px;
+}
+.config-footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #f8f8f8;
+  border-top: 1px solid #ddd;
+  padding: 6px 12px;
+  font-size: 11px;
+  color: #555;
+  z-index: 100;
+  text-align: right;
+}

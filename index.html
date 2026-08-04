@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>LLM Proxy Router</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="proxy">Proxy Control</button>
+    <button class="tab-btn" data-tab="config">Admin / Configuration</button>
+    <button class="tab-btn" data-tab="health">Health Check</button>
+    <button class="tab-btn" data-tab="usage">Token Usage</button>
+  </div>
+
+  <!-- Proxy Control Tab -->
+  <div id="proxy-tab" class="tab-content active">
+    <div class="control-panel">
+      <label>Port: <input type="number" id="portInput" value="8000" min="1024" max="65535"></label>
+      <button id="connectBtn">Connect</button>
+      <button id="disconnectBtn" disabled>Stop</button>
+    </div>
+    <div id="serverAddress" class="status stopped">Server stopped</div>
+    <hr>
+    <h3>Quick Chat</h3>
+    <div class="chat-container">
+      <div id="chatMessages" class="chat-messages"></div>
+      <div class="chat-input-area">
+        <input type="text" id="chatInput" placeholder="Type a message...">
+        <button id="sendBtn">Send</button>
+      </div>
+    </div>
+    <h3>Developer Logs</h3>
+    <div class="log-controls">
+      <button id="clearLogsBtn">Clear Logs</button>
+    </div>
+    <div id="devLogs" class="dev-logs"></div>
+  </div>
+
+  <!-- Fetch Models Confirmation Modal -->
+  <div id="fetchModal" class="modal-overlay" style="display:none;">
+    <div class="modal-box">
+      <h3>WARNING</h3>
+      <p>This will load all available models it can find based on the providers available!</p>
+      <div class="modal-actions">
+        <button id="fetchModalProceed" class="btn-danger">Proceed</button>
+        <button id="fetchModalCancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Admin / Configuration Tab -->
+  <div id="config-tab" class="tab-content">
+    <h2>Model Configuration</h2>
+    <div class="config-controls">
+      <button id="addEntryBtn">+ Add Entry</button>
+      <button id="loadDefaultsBtn">Load Defaults</button>
+      <button id="clearAllBtn">Clear All</button>
+      <button id="fetchModelsBtn">Fetch All Models</button>
+      <div id="fetchProgressBar" class="progress-bar-container" style="display:none;">
+        <div class="progress-bar-fill"></div>
+      </div>
+      <button id="saveConfigBtn" class="btn-primary">Apply Configuration</button>
+      <span id="modelFileLabel" class="model-file-label"></span>
+    </div>
+    <div id="configFooter" class="config-footer">
+      <span id="configFileLabel" class="model-file-label"></span>
+    </div>
+    <table id="configTable">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Provider</th>
+          <th>Base URL</th>
+          <th>API Key Env Var</th>
+          <th>Model</th>
+          <th>Enabled</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <!-- Health Check Tab -->
+    <div id="health-tab" class="tab-content">
+      <h2>Health Check</h2>
+      <button id="pingAllBtn">Ping All Models</button>
+      <div id="pingSummary"></div>
+      <div id="healthResults">
+        <h3>✅ OK Models</h3>
+        <textarea id="healthOkLog" class="health-log" readonly placeholder="No health check results yet."></textarea>
+        <h3>❌ Failed Models</h3>
+        <textarea id="healthFailLog" class="health-log" readonly placeholder="No health check results yet."></textarea>
+      </div>
+    </div>
+
+  <!-- Token Usage Tab -->
+  <div id="usage-tab" class="tab-content">
+    <h2>Token Usage</h2>
+    <button id="refreshUsageBtn">Refresh</button>
+    <div id="usageSummary"></div>
+    <table id="usageTable">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Provider</th>
+          <th>Model</th>
+          <th>Requests</th>
+          <th>Prompt Tokens</th>
+          <th>Completion Tokens</th>
+          <th>Total Tokens</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>

@@ -1,0 +1,21 @@
+provider,model
+Anthropic,claude-3-5-sonnet-20241022
+Anthropic,claude-3-5-haiku-20241022
+OpenAI,gpt-4o
+OpenAI,gpt-4o-mini
+OpenAI,gpt-3.5-turbo
+Google AI Studio,gemini-1.5-pro
+Google AI Studio,gemini-1.5-flash
+OpenRouter,anthropic/claude-3.5-sonnet
+OpenRouter,openai/gpt-4o
+OpenRouter,google/gemini-pro-1.5
+Groq,llama-3.1-8b-instant
+Groq,llama-3.1-70b-versatile
+Mistral,mistral-large-latest
+Mistral,mistral-small-latest
+Codestral,codestral-latest
+NVIDIA NIM,meta/llama-3.1-70b-instruct
+Cerebras,llama3.1-8b
+Cerebras,llama3.1-70b
+Fireworks,accounts/fireworks/models/llama-v3p1-70b-instruct
+Cohere,command-r-plus

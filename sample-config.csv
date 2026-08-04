@@ -1,0 +1,15 @@
+provider,baseURL,apiKeyEnv,model,enabled
+Anthropic,https://api.anthropic.com/v1/messages,ANTHROPIC_API_KEY,claude-3-5-sonnet-20241022,true
+Anthropic,https://api.anthropic.com/v1/messages,ANTHROPIC_API_KEY,claude-3-5-haiku-20241022,true
+OpenAI,https://api.openai.com/v1/chat/completions,OPENAI_API_KEY,gpt-4o,true
+OpenAI,https://api.openai.com/v1/chat/completions,OPENAI_API_KEY,gpt-4o-mini,true
+OpenRouter,https://openrouter.ai/api/v1/chat/completions,OPENROUTER_API_KEY,google/gemini-2.0-flash-exp,true
+Groq,https://api.groq.com/openai/v1/chat/completions,GROQ_API_KEY,llama-3.3-70b-versatile,true
+Groq,https://api.groq.com/openai/v1/chat/completions,GROQ_API_KEY,llama-3.1-8b-instant,true
+Mistral,https://api.mistral.ai/v1/chat/completions,MISTRAL_API_KEY,mistral-large-latest,true
+Codestral,https://codestral.mistral.ai/v1/chat/completions,CODESTRAL_API_KEY,codestral-latest,true
+Google AI Studio,https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent,GOOGLE_AI_STUDIO_API_KEY,gemini-2.0-flash-exp,true
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,nvidia/llama-3.1-nemotron-70b-instruct,true
+Cerebras,https://api.cerebras.ai/v1/chat/completions,CEREBRAS_API_KEY,llama3.1-70b,true
+Fireworks,https://api.fireworks.ai/inference/v1/chat/completions,FIREWORKS_API_KEY,accounts/fireworks/models/llama-v3p1-70b-instruct,true
+Cohere,https://api.cohere.com/v1/chat,COHERE_API_KEY,command-r-plus,true

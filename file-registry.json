@@ -1,0 +1,11 @@
+{
+  "providerConfig": "ProviderConfig.csv",
+  "ultimateConfig": "UltimateConfig.csv",
+  "proxyConfig": "proxy-config.json",
+  "models": "models.csv",
+  "latestModels": "LatestModels.csv",
+  "knownOk": "known-ok.json",
+  "tokenUsage": "token-usage.json",
+  "settings": "settings.json",
+  "env": ".env"
+}

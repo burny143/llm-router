@@ -1,0 +1,22 @@
+# --- Secrets (never commit) ---
+.env
+
+# --- Node ---
+node_modules/
+npm-debug.log*
+
+# --- Runtime / auto-generated data (regenerated at startup or via fetch-models.js) ---
+proxy-config.json
+models.csv
+LatestModels.csv
+known-ok.json
+token-usage.json
+settings.json
+
+# --- OS / editor ---
+.DS_Store
+Thumbs.db
+*.log
+
+# --- Misc ---
+archive/
