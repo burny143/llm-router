@@ -78,6 +78,74 @@ function normalizeResponse(data) {
   };
 }
 
+// OpenAI-compatible SSE stream writer.
+// The router always probes upstreams in buffered (non-streaming) mode because it
+// needs the full response to pick a winner and normalize it; when the client
+// requests stream:true we replay the winner's content as SSE chunks. This is a
+// faithful OpenAI-style stream (delta chunks + finish_reason + [DONE]) so any
+// OpenAI-compatible client (e.g. opencode) works against the router.
+function sendSseResponse(res, data, entry) {
+  const content = extractContent(data);
+  const id = `chatcmpl-${Date.now()}`;
+  const created = Math.floor(Date.now() / 1000);
+  const model = entry.model;
+
+  res.status(200);
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+
+  const writeChunk = (delta, finishReason, extra) => {
+    const payload = {
+      id,
+      object: 'chat.completion.chunk',
+      created,
+      model,
+      choices: [{ index: 0, delta, finish_reason: finishReason }],
+      ...extra
+    };
+    res.write(`data: ${JSON.stringify(payload)}\n\n`);
+  };
+
+  // First delta announces the assistant role, then content in small pieces
+  // so the client UI renders progressively.
+  writeChunk({ role: 'assistant', content: '' }, null);
+  const CHUNK_SIZE = 32;
+  for (let i = 0; i < content.length; i += CHUNK_SIZE) {
+    writeChunk({ content: content.slice(i, i + CHUNK_SIZE) }, null);
+  }
+  writeChunk({}, 'stop');
+  if (data.usage && typeof data.usage === 'object') {
+    writeChunk({}, null, { usage: data.usage });
+  }
+  res.write('data: [DONE]\n\n');
+  res.end();
+}
+
+// Fast path (known-OK, fastest first) then parallel fallback across all entries.
+// Returns the winning result or null when every candidate failed.
+async function findWinner(ordered, ctx) {
+  // 1) Fast path: health-check confirmed working models, tried in order (fastest first).
+  if (knownOk.length > 0) {
+    const okCandidates = ordered.filter(e => knownOk.some(o => keyOf(o) === keyOf(e)));
+    const okResult = await probeSequential(okCandidates, ctx);
+    if (okResult) {
+      learnSuccess(okResult.entry, okResult.elapsed);
+      console.log(`[${okResult.entry.provider}/${okResult.entry.model}] used for this request.`);
+      return okResult;
+    }
+  }
+
+  // 2) Fallback: nothing confirmed working (or all of them failed) ->
+  //    probe all candidates in parallel, fastest success wins.
+  const winner = await probeParallel(ordered, ctx);
+  if (winner) {
+    console.log(`[${winner.entry.provider}/${winner.entry.model}] used for this request.`);
+    return winner;
+  }
+  return null;
+}
+
 // Order candidates: known-OK (fastest first) -> untested -> known-failed
 function orderEntries() {
   const okSpeed = new Map();
@@ -190,9 +258,6 @@ function startProxy(port, entries) {
 
     app.post('/v1/chat/completions', async (req, res) => {
       const { messages, stream, ...rest } = req.body;
-      if (stream) {
-        return res.status(400).json({ error: 'Streaming not supported in fallback mode.' });
-      }
 
       const ordered = orderEntries();
       if (ordered.length === 0) {
@@ -200,25 +265,15 @@ function startProxy(port, entries) {
       }
       const ctx = { messages, rest };
 
-      // 1) Fast path: health-check confirmed working models, tried in order (fastest first).
-      if (knownOk.length > 0) {
-        const okCandidates = ordered.filter(e => knownOk.some(o => keyOf(o) === keyOf(e)));
-        const okResult = await probeSequential(okCandidates, ctx);
-        if (okResult) {
-          learnSuccess(okResult.entry, okResult.elapsed);
-          console.log(`[${okResult.entry.provider}/${okResult.entry.model}] used for this request.`);
-          return res.json(okResult.data);
-        }
+      const winner = await findWinner(ordered, ctx);
+      if (!winner) {
+        return res.status(502).json({ error: 'All configured models failed.' });
       }
 
-      // 2) Fallback: nothing confirmed working (or all of them failed) ->
-      //    probe all candidates in parallel, fastest success wins.
-      const winner = await probeParallel(ordered, ctx);
-      if (winner) {
-        console.log(`[${winner.entry.provider}/${winner.entry.model}] used for this request.`);
-        return res.json(winner.data);
+      if (stream) {
+        return sendSseResponse(res, winner.data, winner.entry);
       }
-      res.status(502).json({ error: 'All configured models failed.' });
+      return res.json(winner.data);
     });
 
     serverInstance = app.listen(port, () => {

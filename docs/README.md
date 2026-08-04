@@ -94,7 +94,7 @@ npm run dev        # Runs via start.js
 ### Proxy Core
 - **Express server** at `http://localhost:PORT/v1/chat/completions`
 - **OpenAI-compatible API** — works with any OpenAI SDK / client
-- **Streaming not supported** in fallback mode (returns 400)
+- **Streaming supported** — `stream: true` returns OpenAI-style SSE (`data:` delta chunks, `finish_reason`, `[DONE]`); upstream probing stays buffered so routing/fallback is preserved, and the winner's content is replayed as chunks
 
 ### Intelligent Routing
 | Phase | Strategy | Behavior |
@@ -560,7 +560,7 @@ npm run dev  # node start.js
 - [ ] **Per-entry health status** — health check results not yet displayed per-row in the config table
 
 ### Medium Priority
-- [ ] Streaming support (`/v1/chat/completions` with `stream: true`)
+- [x] Streaming support (`/v1/chat/completions` with `stream: true`) — SSE replay of the buffered winner (2026-08-04)
 - [ ] Provider-specific request/response normalization (Anthropic, Google, etc.)
 - [ ] Config validation on import (warn on unknown providers, missing models)
 - [ ] Export config to CSV/Excel button
