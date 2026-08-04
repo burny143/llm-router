@@ -173,7 +173,10 @@ async function probeOne(entry, { messages, rest }) {
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${apiKey}`
   };
-  const payload = { model: entry.model, messages, ...rest };
+  // The proxy decides WHICH model to use (router's job), so the client's
+  // requested model must never reach the upstream. Spread rest FIRST, then
+  // overwrite with the entry's model + original messages so they always win.
+  const payload = { ...rest, model: entry.model, messages };
   const response = await axios.post(entry.baseURL, payload, { headers, timeout: 30000 });
   const elapsed = Date.now() - startTime;
 
@@ -257,7 +260,10 @@ function startProxy(port, entries) {
     app.use(express.json());
 
     app.post('/v1/chat/completions', async (req, res) => {
-      const { messages, stream, ...rest } = req.body;
+      // The client's model/stream fields are router control inputs, not
+      // upstream payload — never forward them (upstreams would reject the
+      // unknown model string / stream options).
+      const { messages, stream, model: _clientModel, stream_options, ...rest } = req.body;
 
       const ordered = orderEntries();
       if (ordered.length === 0) {
