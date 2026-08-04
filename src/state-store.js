@@ -4,20 +4,22 @@ const path = require('path');
 // --- File registry (central "notepad" that maps each data-file role to a path) ---
 // file-registry.json is the single place that says WHICH file plays WHICH role.
 // Every other module must resolve data-file paths via getFilePath(role) instead of
-// hardcoding filenames. Relative paths are resolved against the project root.
-const REGISTRY_FILE = path.join(__dirname, 'file-registry.json');
+// hardcoding filenames. Relative paths are resolved against the PROJECT ROOT
+// (one level above src/), not against this module.
+const PROJECT_ROOT = path.resolve(__dirname, '..');
+const REGISTRY_FILE = path.join(PROJECT_ROOT, 'file-registry.json');
 
 // Defaults: used when file-registry.json is missing, unreadable, or lacks a role.
 const DEFAULT_PATHS = {
-  providerConfig: 'ProviderConfig.csv',
-  ultimateConfig: 'UltimateConfig.csv',
-  proxyConfig: 'proxy-config.json',
-  models: 'models.csv',
-  latestModels: 'LatestModels.csv',
-  knownOk: 'known-ok.json',
-  tokenUsage: 'token-usage.json',
-  settings: 'settings.json',
-  env: '.env'
+  providerConfig: 'data/ProviderConfig.csv',
+  ultimateConfig: 'data/UltimateConfig.csv',
+  proxyConfig: 'data/proxy-config.json',
+  models: 'data/models.csv',
+  latestModels: 'data/LatestModels.csv',
+  knownOk: 'data/known-ok.json',
+  tokenUsage: 'data/token-usage.json',
+  settings: 'data/settings.json',
+  env: 'data/.env'
 };
 
 let fileRegistry = {};
@@ -32,7 +34,7 @@ try {
 // Resolve a data-file role to an absolute path (registry first, then default).
 function getFilePath(role) {
   const value = fileRegistry[role] || DEFAULT_PATHS[role] || role;
-  return path.isAbsolute(value) ? value : path.join(__dirname, value);
+  return path.isAbsolute(value) ? value : path.join(PROJECT_ROOT, value);
 }
 
 // Keep the legacy constants working for any code that still destructures them.

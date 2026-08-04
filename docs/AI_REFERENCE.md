@@ -49,27 +49,32 @@ separate one. `startProxy()`/`stopProxy()` are called from renderer via IPC.
 
 ## 3. File Map & Dependencies (verified)
 
+> Layout (reorganized 2026-08-04): all app code in `src/` (entry `package.json` → `src/main.js`,
+> HTML/CSS/JS together so `index.html`→`style.css`/`renderer.js` relative refs stay valid);
+> all data files in `data/` (resolved via `file-registry.json` → `getFilePath(role)`);
+> samples in `samples/`; docs in `docs/`.
+
 ### Source code (require graph)
 
 | File | Requires | Exports / Role |
 |------|----------|----------------|
-| `main.js` | `electron`, `axios`, `dotenv`, `proxy-server.js`, `state-store.js`, `models-config.js`, `child_process`, `path`, `fs` | Electron main: window, IPC, health check, log forwarding, startup auto-load |
-| `preload.js` | `electron` (contextBridge, ipcRenderer) | Exposes `window.api` (the ONLY bridge to renderer) |
-| `renderer.js` | none (uses `window.api` from preload) | All UI: config table, quick chat, dev logs, health tab, token usage |
-| `proxy-server.js` | `express`, `axios`, `dotenv`, `state-store.js` | `startProxy, stopProxy, isProxyRunning, setHealthResults, getKnownOk, getTokenUsage, extractContent` |
-| `state-store.js` | `fs`, `path` | `saveResults/loadResults, saveUsage/loadUsage, saveSettings/loadSettings, saveConfig/loadConfig, saveConfigBoth, syncConfigFromCsv, pruneConfigEntries, loadProviderConfig, getFilePath` + file-path resolution via registry |
-| `models-config.js` | (standalone) | **Fallback default catalog** — 17 provider groups `{provider, baseURL, apiKeyEnv, models[]}`. Uses `api.kilocode.ai` for Kilo. |
+| `src/main.js` | `electron`, `axios`, `dotenv`, `proxy-server.js`, `state-store.js`, `models-config.js`, `child_process`, `path`, `fs` | Electron main: window, IPC, health check, log forwarding, startup auto-load |
+| `src/preload.js` | `electron` (contextBridge, ipcRenderer) | Exposes `window.api` (the ONLY bridge to renderer) |
+| `src/renderer.js` | none (uses `window.api` from preload) | All UI: config table, quick chat, dev logs, health tab, token usage |
+| `src/proxy-server.js` | `express`, `axios`, `dotenv`, `state-store.js` | `startProxy, stopProxy, isProxyRunning, setHealthResults, getKnownOk, getTokenUsage, extractContent` |
+| `src/state-store.js` | `fs`, `path` | `saveResults/loadResults, saveUsage/loadUsage, saveSettings/loadSettings, saveConfig/loadConfig, saveConfigBoth, syncConfigFromCsv, pruneConfigEntries, loadProviderConfig, getFilePath` + file-path resolution via registry |
+| `src/models-config.js` | (standalone) | **Fallback default catalog** — 17 provider groups `{provider, baseURL, apiKeyEnv, models[]}`. Uses `api.kilocode.ai` for Kilo. |
 | `model-config.js` | (standalone) | **MOVED TO `archive/`** — legacy/alternate catalog, different URLs (e.g. Anthropic via `cc.freemodel.dev`). **Not loaded anywhere**; kept only for reference. |
-| `fetch-models.js` | `fs`, `axios`, `dotenv` | CLI script (run via IPC `run-fetch-models` or `node fetch-models.js`): reads `ProviderConfig.csv`, hits each `modelsEndpoint`, writes `LatestModels.csv` + `models.csv` |
-| `index.html` | `style.css`, `renderer.js` | 4 tabs: Proxy Control / Admin-Configuration / Health Check / Token Usage |
-| `style.css` | — | Light theme |
+| `src/fetch-models.js` | `fs`, `axios`, `dotenv` | CLI script (run via IPC `run-fetch-models` or `node src\fetch-models.js`): reads `ProviderConfig.csv`, hits each `modelsEndpoint`, writes `LatestModels.csv` + `models.csv` |
+| `src/index.html` | `style.css`, `renderer.js` | 4 tabs: Proxy Control / Admin-Configuration / Health Check / Token Usage |
+| `src/style.css` | — | Light theme |
 
 ### Data files (who reads / who writes)
 
 **All data-file paths resolve through `state-store.getFilePath(role)`** (registry first,
-default filename fallback). `file-registry.json` is the map — edit it to point a role at a
-different file. Roles: `providerConfig`, `ultimateConfig`, `proxyConfig`, `models`,
-`latestModels`, `knownOk`, `tokenUsage`, `settings`, `env`.
+default filename fallback) into `data/`. `file-registry.json` (project root) is the map —
+edit it to point a role at a different file. Roles: `providerConfig`, `ultimateConfig`,
+`proxyConfig`, `models`, `latestModels`, `knownOk`, `tokenUsage`, `settings`, `env`.
 
 | File | Schema | Read by | Written by | Source of truth? |
 |------|--------|---------|------------|------------------|
@@ -104,7 +109,7 @@ Renderer **cannot** touch Node/fs — everything goes through these.
 | `open-config-file-dialog` | `openConfigFileDialog()` | — | `{canceled}` / `{canceled:false, filePath}` |
 | `parse-config-csv-file` | `parseConfigCsvFile(filePath)` | abs path | `{success, entries, rowCount}` |
 | `parse-config-excel-file` | `parseConfigExcelFile(filePath)` | abs path | `{success, entries, rowCount}` |
-| `run-fetch-models` | `runFetchModels()` | — | `{success, output, entries}` — spawns `node fetch-models.js` |
+| `run-fetch-models` | `runFetchModels()` | — | `{success, output, entries}` — spawns `node src\fetch-models.js` |
 | `get-token-usage` | `getTokenUsage()` | — | usage array sorted by totalTokens desc |
 | `health-check` | `healthCheck(entries)` | entries[] | results[] (ping every enabled model in parallel) |
 | `dev-log` (event) | `onDevLog(callback)` | — | `{level, text, time}` pushed from main's console interception |
@@ -300,7 +305,7 @@ npm start          # electron .
 npm run dev        # node start.js  (npx electron .)
 
 # Regenerate model lists
-node fetch-models.js
+node src\fetch-models.js
 ```
 
 There is **no automated test suite** — no test runner in package.json, no `test` script.

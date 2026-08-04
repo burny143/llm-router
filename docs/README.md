@@ -137,17 +137,20 @@ npm run dev        # Runs via start.js
 
 ### Source Code
 
+All app code lives in `src/` (entry: `package.json` → `src/main.js`). All data files live
+in `data/` and are resolved via `file-registry.json` → `state-store.getFilePath(role)`.
+
 | File | Role | Dependencies |
 |------|------|--------------|
-| `main.js` | Electron main process: window, IPC, health check, log forwarding, startup auto-load | `proxy-server.js`, `state-store.js`, `models-config.js`, `dotenv` |
-| `preload.js` | Context bridge → `window.api` (typed IPC surface) | `electron` (contextBridge, ipcRenderer) |
-| `renderer.js` | All UI logic: config table, quick chat, dev logs, health tab, token usage tab | `window.api` (from preload) |
-| `proxy-server.js` | Express proxy + routing engine (`probeSequential`, `probeParallel`, `learnSuccess`, `learnFailure`, `extractContent`, `recordUsage`) | `axios`, `dotenv`, `state-store.js` |
-| `state-store.js` | Tiny JSON/CSV persistence layer | `fs`, `path` |
-| `models-config.js` | **Default catalog** — 17 providers with base URLs, env var names, model lists | (standalone) |
-| `model-config.js` | **Moved to `archive/`** — legacy/alternate catalog, not used | (standalone) |
-| `index.html` | Four tabs: Proxy Control, Admin/Configuration, Health Check, Token Usage | `style.css`, `renderer.js` |
-| `style.css` | Light theming, tables, log colors, status labels | — |
+| `src/main.js` | Electron main process: window, IPC, health check, log forwarding, startup auto-load | `proxy-server.js`, `state-store.js`, `models-config.js`, `dotenv` |
+| `src/preload.js` | Context bridge → `window.api` (typed IPC surface) | `electron` (contextBridge, ipcRenderer) |
+| `src/renderer.js` | All UI logic: config table, quick chat, dev logs, health tab, token usage tab | `window.api` (from preload) |
+| `src/proxy-server.js` | Express proxy + routing engine (`probeSequential`, `probeParallel`, `learnSuccess`, `learnFailure`, `extractContent`, `recordUsage`) | `axios`, `dotenv`, `state-store.js` |
+| `src/state-store.js` | JSON/CSV persistence + `getFilePath(role)` registry resolution | `fs`, `path` |
+| `src/models-config.js` | **Default catalog** — 17 providers with base URLs, env var names, model lists | (standalone) |
+| `src/fetch-models.js` | Model fetcher (regenerates `data/LatestModels.csv` + `data/models.csv`) | `axios`, `dotenv`, `state-store.js` |
+| `src/index.html` | Four tabs: Proxy Control, Admin/Configuration, Health Check, Token Usage | `style.css`, `renderer.js` (same folder) |
+| `src/style.css` | Light theming, tables, log colors, status labels | — |
 
 ### Configuration & Data Files (Source of Truth Hierarchy)
 
@@ -471,33 +474,44 @@ loadDefaultConfig()
 ### Project Structure
 ```
 llm-proxy-gui/
-├── main.js              # Electron main process
-├── preload.js           # Context bridge
-├── renderer.js          # UI logic
-├── proxy-server.js      # Express proxy + routing
-├── state-store.js       # JSON/CSV persistence
-├── models-config.js     # Default catalog (17 providers)
-├── archive/             # Stale files (model-config.js, etc.)
-├── index.html           # 4-tab UI
-├── style.css            # Theming
-├── start.js             # Dev launcher (npx electron .)
-├── package.json         # Dependencies + scripts
-├── file-registry.json   # File-path notepad (role → path)
-├── ProviderConfig.csv   # Provider metadata
-├── UltimateConfig.csv   # Proxy config truth
-├── proxy-config.json    # Auto-generated from CSV
-├── models.csv           # Model dropdown source
-├── known-ok.json        # Routing priority
-├── token-usage.json     # Token counters
-├── settings.json        # Model-list path
-├── .env                 # API keys (gitignored)
-├── env.example          # .env template
-├── sample-config.csv    # Config format reference
-├── sample-models.csv    # Model list sample
-├── sample-models.xlsx   # Excel sample
-├── LatestModels.csv     # Fetched live models
-├── fetch-models.js      # Model fetcher script (reads ProviderConfig.csv)
-└── README.md            # This file
+├── package.json           # Dependencies + scripts ("main": src/main.js)
+├── package-lock.json
+├── file-registry.json     # File-path notepad (role → path; lands in data/ by default)
+├── .gitignore
+├── src/                   # All application code (JS + HTML + CSS together)
+│   ├── main.js            # Electron main process (entry)
+│   ├── preload.js         # Context bridge
+│   ├── proxy-server.js    # Express proxy + routing
+│   ├── state-store.js     # JSON/CSV persistence + getFilePath() registry resolve
+│   ├── models-config.js   # Default catalog (17 providers) — fallback
+│   ├── fetch-models.js    # Model fetcher script (reads ProviderConfig.csv)
+│   ├── start.js           # Dev launcher (npx electron .)
+│   ├── index.html         # 4-tab UI
+│   ├── renderer.js        # UI logic
+│   └── style.css          # Theming
+├── data/                  # Data files (resolved via file-registry.json)
+│   ├── ProviderConfig.csv # Provider metadata
+│   ├── UltimateConfig.csv # Proxy config truth
+│   ├── proxy-config.json  # Auto-generated from CSV
+│   ├── models.csv         # Model dropdown source
+│   ├── LatestModels.csv   # Fetched live models
+│   ├── known-ok.json      # Routing priority (runtime)
+│   ├── token-usage.json   # Token counters (runtime)
+│   ├── settings.json      # Model-list path (runtime)
+│   ├── .env               # API keys (gitignored)
+│   └── env.example        # .env template
+├── samples/               # Sample/reference data
+│   ├── sample-config.csv
+│   ├── sample-models.csv
+│   └── sample-models.xlsx
+├── docs/                  # Documentation
+│   ├── README.md          # This file
+│   ├── APP.md             # Architecture/feature doc
+│   ├── AI_REFERENCE.md    # AI onboarding deep-dive
+│   ├── CONFIG_REFERENCE.md# Config formats reference
+│   └── AGENTS.md          # Agent rules / handoff
+├── archive/               # Stale files (model-config.js, etc.)
+└── .opencode/             # Session/handoff state
 ```
 
 ### Dependencies

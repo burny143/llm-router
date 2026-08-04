@@ -1,11 +1,11 @@
 {
-  "providerConfig": "ProviderConfig.csv",
-  "ultimateConfig": "UltimateConfig.csv",
-  "proxyConfig": "proxy-config.json",
-  "models": "models.csv",
-  "latestModels": "LatestModels.csv",
-  "knownOk": "known-ok.json",
-  "tokenUsage": "token-usage.json",
-  "settings": "settings.json",
-  "env": ".env"
+  "providerConfig": "data/ProviderConfig.csv",
+  "ultimateConfig": "data/UltimateConfig.csv",
+  "proxyConfig": "data/proxy-config.json",
+  "models": "data/models.csv",
+  "latestModels": "data/LatestModels.csv",
+  "knownOk": "data/known-ok.json",
+  "tokenUsage": "data/token-usage.json",
+  "settings": "data/settings.json",
+  "env": "data/.env"
 }

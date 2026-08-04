@@ -20,7 +20,7 @@ This application uses a multi-layer configuration system with clear separation o
 
 **Purpose**: Defines LLM providers, their endpoints, authentication, and model discovery settings.
 
-**Location**: `ProviderConfig.csv` (in project root)
+**Location**: `ProviderConfig.csv` (in `data/`)
 
 **Format**: CSV with 4 columns
 
@@ -61,7 +61,7 @@ Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GAT
 
 **Purpose**: Defines which specific model instances to use for proxy routing.
 
-**Location**: `UltimateConfig.csv` (in project root)
+**Location**: `UltimateConfig.csv` (in `data/`)
 
 **Format**: CSV with 5 columns
 
@@ -104,7 +104,7 @@ Mistral,https://api.mistral.ai/v1/chat/completions,MISTRAL_API_KEY,ministral-14b
 
 **Purpose**: Fast-access cache of UltimateConfig.csv in JSON format for quick reload.
 
-**Location**: `proxy-config.json` (in project root)
+**Location**: `proxy-config.json` (in `data/`)
 
 **Format**: JSON array of config entry objects
 
@@ -143,7 +143,7 @@ Mistral,https://api.mistral.ai/v1/chat/completions,MISTRAL_API_KEY,ministral-14b
 
 **Purpose**: User-selectable model list for dropdown filtering.
 
-**Location**: `models.csv` (in project root, auto-connected)
+**Location**: `models.csv` (in `data/`, auto-connected)
 
 **Format**: CSV with 2 columns
 
@@ -182,7 +182,7 @@ Vercel AI Gateway,ai-gateway-default
 
 **Purpose**: Default model list when no user model file is connected.
 
-**Location**: `models-config.js` (in project root)
+**Location**: `models-config.js` (in `src/`)
 
 **Format**: JavaScript array of provider groups
 
@@ -219,7 +219,7 @@ module.exports = [
 
 **Purpose**: Live model discovery results from each provider.
 
-**Location**: `LatestModels.csv` (in project root)
+**Location**: `LatestModels.csv` (in `data/`)
 
 **Format**: CSV with 2 columns
 
@@ -254,7 +254,7 @@ Mistral,ministral-14b-2512
 
 **Purpose**: Stores API keys for all providers.
 
-**Location**: `.env` (in project root)
+**Location**: `.env` (in `data/`)
 
 **Format**: KEY=VALUE pairs
 
@@ -434,7 +434,7 @@ npm run dev        # Node with electron
 ### Model Discovery
 ```bash
 # Manually fetch latest models from all providers
-node fetch-models.js
+node src\fetch-models.js
 
 # Alternative: Run via UI
 # Admin/Configuration Tab → Fetch All Models button
@@ -533,7 +533,7 @@ cp .env .env.backup
 ---
 
 *Last updated: 2026-08-04*
-*All configuration file paths are relative to project root*
+*All configuration file paths resolve via file-registry.json (defaults in `data/`)*
 *Configuration syntax verified using node --check*
 
 ---

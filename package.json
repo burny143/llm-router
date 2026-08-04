@@ -2,7 +2,7 @@
   "name": "llm-proxy-router",
   "version": "1.0.0",
   "description": "High-availability LLM API proxy with fallback and desktop GUI",
-  "main": "main.js",
+  "main": "src/main.js",
   "scripts": {
     "start": "electron .",
     "dev": "node start.js"
