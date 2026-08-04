@@ -19,6 +19,11 @@
       <label>Port: <input type="number" id="portInput" value="8000" min="1024" max="65535"></label>
       <button id="connectBtn">Connect</button>
       <button id="disconnectBtn" disabled>Stop</button>
+      <label>Priority model:
+        <select id="priorityModelSelect">
+          <option value="">None (auto)</option>
+        </select>
+      </label>
     </div>
     <div id="serverAddress" class="status stopped">Server stopped</div>
     <hr>
@@ -45,6 +50,9 @@
       <div class="modal-actions">
         <button id="fetchModalProceed" class="btn-danger">Proceed</button>
         <button id="fetchModalCancel">Cancel</button>
+        <div id="fetchProgressBar" class="progress-bar-container" style="display:none;">
+          <div class="progress-bar-fill"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -53,18 +61,12 @@
   <div id="config-tab" class="tab-content">
     <h2>Model Configuration</h2>
     <div class="config-controls">
-      <button id="addEntryBtn">+ Add Entry</button>
+      <button id="addEntryBtn">Add Entry</button>
       <button id="loadDefaultsBtn">Load Defaults</button>
-      <button id="clearAllBtn">Clear All</button>
       <button id="fetchModelsBtn">Fetch All Models</button>
-      <span id="configFileLabel" class="model-file-label"></span>
-      <div id="fetchProgressBar" class="progress-bar-container" style="display:none;">
-        <div class="progress-bar-fill"></div>
-      </div>
+      <button id="loadConfigFromCsvBtn">Load Config from CSV/Excel</button>
+      <button id="clearAllBtn" class="btn-danger">Clear All</button>
       <button id="saveConfigBtn" class="btn-primary">Apply Configuration</button>
-    </div>
-    <div id="configFooter" class="config-footer">
-      <span id="modelFileLabel" class="model-file-label"></span>
     </div>
     <table id="configTable">
       <thead>
@@ -80,6 +82,10 @@
       </thead>
       <tbody></tbody>
     </table>
+    <div id="configFooter" class="config-footer">
+      <span id="configFileLabel" class="model-file-label"></span>
+      <span id="modelFileLabel" class="model-file-label"></span>
+    </div>
   </div>
 
   <!-- Health Check Tab -->

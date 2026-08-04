@@ -1,12 +1,15 @@
 const express = require('express');
 const axios = require('axios');
-require('dotenv').config();
+const { getFilePath } = require('./state-store');
+require('dotenv').config({ path: getFilePath('env') });
 const { saveResults, loadUsage, saveUsage } = require('./state-store');
 
 let serverInstance = null;
 let modelEntries = [];         // All enabled entries as configured
 let knownOk = [];              // Confirmed-working entries, sorted by latency (fastest first)
 let knownFailedKeys = new Set(); // "provider::model" keys known to fail
+let totalRequests = 0;         // Total requests counter
+let priorityOverrideKey = null; // Pinned provider::model key for priority routing
 
 // Per-model token counters, keyed by "provider::model"
 let tokenUsage = loadUsage();
@@ -115,14 +118,36 @@ function sendSseResponse(res, data, entry) {
     writeChunk({ content: content.slice(i, i + CHUNK_SIZE) }, null);
   }
   writeChunk({}, 'stop');
-  if (data.usage && typeof data.usage === 'object') {
+  if (data.usage && typeof data.usage === 'object' && Object.keys(data.usage).length > 0) {
     writeChunk({}, null, { usage: data.usage });
   }
   res.write('data: [DONE]\n\n');
   res.end();
 }
 
-// Fast path (known-OK, fastest first) then parallel fallback across all entries.
+// How many candidates the parallel fallback is allowed to probe at once.
+// This exists so a cold request (no known-OK model yet) doesn't fan the
+// user's real chat message out to every configured provider simultaneously
+// -- each parallel probe is a real, billed API call, not a cheap ping.
+// Override via the MAX_PARALLEL_PROBES env var if a wider/narrower race is desired.
+const MAX_PARALLEL_PROBES = (() => {
+  const n = parseInt(process.env.MAX_PARALLEL_PROBES, 10);
+  return Number.isFinite(n) && n > 0 ? n : 3;
+})();
+
+// Try candidates in fixed-size batches, in parallel within each batch, resolving
+// on the first success. Batches run one after another, not all at once, so total
+// concurrent in-flight requests is bounded by MAX_PARALLEL_PROBES.
+async function probeInBatches(entries, ctx, batchSize) {
+  for (let i = 0; i < entries.length; i += batchSize) {
+    const batch = entries.slice(i, i + batchSize);
+    const winner = await probeParallel(batch, ctx);
+    if (winner) return winner;
+  }
+  return null;
+}
+
+// Fast path (known-OK, fastest first) then bounded-parallel fallback.
 // Returns the winning result or null when every candidate failed.
 async function findWinner(ordered, ctx) {
   // 1) Fast path: health-check confirmed working models, tried in order (fastest first).
@@ -136,9 +161,12 @@ async function findWinner(ordered, ctx) {
     }
   }
 
-  // 2) Fallback: nothing confirmed working (or all of them failed) ->
-  //    probe all candidates in parallel, fastest success wins.
-  const winner = await probeParallel(ordered, ctx);
+  // 2) Fallback: nothing confirmed working (or all of them failed) -> probe
+  //    candidates that aren't already known to fail, in small parallel
+  //    batches (capped at MAX_PARALLEL_PROBES) rather than firing the real
+  //    message at every configured model across every provider at once.
+  const untested = ordered.filter(e => !knownFailedKeys.has(keyOf(e)));
+  const winner = await probeInBatches(untested, ctx, MAX_PARALLEL_PROBES);
   if (winner) {
     console.log(`[${winner.entry.provider}/${winner.entry.model}] used for this request.`);
     return winner;
@@ -146,13 +174,22 @@ async function findWinner(ordered, ctx) {
   return null;
 }
 
-// Order candidates: known-OK (fastest first) -> untested -> known-failed
+// Order candidates: pinned priority override -> known-OK (fastest first) -> untested -> known-failed
 function orderEntries() {
   const okSpeed = new Map();
   knownOk.forEach((e, i) => okSpeed.set(keyOf(e), i));
 
+  // If a priority override is pinned but that model is no longer known-OK
+  // (e.g. it was demoted after a failed request), the pin is stale — clear
+  // it and fall back to normal ordering rather than pinning a dead/unknown entry.
+  if (priorityOverrideKey && !okSpeed.has(priorityOverrideKey)) {
+    console.log(`Priority override "${priorityOverrideKey}" is no longer known-OK; clearing pin and reverting to auto ordering.`);
+    priorityOverrideKey = null;
+  }
+
   const rank = (entry) => {
     const k = keyOf(entry);
+    if (priorityOverrideKey && k === priorityOverrideKey) return -1; // Pinned entry always first
     if (okSpeed.has(k)) return okSpeed.get(k);            // 0..n-1 fastest first
     if (knownFailedKeys.has(k)) return knownOk.length + 999; // last
     return knownOk.length;                                   // untested
@@ -162,7 +199,10 @@ function orderEntries() {
 }
 
 // Single-model probe; resolves with { entry, data, elapsed } or throws.
-async function probeOne(entry, { messages, rest }) {
+// `signal` (an AbortController.signal) lets the caller cancel this in-flight
+// request -- used by probeParallel() to stop losing requests once a winner
+// is picked, instead of letting them run to completion and keep burning quota.
+async function probeOne(entry, { messages, rest }, signal) {
   const startTime = Date.now();
   const apiKey = process.env[entry.apiKeyEnv];
   if (!apiKey) {
@@ -177,7 +217,7 @@ async function probeOne(entry, { messages, rest }) {
   // requested model must never reach the upstream. Spread rest FIRST, then
   // overwrite with the entry's model + original messages so they always win.
   const payload = { ...rest, model: entry.model, messages };
-  const response = await axios.post(entry.baseURL, payload, { headers, timeout: 30000 });
+  const response = await axios.post(entry.baseURL, payload, { headers, timeout: 30000, signal });
   const elapsed = Date.now() - startTime;
 
   // Only accept responses that actually contain usable content.
@@ -215,7 +255,8 @@ function recordUsage(entry, rawData) {
 // Try a list in order; first success returns, failures logged and demoted as they happen.
 async function probeSequential(entries, ctx) {
   for (const entry of entries) {
-    const result = await probeOne(entry, ctx).catch(() => null);
+    const controller = new AbortController();
+    const result = await probeOne(entry, ctx, controller.signal).catch(() => null);
     if (result) return result;
     learnFailure(entry); // known-OK model failed at request time -> demote it
   }
@@ -230,22 +271,30 @@ function probeParallel(entries, ctx) {
     let pending = entries.length;
     let winnerResolved = false;
     if (pending === 0) return resolve(null);
-    entries.forEach(entry => {
-      probeOne(entry, ctx).then(
+    const controllers = entries.map(() => new AbortController());
+    entries.forEach((entry, i) => {
+      probeOne(entry, ctx, controllers[i].signal).then(
         (result) => {
           // Learn from every parallel success, not just the fastest winner,
           // so future requests know all the endpoints that worked.
           learnSuccess(result.entry, result.elapsed);
           if (!winnerResolved) {
             winnerResolved = true;
+            // A winner was picked -- cancel every other in-flight probe so
+            // they don't keep running (and burning quota/cost) after their
+            // result is already discarded.
+            controllers.forEach((c, j) => { if (j !== i) c.abort(); });
             resolve(result);
           }
         },
-         () => {
-           learnFailure(entry); // mark failed so it's deprioritized next time
-           console.log(`[${entry.provider}/${entry.model}] FAILED`);
-           if (--pending === 0) resolve(null);
-         }
+        (err) => {
+          const wasCancelled = axios.isCancel(err) || err?.code === 'ERR_CANCELED' || err?.name === 'CanceledError';
+          if (!wasCancelled) {
+            learnFailure(entry); // mark failed so it's deprioritized next time
+            console.log(`[${entry.provider}/${entry.model}] FAILED`);
+          }
+          if (--pending === 0 && !winnerResolved) resolve(null);
+        }
       );
     });
   });
@@ -265,6 +314,8 @@ function startProxy(port, entries) {
       // unknown model string / stream options).
       const { messages, stream, model: _clientModel, stream_options, ...rest } = req.body;
 
+      totalRequests++; // Increment total requests counter
+
       const ordered = orderEntries();
       if (ordered.length === 0) {
         return res.status(502).json({ error: 'No models configured.' });
@@ -282,8 +333,29 @@ function startProxy(port, entries) {
       return res.json(winner.data);
     });
 
-    serverInstance = app.listen(port, () => {
-      console.log(`Proxy running at http://localhost:${port}/`);
+    // Bind the port and wait for a definitive outcome (either 'listening' or
+    // 'error') before resolving/rejecting. Attaching the 'error' listener
+    // synchronously, before yielding control, means a bind failure (e.g.
+    // EADDRINUSE from clicking Connect twice, or the port already being used
+    // by another app) is caught here instead of throwing an unhandled 'error'
+    // event that crashes the entire Electron main process.
+    await new Promise((resolve, reject) => {
+      const server = app.listen(port);
+
+      server.once('error', (err) => {
+        serverInstance = null;
+        if (err && err.code === 'EADDRINUSE') {
+          reject(new Error(`Port already in use: ${port}`));
+        } else {
+          reject(err instanceof Error ? err : new Error(String(err)));
+        }
+      });
+
+      server.once('listening', () => {
+        serverInstance = server;
+        console.log(`Proxy running at http://localhost:${port}/`);
+        resolve();
+      });
     });
   })();
 }
@@ -328,9 +400,23 @@ function getKnownOk() {
   return knownOk.map(e => ({ provider: e.provider, model: e.model, latency: e.latency }));
 }
 
+function setPriorityOverride(entryKey) {
+  priorityOverrideKey = entryKey;
+  console.log(`Priority override set to: ${entryKey || 'None (auto)'}`);
+}
+
+function getProxyStats() {
+  return {
+    running: isProxyRunning(),
+    activeModelCount: modelEntries.length,
+    knownOkCount: knownOk.length,
+    totalRequests: totalRequests
+  };
+}
+
 function getTokenUsage() {
   // Return as a sorted array (most total tokens first) for clean display
   return Object.values(tokenUsage).sort((a, b) => b.totalTokens - a.totalTokens);
 }
 
-module.exports = { startProxy, stopProxy, isProxyRunning, setHealthResults, getKnownOk, getTokenUsage, extractContent };
+module.exports = { startProxy, stopProxy, isProxyRunning, setHealthResults, getKnownOk, setPriorityOverride, getProxyStats, getTokenUsage, extractContent };

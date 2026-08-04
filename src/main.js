@@ -4,8 +4,9 @@ const fs = require('fs');
 const { exec } = require('child_process');
 const axios = require('axios');
 
-const { startProxy, stopProxy, isProxyRunning, setHealthResults, extractContent, getTokenUsage } = require('./proxy-server');
+const { startProxy, stopProxy, isProxyRunning, setHealthResults, extractContent, getTokenUsage, getProxyStats, getKnownOk, setPriorityOverride } = require('./proxy-server');
 const { saveResults, loadResults, saveSettings, loadSettings, saveConfigBoth, syncConfigFromCsv, pruneConfigEntries, loadProviderConfig, CONFIG_CSV, PROVIDER_CONFIG_CSV, getFilePath } = require('./state-store');
+const { IPC_CHANNELS } = require('./shared-constants');
 require('dotenv').config({ path: getFilePath('env') }); // Load .env (path from file-registry.json) so process.env has the API keys
 
 let mainWindow;
@@ -15,6 +16,7 @@ let availableProviderModels = {}; // Map: provider -> models[] from model-list f
 let latestProviderModels = {}; // Map: provider -> models[] from LatestModels.csv (primary)
 let modelsFile = '';         // Path of the connected model-list file (auto-loaded like .env)
 let configEntries = [];      // Proxy entries from the connected config file (source of truth)
+let pendingConfigReady = null; // Queued config-ready payload, flushed once the renderer has finished loading
 
 function loadHealthResults() {
   const saved = loadResults();
@@ -43,7 +45,7 @@ function forwardLogsToRenderer() {
         if (a instanceof Error) return a.stack || a.message;
         try { return JSON.stringify(a); } catch { return String(a); }
       }).join(' ');
-      sendToRenderer('dev-log', { level, text, time: new Date().toLocaleTimeString() });
+      sendToRenderer(IPC_CHANNELS.DEV_LOG, { level, text, time: new Date().toLocaleTimeString() });
     };
   });
 }
@@ -55,15 +57,48 @@ function createWindow() {
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      // Explicitly disabled: Electron 20+ defaults `sandbox` to true when
+      // unset, which restricts preload.js's require() to a small whitelist
+      // of built-ins (electron, events, timers, url, ...). That silently
+      // breaks `require('./shared-constants')` with
+      // "Error: module not found: ./shared-constants" thrown by the
+      // sandboxed preloadRequire shim, which in turn means
+      // contextBridge.exposeInMainWorld never runs and window.api is never
+      // defined in the renderer. contextIsolation:true is kept as the real
+      // security boundary between preload and page content.
+      sandbox: false
     }
   });
 
   mainWindow.loadFile(path.join(__dirname, 'index.html'));
+
+  // The renderer's onConfigReady listener isn't guaranteed to be registered
+  // until the page has actually finished loading, even though `mainWindow`
+  // itself exists synchronously. Flush anything queued via queueConfigReady()
+  // once the page is ready, so we never fire config-ready into a listener
+  // that isn't there yet.
+  mainWindow.webContents.once('did-finish-load', () => {
+    if (pendingConfigReady) {
+      sendToRenderer(IPC_CHANNELS.CONFIG_READY, pendingConfigReady);
+      pendingConfigReady = null;
+    }
+  });
+}
+
+// Queue a config-ready payload for delivery once the renderer has finished loading.
+// Use this instead of calling sendToRenderer(IPC_CHANNELS.CONFIG_READY, ...) directly.
+function queueConfigReady(payload) {
+  pendingConfigReady = payload;
+  // If the page already finished loading by the time this is called, flush immediately.
+  if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.webContents.isLoading()) {
+    sendToRenderer(IPC_CHANNELS.CONFIG_READY, pendingConfigReady);
+    pendingConfigReady = null;
+  }
 }
 
 // IPC handlers for proxy control
-ipcMain.handle('start-proxy', async (event, port, entries) => {
+ipcMain.handle(IPC_CHANNELS.START_PROXY, async (event, port, entries) => {
   try {
     await startProxy(port, entries);
     return { success: true };
@@ -72,23 +107,35 @@ ipcMain.handle('start-proxy', async (event, port, entries) => {
   }
 });
 
-ipcMain.handle('stop-proxy', () => {
+ipcMain.handle(IPC_CHANNELS.STOP_PROXY, () => {
   stopProxy();
   return { success: true };
 });
 
-ipcMain.handle('is-proxy-running', () => {
+ipcMain.handle(IPC_CHANNELS.IS_PROXY_RUNNING, () => {
   return isProxyRunning();
 });
 
 // Return the default models configuration (from models-config.js)
-ipcMain.handle('get-default-config', () => {
+ipcMain.handle(IPC_CHANNELS.GET_DEFAULT_CONFIG, () => {
   const defaultConfig = require('./models-config');
   return defaultConfig;
 });
 
+// Canonical default basenames for the data files (LatestModels.csv, ProviderConfig.csv,
+// UltimateConfig.csv, ...), resolved from state-store.js's file registry/defaults —
+// the single source of truth. The renderer calls this once on startup so its fallback
+// labels are never hardcoded literals that could go stale if a filename changes here.
+ipcMain.handle(IPC_CHANNELS.GET_DEFAULT_FILE_NAMES, () => {
+  return {
+    latestModelsFileName: path.basename(getFilePath('latestModels')),
+    providerConfigFileName: path.basename(getFilePath('providerConfig')),
+    ultimateConfigFileName: path.basename(getFilePath('ultimateConfig'))
+  };
+});
+
 // Get available environment variables from .env file
-ipcMain.handle('get-env-vars', () => {
+ipcMain.handle(IPC_CHANNELS.GET_ENV_VARS, () => {
   const envPath = getFilePath('env');
   const envVars = [];
 
@@ -135,9 +182,9 @@ function loadLatestModels() {
     }
     latestProviderModels = providerModels;
     const totalModels = Object.values(providerModels).reduce((sum, arr) => sum + arr.length, 0);
-    console.log(`Loaded LatestModels.csv: ${Object.keys(providerModels).length} provider(s), ${totalModels} model(s)`);
+    console.log(`Loaded ${path.basename(getFilePath('latestModels'))}: ${Object.keys(providerModels).length} provider(s), ${totalModels} model(s)`);
   } catch (err) {
-    console.warn('Could not load LatestModels.csv:', err.message);
+    console.warn(`Could not load ${path.basename(getFilePath('latestModels'))}:`, err.message);
   }
 }
 
@@ -186,45 +233,17 @@ function autoConnectModelFile() {
   }
 }
 
-// Parse CSV file and extract model names
-ipcMain.handle('parse-csv-file', async (event, filePath) => {
-  const csv = require('csv-parser');
-  return new Promise((resolve, reject) => {
-    const results = [];
-    fs.createReadStream(filePath)
-      .pipe(csv())
-      .on('data', (data) => results.push(data))
-      .on('end', () => {
-        const { models, providers } = connectModelFile(filePath, results);
-        resolve({ success: true, models, providers, rowCount: results.length });
-      })
-      .on('error', (err) => reject({ success: false, error: err.message }));
-  });
-});
-
-// Parse Excel file and extract model names
-ipcMain.handle('parse-excel-file', async (event, filePath) => {
-  const XLSX = require('xlsx');
-  try {
-    const workbook = XLSX.readFile(filePath);
-    const sheetName = workbook.SheetNames[0];
-    const worksheet = workbook.Sheets[sheetName];
-    const rows = XLSX.utils.sheet_to_json(worksheet);
-    const { models, providers } = connectModelFile(filePath, rows);
-    return { success: true, models, providers, rowCount: rows.length };
-  } catch (err) {
-    return { success: false, error: err.message };
-  }
-});
-
 // Get the currently connected model list (models + providers + provider-to-model map + source file)
-ipcMain.handle('get-connected-model-list', () => {
+ipcMain.handle(IPC_CHANNELS.GET_CONNECTED_MODEL_LIST, () => {
   return {
     models: availableModels,
     providers: availableProviders,
     providerModels: availableProviderModels,
     latestProviderModels: latestProviderModels,
-    file: modelsFile
+    file: modelsFile,
+    // Basenames so the renderer can build display strings without hardcoding filenames.
+    latestModelsFileName: path.basename(getFilePath('latestModels')),
+    providerConfigFileName: path.basename(PROVIDER_CONFIG_CSV)
   };
 });
 
@@ -233,9 +252,12 @@ ipcMain.handle('get-connected-model-list', () => {
 
 // Build model lists for each provider from ProviderConfig.csv
 // Uses live model sources (LatestModels.csv, connected model-list) before fallback to models-config.js
-async function buildModelListsForProviders(providerMap) {
+function buildModelListsForProviders(providerMap) {
   const modelLists = [];
-  
+  // Priority 3 fallback catalog — hoisted out of the loop since require()
+  // is cached anyway and re-requiring on every iteration was sloppy.
+  const defaultConfig = require('./models-config');
+
   for (const [provider, info] of Object.entries(providerMap)) {
     const modelSet = new Set();
     
@@ -250,7 +272,6 @@ async function buildModelListsForProviders(providerMap) {
     }
     
     // Priority 3: Fallback to models-config.js (hardcoded catalog)
-    const defaultConfig = require('./models-config');
     const defaultModels = defaultConfig
       .filter(group => group.provider === provider)
       .map(group => group.models)
@@ -282,102 +303,48 @@ async function autoConnectConfigFile() {
     // Load existing config and prune orphaned providers
     let entries = syncConfigFromCsv();
     const providerMap = loadProviderConfig();
-    entries = pruneConfigEntries(entries, providerMap);
+    const result = pruneConfigEntries(entries, providerMap);
+    entries = result.pruned;
+    const changed = result.changed;
     configEntries = entries;
     
     // Persist pruned config if any entries were dropped
-    if (entries.length < Object.values(providerMap || {}).length * 3) {
+    if (changed) {
       saveConfigBoth(entries);
     }
-    console.log(`Loaded existing config: ${configEntries.length} entries (pruned to match ProviderConfig.csv).`);
+    console.log(`Loaded existing config: ${configEntries.length} entries (pruned to match ${path.basename(PROVIDER_CONFIG_CSV)}).`);
+    // Notify renderer here too — previously this branch never sent config-ready,
+    // so the renderer had no way to know the existing config had loaded.
+    queueConfigReady({ entries: configEntries });
   } else {
     // Generate from ProviderConfig.csv (first-time setup)
     const providerMap = loadProviderConfig();
     const modelLists = await buildModelListsForProviders(providerMap);
     configEntries = modelLists;
     saveConfigBoth(configEntries);
-    console.log(`Generated config: ${configEntries.length} entries (created from ProviderConfig.csv).`);
-    
-    // Notify renderer that config is ready
-    sendToRenderer('config-ready', { entries: configEntries });
+    console.log(`Generated config: ${configEntries.length} entries (created from ${path.basename(PROVIDER_CONFIG_CSV)}).`);
+
+    // Notify renderer that config is ready (queued until the page has finished loading)
+    queueConfigReady({ entries: configEntries });
   }
 }
 
 // Load config entries from the connected config file
-ipcMain.handle('get-connected-config', () => {
-  return { entries: configEntries, file: CONFIG_CSV };
+ipcMain.handle(IPC_CHANNELS.GET_CONNECTED_CONFIG, () => {
+  return { entries: configEntries, file: CONFIG_CSV, fileName: path.basename(CONFIG_CSV) };
 });
 
 // Load provider configuration (provider -> baseURL, apiKeyEnv from ProviderConfig.csv)
-ipcMain.handle('get-provider-config', () => {
+ipcMain.handle(IPC_CHANNELS.GET_PROVIDER_CONFIG, () => {
   return loadProviderConfig();
 });
 
-// Save provider configuration to ProviderConfig.csv
-ipcMain.handle('save-provider-config', async (event, providerConfig) => {
-  try {
-    // Parse existing ProviderConfig.csv
-    const csvText = fs.readFileSync(PROVIDER_CONFIG_CSV, 'utf-8');
-    const lines = csvText.trim().split(/\r?\n/);
-    const headers = lines[0].split(',');
-    const rows = lines.slice(1).map(line => {
-      const cols = line.split(',');
-      const obj = {};
-      headers.forEach((header, idx) => {
-        obj[header.trim()] = (cols[idx] || '').trim();
-      });
-      return obj;
-    });
-    
-    // Update or add provider entries
-    providerConfig.forEach(newProvider => {
-      const existingIndex = rows.findIndex(r => r.provider === newProvider.provider);
-      if (existingIndex >= 0) {
-        // Update existing
-        rows[existingIndex] = {
-          provider: newProvider.provider,
-          baseURL: newProvider.baseURL || '',
-          apiKeyEnv: newProvider.apiKeyEnv || '',
-          modelsEndpoint: newProvider.modelsEndpoint || ''
-        };
-      } else {
-        // Add new
-        rows.push({
-          provider: newProvider.provider,
-          baseURL: newProvider.baseURL || '',
-          apiKeyEnv: newProvider.apiKeyEnv || '',
-          modelsEndpoint: newProvider.modelsEndpoint || ''
-        });
-      }
-    });
-    
-    // Write back to ProviderConfig.csv
-    const outputLines = ['provider,baseURL,apiKeyEnv,modelsEndpoint'];
-    rows.forEach(row => {
-      const line = [
-        row.provider,
-        row.baseURL,
-        row.apiKeyEnv,
-        row.modelsEndpoint
-      ].join(',');
-      outputLines.push(line);
-    });
-    
-    fs.writeFileSync(PROVIDER_CONFIG_CSV, outputLines.join('\n'), 'utf-8');
-    console.log(`Provider config saved: ${providerConfig.length} provider(s) to ProviderConfig.csv`);
-    return { success: true };
-  } catch (err) {
-    console.warn('Could not save provider config:', err.message);
-    return { success: false, error: err.message };
-  }
-});
-
 // Save current config entries to UltimateConfig.csv (and regenerate proxy-config.json)
-ipcMain.handle('save-config', async (event, entries) => {
+ipcMain.handle(IPC_CHANNELS.SAVE_CONFIG, async (event, entries) => {
   try {
     saveConfigBoth(entries);
     configEntries = entries;
-    console.log(`Config saved: ${entries.length} entries (UltimateConfig.csv + proxy-config.json updated).`);
+    console.log(`Config saved: ${entries.length} entries (${path.basename(getFilePath('ultimateConfig'))} + proxy-config.json updated).`);
     return { success: true };
   } catch (err) {
     return { success: false, error: err.message };
@@ -385,7 +352,7 @@ ipcMain.handle('save-config', async (event, entries) => {
 });
 
 // Open file dialog to select config file (optional - for manual override)
-ipcMain.handle('open-config-file-dialog', async () => {
+ipcMain.handle(IPC_CHANNELS.OPEN_CONFIG_FILE_DIALOG, async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
     title: 'Select Proxy Config File (CSV or Excel)',
     filters: [
@@ -402,7 +369,7 @@ ipcMain.handle('open-config-file-dialog', async () => {
 });
 
 // Parse CSV config file (provider,baseURL,apiKeyEnv,model,enabled)
-ipcMain.handle('parse-config-csv-file', async (event, filePath) => {
+ipcMain.handle(IPC_CHANNELS.PARSE_CONFIG_CSV_FILE, async (event, filePath) => {
   const csv = require('csv-parser');
   return new Promise((resolve, reject) => {
     const results = [];
@@ -424,7 +391,7 @@ ipcMain.handle('parse-config-csv-file', async (event, filePath) => {
 });
 
 // Parse Excel config file
-ipcMain.handle('parse-config-excel-file', async (event, filePath) => {
+ipcMain.handle(IPC_CHANNELS.PARSE_CONFIG_EXCEL_FILE, async (event, filePath) => {
   const XLSX = require('xlsx');
   try {
     const workbook = XLSX.readFile(filePath);
@@ -445,7 +412,7 @@ ipcMain.handle('parse-config-excel-file', async (event, filePath) => {
 });
 
 // Run fetch-models.js to update LatestModels.csv from ProviderConfig.csv
-ipcMain.handle('run-fetch-models', async () => {
+ipcMain.handle(IPC_CHANNELS.RUN_FETCH_MODELS, async () => {
   return new Promise((resolve) => {
     exec('node fetch-models.js', { cwd: __dirname }, (error, stdout, stderr) => {
       if (error) {
@@ -461,6 +428,10 @@ ipcMain.handle('run-fetch-models', async () => {
         for (let i = 1; i < lines.length; i++) {
           const cols = lines[i].split(',');
           if (cols.length >= 2 && cols[0] && cols[1]) {
+            // Skip error entries (e.g. "ERROR: too many requests") so they
+            // never get persisted into configEntries / UltimateConfig.csv /
+            // proxy-config.json as if they were real model names.
+            if (cols[1].startsWith('ERROR:')) continue;
             entries.push({ provider: cols[0], model: cols[1] });
           }
         }
@@ -473,23 +444,43 @@ ipcMain.handle('run-fetch-models', async () => {
   });
 });
 
+// Return the current set of known-OK endpoints (provider/model/latency) for the priority dropdown
+ipcMain.handle(IPC_CHANNELS.GET_KNOWN_OK, () => {
+  return getKnownOk();
+});
+
+// Set (or clear, with null/undefined) the pinned provider/model priority override
+ipcMain.handle(IPC_CHANNELS.SET_PRIORITY_OVERRIDE, (event, providerModelKey) => {
+  try {
+    setPriorityOverride(providerModelKey || null);
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+});
+
 // Token usage report per provider/model
-ipcMain.handle('get-token-usage', () => {
+ipcMain.handle(IPC_CHANNELS.GET_TOKEN_USAGE, () => {
   return getTokenUsage();
 });
 
+// Live proxy stats: request count + connected clients
+ipcMain.handle(IPC_CHANNELS.GET_PROXY_STATS, () => {
+  return getProxyStats();
+});
+
 // Health check: ping all enabled models (in parallel)
-ipcMain.handle('health-check', async (event, entries) => {
+ipcMain.handle(IPC_CHANNELS.HEALTH_CHECK, async (event, entries) => {
   console.log(`Health check: pinging ${entries.length} enabled model(s)...`);
 
   const checkOne = async (entry) => {
+    const startTime = Date.now();
     const apiKey = process.env[entry.apiKeyEnv];
     if (!apiKey) {
       console.log(`  [SKIP] ${entry.provider}/${entry.model} — No API key`);
-      return { provider: entry.provider, model: entry.model, status: 'Failed', reason: 'No API key' };
+      return { provider: entry.provider, model: entry.model, status: 'Failed', reason: 'No API key', latency: Date.now() - startTime };
     }
 
-    const startTime = Date.now();
     try {
       const payload = {
         model: entry.model,
@@ -525,25 +516,8 @@ ipcMain.handle('health-check', async (event, entries) => {
   return results;
 });
 
-// Open file dialog to select CSV/Excel file
-ipcMain.handle('open-model-file-dialog', async () => {
-  const result = await dialog.showOpenDialog(mainWindow, {
-    title: 'Select Model List File (CSV or Excel)',
-    filters: [
-      { name: 'CSV Files', extensions: ['csv'] },
-      { name: 'Excel Files', extensions: ['xlsx', 'xls'] },
-      { name: 'All Files', extensions: ['*'] }
-    ],
-    properties: ['openFile']
-  });
-  if (result.canceled || result.filePaths.length === 0) {
-    return { canceled: true };
-  }
-  return { canceled: false, filePath: result.filePaths[0] };
-});
-
 function extractModelsFromRows(rows) {
-  if (!rows || rows.length === 0) return [];
+  if (!rows || rows.length === 0) return { models: [], providers: [], providerModels: {} };
 
   // Get all column names from the first row
   const columns = Object.keys(rows[0]);
@@ -604,8 +578,8 @@ app.whenReady().then(async () => {
   loadHealthResults();
   loadLatestModels();
   autoConnectModelFile();
-  await autoConnectConfigFile();
   createWindow();
+  await autoConnectConfigFile();
 });
 
 app.on('window-all-closed', () => {

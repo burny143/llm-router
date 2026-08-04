@@ -19,7 +19,8 @@ const DEFAULT_PATHS = {
   knownOk: 'data/known-ok.json',
   tokenUsage: 'data/token-usage.json',
   settings: 'data/settings.json',
-  env: 'data/.env'
+  env: 'data/.env',
+  providerFlags: 'data/provider-flags.json'
 };
 
 let fileRegistry = {};
@@ -90,11 +91,25 @@ function parseCsvWithFilter(text, requiredCol) {
   return rows.filter(o => o[requiredCol]);
 }
 
-// Convert config entries to CSV string
+// Convert config entries to CSV string with proper escaping
 function configToCsv(entries) {
   const lines = ['provider,baseURL,apiKeyEnv,model,enabled'];
   entries.forEach(e => {
-    lines.push([e.provider, e.baseURL, e.apiKeyEnv, e.model, e.enabled ? 'true' : 'false'].join(','));
+    const escape = (value) => {
+      if (value == null) return '';
+      const str = String(value);
+      if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+        return `"${str.replace(/"/g, '""')}"`;
+      }
+      return str;
+    };
+    lines.push([
+      escape(e.provider),
+      escape(e.baseURL),
+      escape(e.apiKeyEnv),
+      escape(e.model),
+      e.enabled ? 'true' : 'false'
+    ].join(','));
   });
   return lines.join('\n');
 }
@@ -130,15 +145,18 @@ function saveConfigBoth(entries) {
 // (the single source of truth for available providers). Persists the pruned
 // list back to BOTH UltimateConfig.csv and proxy-config.json so a provider
 // deleted from ProviderConfig.csv cascades cleanly on the next startup.
-// Returns the pruned entries.
+// Returns { pruned: [], changed: boolean } where changed indicates if any entries were removed.
 function pruneConfigEntries(entries, providerMap) {
-  if (!providerMap || Object.keys(providerMap).length === 0) return entries;
+  if (!providerMap || Object.keys(providerMap).length === 0) {
+    return { pruned: entries, changed: false };
+  }
   const pruned = entries.filter(e => providerMap[e.provider]);
-  if (pruned.length !== entries.length) {
-    console.warn(`ProviderConfig.csv: pruning ${entries.length - pruned.length} config entr(ies) for providers no longer present.`);
+  const changed = pruned.length !== entries.length;
+  if (changed) {
+    console.warn(`${path.basename(PROVIDER_CONFIG_CSV)}: pruning ${entries.length - pruned.length} config entr(ies) for providers no longer present.`);
     saveConfigBoth(pruned);
   }
-  return pruned;
+  return { pruned, changed };
 }
 
 // Persist/load app settings (e.g. the last-used model list file, like .env auto-loading)
@@ -250,4 +268,4 @@ function loadUsage() {
   return {};
 }
 
-module.exports = { STATE_FILE, saveResults, loadResults, saveUsage, loadUsage, saveSettings, loadSettings, saveConfig, loadConfig, saveConfigBoth, syncConfigFromCsv, pruneConfigEntries, loadProviderConfig, CONFIG_FILE, CONFIG_CSV, PROVIDER_CONFIG_CSV, getFilePath };
+module.exports = { saveResults, loadResults, saveUsage, loadUsage, saveSettings, loadSettings, saveConfig, loadConfig, saveConfigBoth, syncConfigFromCsv, pruneConfigEntries, loadProviderConfig, CONFIG_CSV, PROVIDER_CONFIG_CSV, getFilePath, parseCsv, DEFAULT_PATHS };

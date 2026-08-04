@@ -1,29 +1,35 @@
 const { contextBridge, ipcRenderer } = require('electron');
+const { IPC_CHANNELS, LOG_MARKERS } = require('./shared-constants');
 
 contextBridge.exposeInMainWorld('api', {
-  startProxy: (port, entries) => ipcRenderer.invoke('start-proxy', port, entries),
-  stopProxy: () => ipcRenderer.invoke('stop-proxy'),
-  isProxyRunning: () => ipcRenderer.invoke('is-proxy-running'),
-  healthCheck: (entries) => ipcRenderer.invoke('health-check', entries),
-  getDefaultConfig: () => ipcRenderer.invoke('get-default-config'),
-  getEnvVars: () => ipcRenderer.invoke('get-env-vars'),
-  getConnectedModelList: () => ipcRenderer.invoke('get-connected-model-list'),
-  getConnectedConfig: () => ipcRenderer.invoke('get-connected-config'),
-  getProviderConfig: () => ipcRenderer.invoke('get-provider-config'),
-  saveConfig: (entries) => ipcRenderer.invoke('save-config', entries),
-  openConfigFileDialog: () => ipcRenderer.invoke('open-config-file-dialog'),
-  parseConfigCsvFile: (filePath) => ipcRenderer.invoke('parse-config-csv-file', filePath),
-  parseConfigExcelFile: (filePath) => ipcRenderer.invoke('parse-config-excel-file', filePath),
-  getTokenUsage: () => ipcRenderer.invoke('get-token-usage'),
-  runFetchModels: () => ipcRenderer.invoke('run-fetch-models'),
+  startProxy: (port, entries) => ipcRenderer.invoke(IPC_CHANNELS.START_PROXY, port, entries),
+  stopProxy: () => ipcRenderer.invoke(IPC_CHANNELS.STOP_PROXY),
+  isProxyRunning: () => ipcRenderer.invoke(IPC_CHANNELS.IS_PROXY_RUNNING),
+  healthCheck: (entries) => ipcRenderer.invoke(IPC_CHANNELS.HEALTH_CHECK, entries),
+  getDefaultConfig: () => ipcRenderer.invoke(IPC_CHANNELS.GET_DEFAULT_CONFIG),
+  getDefaultFileNames: () => ipcRenderer.invoke(IPC_CHANNELS.GET_DEFAULT_FILE_NAMES),
+  getEnvVars: () => ipcRenderer.invoke(IPC_CHANNELS.GET_ENV_VARS),
+  getConnectedModelList: () => ipcRenderer.invoke(IPC_CHANNELS.GET_CONNECTED_MODEL_LIST),
+  getConnectedConfig: () => ipcRenderer.invoke(IPC_CHANNELS.GET_CONNECTED_CONFIG),
+  getProviderConfig: () => ipcRenderer.invoke(IPC_CHANNELS.GET_PROVIDER_CONFIG),
+  saveConfig: (entries) => ipcRenderer.invoke(IPC_CHANNELS.SAVE_CONFIG, entries),
+  openConfigFileDialog: () => ipcRenderer.invoke(IPC_CHANNELS.OPEN_CONFIG_FILE_DIALOG),
+  parseConfigCsvFile: (filePath) => ipcRenderer.invoke(IPC_CHANNELS.PARSE_CONFIG_CSV_FILE, filePath),
+  parseConfigExcelFile: (filePath) => ipcRenderer.invoke(IPC_CHANNELS.PARSE_CONFIG_EXCEL_FILE, filePath),
+  getTokenUsage: () => ipcRenderer.invoke(IPC_CHANNELS.GET_TOKEN_USAGE),
+  getProxyStats: () => ipcRenderer.invoke(IPC_CHANNELS.GET_PROXY_STATS),
+  runFetchModels: () => ipcRenderer.invoke(IPC_CHANNELS.RUN_FETCH_MODELS),
+  getKnownOk: () => ipcRenderer.invoke(IPC_CHANNELS.GET_KNOWN_OK),
+  setPriorityOverride: (key) => ipcRenderer.invoke(IPC_CHANNELS.SET_PRIORITY_OVERRIDE, key),
+  logSuccessMarker: LOG_MARKERS.SUCCESS,
   onDevLog: (callback) => {
     const handler = (_event, data) => callback(data);
-    ipcRenderer.on('dev-log', handler);
-    return () => ipcRenderer.removeListener('dev-log', handler);
+    ipcRenderer.on(IPC_CHANNELS.DEV_LOG, handler);
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.DEV_LOG, handler);
   },
   onConfigReady: (callback) => {
     const handler = (_event, data) => callback(data);
-    ipcRenderer.on('config-ready', handler);
-    return () => ipcRenderer.removeListener('config-ready', handler);
+    ipcRenderer.on(IPC_CHANNELS.CONFIG_READY, handler);
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.CONFIG_READY, handler);
   }
 });

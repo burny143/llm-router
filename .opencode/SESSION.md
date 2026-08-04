@@ -1,18 +1,20 @@
 # Active Session State
 
-- **Goal:** Reorganize project into folders + push to GitHub. COMPLETE.
-- **Status:** Complete
+- **Goal:** Connect the LLM proxy (localhost:8000) so opencode can use it as a provider.
+- **Status:** In Progress (Electron app running, proxy needs to be started from GUI)
 - **Completed:**
-  - Git repo initialized (`main` branch, remote `origin` = https://github.com/burny143/llm-router.git, pushed).
-  - `.gitignore` created BEFORE first commit — protects `.env`, `node_modules/`, runtime data (proxy-config.json, models.csv, LatestModels.csv, known-ok.json, token-usage.json, settings.json), `archive/`.
-  - Baseline commit `90d0e30` (flat layout safety net, 26 files).
-  - Reorg commit `d6625bf`: `src/` (all app code incl. index.html/style.css/renderer.js together), `data/` (all data files), `samples/`, `docs/` (README/APP/AI_REFERENCE/CONFIG_REFERENCE/AGENTS).
-  - Code path updates for the move: `package.json "main"` → `src/main.js`; `state-store.getFilePath` resolves relative against PROJECT_ROOT (`../`) and registry defaults now point into `data/`; `file-registry.json` paths → `data/…`; `main.js loadFile` → `path.join(__dirname,'index.html')`; `start.js` resolves project root explicitly; `data/settings.json` modelsFile updated to `data\models.csv`.
-  - Docs updated with new layout (README structure tree, file maps, `node src\fetch-models.js`, "in `data/`" locations).
-  - Verified: all `node --check` pass; Electron launches clean both via direct electron and via `node src/start.js`; paths resolve into `data/`.
-- **Current Step:** None — done.
-- **Next Step:** None.
+  - Root cause 1 (streaming): opencode has NO provider-level toggle to disable streaming (confirmed via schema `opencode.ai/config.json` — only a stream timeout option), and the proxy rejected `stream:true` with HTTP 400. Fixed the proxy instead: `src/proxy-server.js` now serves `stream:true` as OpenAI-style SSE (32-char delta chunks, `finish_reason: "stop"`, usage chunk, `[DONE]`). Upstream probing stays buffered so known-OK fast path + parallel fallback routing is preserved (`findWinner()` helper extracted). Verified with mock-upstream harness: reassembled content byte-identical, `[DONE]` present, usage chunk present. (commit `c101710`)
+  - Root cause 2 (502 "All configured models failed"): handler only destructured `messages`+`stream` out of the body, so the client's `model` stayed in `rest`, and `probeOne` built `{ model: entry.model, messages, ...rest }` — rest spread LAST overrode `entry.model`. Every upstream got `model: "router"` (opencode's id) and rejected it → all failed → 502. Fixed: probe payload now `{ ...rest, model: entry.model, messages }` (entry model always wins) and handler strips `model`/`stream`/`stream_options` from rest; legit params (temperature, messages) still forwarded. Verified with echo harness: upstream receives `real-entry-model-v7`, no stream/stream_options leak. (commit `dbf81f7`)
+  - Added provider to `C:\Users\THINKPAD\.config\opencode\opencode.json` (`llm-router`: `@ai-sdk/openai-compatible`, baseURL `http://localhost:8000/v1`, dummy apiKey, `models.router`). JSON validates.
+  - Docs updated: `docs/README.md` streaming line + roadmap checkbox.
+  - Electron app started (restored 36 known-OK endpoints, loaded config).
+- **Current Step:** Start proxy from GUI (click "Start Proxy" button), then restart opencode, then select `llm-router / Router (auto)` and test chat.
+- **Next Step:** User clicks "Start Proxy" in the Electron app → proxy runs on port 8000 → restart opencode → verify chat works.
 - **Blockers/Notes:**
-  - `.env` (real API keys) + runtime data are gitignored — confirmed not in any commit.
-  - No test suite — verification = `node --check` + launch.
-  - `node_modules` present locally but gitignored.
+  - Electron app on port 8000 was running old code; restart required (no hot reload). opencode config also loaded once at startup — restart opencode too.
+  - `data/UltimateConfig.csv` has a dirty working-tree diff from the user's OWN live app edits (model list reordering) — NOT mine; left untouched, don't stage it.
+  - Commits `c101710` + `dbf81f7` are LOCAL (not pushed) — push on request.
+  - `.env` (real keys) + runtime data gitignored — unchanged.
+  - Proxy is NOT auto-started; must click "Start Proxy" in the GUI.
+
+(End of file - total 19 lines)

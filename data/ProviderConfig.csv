@@ -11,3 +11,6 @@ Cohere,https://api.cohere.com/v1/chat,COHERE_API_KEY,https://api.cohere.com/v1/m
 Fireworks,https://api.fireworks.ai/inference/v1/chat/completions,FIREWORKS_API_KEY,https://api.fireworks.ai/inference/v1/models
 Command,https://api.commandcode.ai/provider/v1/chat/completions,COMMAND_API_KEY,https://api.commandcode.ai/provider/v1/models
 Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,https://ai-gateway.vercel.sh/v1/models
+Refiant,https://api.refiant.ai/v1/chat/completions,REFIANT_API_KEY,https://api.refiant.ai/v1/models
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,https://api.deepinfra.com/v1/openai/models
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,https://gen.pollinations.ai/v1/models

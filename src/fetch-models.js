@@ -12,24 +12,58 @@
  */
 
 const fs = require('fs');
+const path = require('path');
 const axios = require('axios');
-const { getFilePath } = require('./state-store');
+const { getFilePath, parseCsv } = require('./state-store');
 require('dotenv').config({ path: getFilePath('env') });
 
-// Read ProviderConfig.csv (path from file-registry.json)
+// Read ProviderConfig.csv (path from file-registry.json) using the shared
+// quote-aware parser from state-store.js, so a baseURL/modelsEndpoint value
+// containing a comma (e.g. a URL with query parameters) no longer corrupts
+// column alignment the way naive line.split(',') did.
 const csvText = fs.readFileSync(getFilePath('providerConfig'), 'utf-8');
-const lines = csvText.trim().split(/\r?\n/);
+const parsedRows = parseCsv(csvText);
 
-// Parse CSV (comma-separated)
-const rows = lines.map(line => {
-    const cols = line.split(',');
+// Detect whether ProviderConfig.csv itself carries a "stripPrefix" column
+// (data-driven, no hardcoded provider names), matching by header name
+// case-insensitively since parseCsv keys are the raw (trimmed) header text.
+const stripPrefixKey = parsedRows.length > 0
+    ? Object.keys(parsedRows[0]).find(k => k.toLowerCase() === 'stripprefix')
+    : null;
+const hasStripPrefixColumn = !!stripPrefixKey;
+
+// Fallback data file: { "Provider Name": true, ... }. Missing/unreadable ->
+// empty map, meaning "strip nothing" (safe default, matches prior behavior
+// only for providers that opt in).
+let providerFlags = {};
+if (!hasStripPrefixColumn) {
+    try {
+        const flagsPath = getFilePath('providerFlags');
+        if (fs.existsSync(flagsPath)) {
+            providerFlags = JSON.parse(fs.readFileSync(flagsPath, 'utf-8')) || {};
+        }
+    } catch (err) {
+        console.warn('Could not load provider-flags.json, defaulting to no prefix stripping:', err.message);
+        providerFlags = {};
+    }
+}
+
+// Build provider rows from the parsed CSV objects (parseCsv already strips
+// the header row and handles quoted commas, so no manual header-skipping or
+// column-index math is needed here anymore).
+const rows = parsedRows.map(r => {
+    const provider = r.provider;
+    const stripPrefix = hasStripPrefixColumn
+        ? ['true', '1', 'yes'].includes((r[stripPrefixKey] || '').trim().toLowerCase())
+        : !!providerFlags[provider];
     return {
-        provider: cols[0],
-        baseURL: cols[1],
-        apiKeyEnv: cols[2],
-        modelsEndpoint: cols[3]
+        provider,
+        baseURL: r.baseURL,
+        apiKeyEnv: r.apiKeyEnv,
+        modelsEndpoint: r.modelsEndpoint,
+        stripPrefix
     };
-}).filter(r => r.provider && r.provider !== 'provider' && r.modelsEndpoint);
+}).filter(r => r.provider && r.modelsEndpoint);
 
 console.log(`Found ${rows.length} providers to fetch models from.`);
 
@@ -75,12 +109,27 @@ async function fetchModels(provider, endpoint, apiKeyEnv) {
 (async () => {
     const results = [];
 
+    // Dedup guard: only write one row per unique (provider, model) pair,
+    // even if an upstream endpoint returns the same model more than once
+    // or multiple fetch passes overlap.
+    const seenKeys = new Set();
+
     for (const row of rows) {
         const models = await fetchModels(row.provider, row.modelsEndpoint, row.apiKeyEnv);
         // Store each model as a separate entry
         models.forEach(model => {
-            // Strip provider prefix before "/" (e.g. "openai/gpt-4" → "gpt-4")
-            const modelName = model.includes('/') ? model.split('/').slice(1).join('/') : model;
+            // Strip provider prefix before "/" only for providers flagged as
+            // using vendor-prefixed routing IDs (e.g. "openai/gpt-4" → "gpt-4").
+            // Providers where "/" is part of the real model ID (e.g. Hugging
+            // Face "org/model") are left untouched unless explicitly flagged.
+            const modelName = (row.stripPrefix && model.includes('/'))
+                ? model.split('/').slice(1).join('/')
+                : model;
+
+            const dedupeKey = `${row.provider}::${modelName}`;
+            if (seenKeys.has(dedupeKey)) return; // skip exact duplicate
+            seenKeys.add(dedupeKey);
+
             results.push({
                 provider: row.provider,
                 model: modelName
@@ -98,7 +147,7 @@ async function fetchModels(provider, endpoint, apiKeyEnv) {
     });
 
     fs.writeFileSync(getFilePath('latestModels'), outputLines.join('\n'), 'utf-8');
-    console.log('\nSaved to LatestModels.csv with', results.length, 'total rows (1 row per model).');
+    console.log(`\nSaved to ${path.basename(getFilePath('latestModels'))} with`, results.length, 'total rows (1 row per model).');
 
     // Also write models.csv with top 5 models per provider (for fallback dropdown)
     const providerModels = {};
@@ -118,7 +167,7 @@ async function fetchModels(provider, endpoint, apiKeyEnv) {
         });
     }
     fs.writeFileSync(getFilePath('models'), modelsCsvLines.join('\n'), 'utf-8');
-    console.log('Saved to models.csv with', Object.values(providerModels).reduce((s, arr) => s + arr.length, 0), 'models (top 5 per provider).');
+    console.log(`Saved to ${path.basename(getFilePath('models'))} with`, Object.values(providerModels).reduce((s, arr) => s + arr.length, 0), 'models (top 5 per provider).');
 
     // Summary
     const errorCount = results.filter(r => r.model.startsWith('ERROR')).length;
