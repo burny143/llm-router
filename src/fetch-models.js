@@ -9,6 +9,9 @@
  *   - API key environment variable names
  *
  * Run: node fetch-models.js
+ *
+ * NOTE: this file MUST stay in src/ — data-file paths resolve via
+ * state-store.getFilePath(), whose PROJECT_ROOT is derived from __dirname.
  */
 
 const fs = require('fs');
@@ -21,8 +24,21 @@ require('dotenv').config({ path: getFilePath('env') });
 // quote-aware parser from state-store.js, so a baseURL/modelsEndpoint value
 // containing a comma (e.g. a URL with query parameters) no longer corrupts
 // column alignment the way naive line.split(',') did.
-const csvText = fs.readFileSync(getFilePath('providerConfig'), 'utf-8');
-const parsedRows = parseCsv(csvText);
+// Guarded at module scope: a missing/unreadable CSV must fail with a clear
+// message and non-zero exit, not an unhandled exception.
+const providerConfigPath = getFilePath('providerConfig');
+let parsedRows = [];
+if (!fs.existsSync(providerConfigPath)) {
+  console.error(`ProviderConfig.csv not found at ${providerConfigPath}. Nothing to fetch — exiting.`);
+  process.exit(1);
+}
+try {
+  const csvText = fs.readFileSync(providerConfigPath, 'utf-8');
+  parsedRows = parseCsv(csvText);
+} catch (err) {
+  console.error(`Could not read/parse ProviderConfig.csv at ${providerConfigPath}: ${err.message}`);
+  process.exit(1);
+}
 
 // Detect whether ProviderConfig.csv itself carries a "stripPrefix" column
 // (data-driven, no hardcoded provider names), matching by header name
@@ -61,6 +77,7 @@ const rows = parsedRows.map(r => {
         baseURL: r.baseURL,
         apiKeyEnv: r.apiKeyEnv,
         modelsEndpoint: r.modelsEndpoint,
+        authType: (r.authType || 'Bearer').trim().toLowerCase() || 'Bearer',
         stripPrefix
     };
 }).filter(r => r.provider && r.modelsEndpoint);
@@ -68,12 +85,21 @@ const rows = parsedRows.map(r => {
 console.log(`Found ${rows.length} providers to fetch models from.`);
 
 // Fetch models from an endpoint
-async function fetchModels(provider, endpoint, apiKeyEnv) {
+async function fetchModels(provider, endpoint, apiKeyEnv, authType) {
     let config = { timeout: 10000 };
 
-    // Add authorization header if API key is available
-    if (apiKeyEnv && process.env[apiKeyEnv]) {
-        config.headers = { 'Authorization': `Bearer ${process.env[apiKeyEnv]}` };
+    // Only bearer-token endpoints are supported here. Cookie-auth providers
+    // (authType === 'Cookie') authenticate with a session cookie via the
+    // browser client, not an API key — sending the cookie string as a Bearer
+    // token would always fail, so skip them explicitly instead.
+    if (authType !== 'cookie') {
+        // Add authorization header if API key is available
+        if (apiKeyEnv && process.env[apiKeyEnv]) {
+            config.headers = { 'Authorization': `Bearer ${process.env[apiKeyEnv]}` };
+        }
+    } else {
+        console.log(`  -> Skipping ${provider}: authType=Cookie — a browser-based models fetch is not supported yet.`);
+        return [];
     }
 
     try {
@@ -115,14 +141,18 @@ async function fetchModels(provider, endpoint, apiKeyEnv) {
     const seenKeys = new Set();
 
     for (const row of rows) {
-        const models = await fetchModels(row.provider, row.modelsEndpoint, row.apiKeyEnv);
+        const models = await fetchModels(row.provider, row.modelsEndpoint, row.apiKeyEnv, row.authType);
         // Store each model as a separate entry
         models.forEach(model => {
+            // Never prefix-strip an error entry: an axios error message often
+            // contains a "/" (e.g. an embedded URL), and stripping before the
+            // ERROR: check would mislabel a failure as a valid model name.
+            const isError = model.startsWith('ERROR:');
             // Strip provider prefix before "/" only for providers flagged as
             // using vendor-prefixed routing IDs (e.g. "openai/gpt-4" → "gpt-4").
             // Providers where "/" is part of the real model ID (e.g. Hugging
             // Face "org/model") are left untouched unless explicitly flagged.
-            const modelName = (row.stripPrefix && model.includes('/'))
+            const modelName = (row.stripPrefix && model.includes('/') && !isError)
                 ? model.split('/').slice(1).join('/')
                 : model;
 

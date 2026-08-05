@@ -7,5 +7,6 @@
   "knownOk": "data/known-ok.json",
   "tokenUsage": "data/token-usage.json",
   "settings": "data/settings.json",
-  "env": "data/.env"
+  "env": "data/.env",
+  "webProviderRules": "data/web-provider-rules.json"
 }

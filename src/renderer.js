@@ -1,27 +1,22 @@
+// renderer.js
+// renderer.js — complete file
 const { startProxy, stopProxy, isProxyRunning, healthCheck, getDefaultConfig, getEnvVars, getConnectedModelList, getConnectedConfig, getProviderConfig, saveConfig, openConfigFileDialog, parseConfigCsvFile, parseConfigExcelFile, onDevLog, runFetchModels, onConfigReady, setPriorityOverride, getKnownOk } = window.api;
 
-// Priority override dropdown in Proxy Control tab
-let priorityOverrideKey = null; // Track current priority selection
-
+let priorityOverrideKey = null;
 let configEntries = [];
 let envVars = [];
 let loadedModels = [];
 let fileProviders = [];
 let defaultModels = [];
-let providerInfo = {}; // Map: provider name -> { baseURL, apiKeyEnv, models: [] }
-let latestProviderModels = {}; // Map: provider -> models from LatestModels.csv (primary)
-let providerModelsFromFile = {}; // Map: provider -> models from connected model list file (fallback)
-let connectedModelFile = ''; // Module scope - declared here to match main.js pattern
-let latestModelsFileName = 'LatestModels.csv';   // Fallback label until main process reports the real basename
-let providerConfigFileName = 'ProviderConfig.csv'; // Fallback label until main process reports the real basename
-let ultimateConfigFileName = 'UltimateConfig.csv'; // Fallback label until main process reports the real basename
+let providerInfo = {};
+let latestProviderModels = {};
+let providerModelsFromFile = {};
+let connectedModelFile = '';
+let latestModelsFileName = null;   // set from getDefaultFileNames() in loadDefaultConfig()
+let providerConfigFileName = null; // — single source of truth is the main-process registry
+let ultimateConfigFileName = null;
 
-// Load default config asynchronously
 async function loadDefaultConfig() {
-  // Pull the real default file basenames from the main process (derived from
-  // state-store.js's DEFAULT_PATHS) before any UI renders, instead of relying
-  // on the hardcoded literals above, so a filename change there propagates
-  // here automatically.
   try {
     const defaultFileNames = await window.api.getDefaultFileNames();
     if (defaultFileNames) {
@@ -29,46 +24,57 @@ async function loadDefaultConfig() {
       if (defaultFileNames.providerConfigFileName) providerConfigFileName = defaultFileNames.providerConfigFileName;
       if (defaultFileNames.ultimateConfigFileName) ultimateConfigFileName = defaultFileNames.ultimateConfigFileName;
     }
-  } catch (err) {
-    console.warn('Could not load default file names:', err.message);
-  }
+  } catch (err) { console.warn('Could not load default file names:', err.message); }
 
-  // ProviderConfig.csv is the source of truth for available providers
   const providerConfig = await getProviderConfig();
   providerInfo = {};
   if (Object.keys(providerConfig).length > 0) {
     Object.entries(providerConfig).forEach(([provider, info]) => {
-      providerInfo[provider] = { baseURL: info.baseURL, apiKeyEnv: info.apiKeyEnv, models: [] };
+      providerInfo[provider] = { baseURL: info.baseURL, apiKeyEnv: info.apiKeyEnv, authType: info.authType, models: [] };
     });
   }
 
-  // Load default catalog (models-config.js) — only add models to providers that exist in ProviderConfig.csv
   const defaultConfig = await getDefaultConfig();
   defaultModels = [];
   defaultConfig.forEach(providerGroup => {
-    providerGroup.models.forEach(modelName => {
-      defaultModels.push(modelName);
-    });
-    if (providerInfo[providerGroup.provider]) {
-      providerInfo[providerGroup.provider].models = providerGroup.models;
-    }
+    providerGroup.models.forEach(modelName => defaultModels.push(modelName));
+    if (providerInfo[providerGroup.provider]) providerInfo[providerGroup.provider].models = providerGroup.models;
   });
 
   await loadEnvVars();
   await loadConnectedModelList();
-  if (Object.keys(providerConfig).length > 0) {
-    console.log(`Loaded provider config from ${providerConfigFileName}:`, Object.keys(providerConfig).length, 'providers');
-  }
-  await loadConnectedConfig(defaultConfig);
-  renderConfigTable();
 
-  // Populate the Priority Model dropdown from any known-OK state already on
-  // disk, so restored routing data is reflected immediately at startup
-  // instead of staying empty until the user reconnects or re-pings.
+  if (Object.keys(providerConfig).length > 0) console.log(`Loaded provider config from ${providerConfigFileName || '(unknown)'}:`, Object.keys(providerConfig).length, 'providers');
+
+  await loadConnectedConfig(defaultConfig);
+  renderAllConfigTables();
   renderPriorityOverrideDropdown();
 }
 
-// Get models for a specific provider (LatestModels.csv primary, model list file fallback, default config fallback)
+// Re-fetch ProviderConfig.csv from main and merge it into providerInfo so a
+// provider added AFTER startup (via "Add Web Provider" capture or cookie paste)
+// shows up in the config-table provider dropdown immediately — no restart needed.
+// Keeps model lists for providers already known (default config merge is only
+// additive; models for brand-new providers are filled in by fetchModels later).
+async function refreshProviderInfo() {
+  let providerConfig = {};
+  try { providerConfig = await getProviderConfig(); } catch (err) { console.warn('Could not refresh provider config:', err.message); return; }
+  if (!providerConfig || Object.keys(providerConfig).length === 0) return;
+  const knownProviderKeys = new Set(Object.keys(providerInfo));
+  Object.entries(providerConfig).forEach(([provider, info]) => {
+    if (!providerInfo[provider]) {
+      providerInfo[provider] = { baseURL: info.baseURL, apiKeyEnv: info.apiKeyEnv, authType: info.authType, models: [] };
+    } else {
+      // Refresh mutable fields; keep models already fetched.
+      providerInfo[provider].baseURL = info.baseURL || providerInfo[provider].baseURL;
+      providerInfo[provider].apiKeyEnv = info.apiKeyEnv || providerInfo[provider].apiKeyEnv;
+      providerInfo[provider].authType = info.authType || providerInfo[provider].authType;
+    }
+  });
+  const newProviders = Object.keys(providerInfo).filter(p => !knownProviderKeys.has(p));
+  if (newProviders.length > 0) console.log('Provider config refreshed — new provider(s):', newProviders.join(', '));
+}
+
 function getModelsForProvider(provider) {
   const latestModels = latestProviderModels[provider] || [];
   const fileModels = providerModelsFromFile[provider] || [];
@@ -76,53 +82,36 @@ function getModelsForProvider(provider) {
   return [...new Set([...latestModels, ...fileModels, ...defaultProviderModels])];
 }
 
-// Auto-connect the model list file (like .env) - no manual load needed
 async function loadConnectedModelList() {
   const list = await getConnectedModelList();
   if (list) {
     loadedModels = list.models || [];
     fileProviders = list.providers || [];
     connectedModelFile = list.file || '';
-    // Build provider -> models map from the file data
-    if (list.providerModels) {
-      providerModelsFromFile = list.providerModels;
-    }
-    // LatestModels.csv data (primary source for model dropdown)
-    if (list.latestProviderModels) {
-      latestProviderModels = list.latestProviderModels;
-    }
+    if (list.providerModels) providerModelsFromFile = list.providerModels;
+    if (list.latestProviderModels) latestProviderModels = list.latestProviderModels;
     if (list.latestModelsFileName) latestModelsFileName = list.latestModelsFileName;
     if (list.providerConfigFileName) providerConfigFileName = list.providerConfigFileName;
+
     const label = document.getElementById('modelFileLabel');
     if (label) {
       const latestCount = Object.values(latestProviderModels).reduce((sum, arr) => sum + arr.length, 0);
       const latestProviders = Object.keys(latestProviderModels).length;
-      if (latestCount > 0) {
-        label.textContent = `Model list connected: ${latestProviders} provider(s) / ${latestCount} model(s) — ${latestModelsFileName}`;
-      } else if (connectedModelFile) {
-        label.textContent = `Model list connected: ${fileProviders.length} provider(s) / ${loadedModels.length} model(s) — ${connectedModelFile}`;
-      } else {
-        label.textContent = 'No model list file connected. Load one to auto-connect it (like .env).';
-      }
+      if (latestCount > 0) label.textContent = `Model list connected: ${latestProviders} provider(s) / ${latestCount} model(s) — ${latestModelsFileName || '(unknown)'}`;
+      else if (connectedModelFile) label.textContent = `Model list connected: ${fileProviders.length} provider(s) / ${loadedModels.length} model(s) — ${connectedModelFile}`;
+      else label.textContent = 'No model list file connected. Load one to auto-connect it (like .env).';
     }
   }
 }
 
-// Auto-connect the config file (source of truth for proxy entries)
-// Entries for providers not in ProviderConfig.csv are pruned automatically.
 async function loadConnectedConfig(defaultConfig) {
   const result = await getConnectedConfig();
   if (result && result.fileName) ultimateConfigFileName = result.fileName;
   if (result && result.entries && result.entries.length > 0) {
-    // Only keep entries whose provider exists in ProviderConfig.csv
-    configEntries = result.entries.filter(e => providerInfo[e.provider]);
-    await updateConfigLabel();
+    configEntries = result.entries.filter(e => providerInfo[e.provider]);    await updateConfigLabel();
   } else {
-    // Fallback: build from default catalog, but only for providers in ProviderConfig.csv
     configEntries = [];
-    if (!defaultConfig) {
-      defaultConfig = await getDefaultConfig();
-    }
+    if (!defaultConfig) defaultConfig = await getDefaultConfig();
     defaultConfig.forEach(providerGroup => {
       if (providerInfo[providerGroup.provider]) {
         providerGroup.models.forEach(modelName => {
@@ -131,37 +120,21 @@ async function loadConnectedConfig(defaultConfig) {
             baseURL: providerInfo[providerGroup.provider].baseURL,
             apiKeyEnv: providerInfo[providerGroup.provider].apiKeyEnv,
             model: modelName,
-            enabled: true
+            enabled: true,
+            authType: providerInfo[providerGroup.provider].authType || 'Bearer'
           });
         });
       }
     });
     const label = document.getElementById('configFileLabel');
-    if (label) {
-      label.textContent = 'No config file yet. Apply Configuration to create one.';
-    }
+    if (label) label.textContent = 'No config file yet. Apply Configuration to create one.';
   }
 }
 
-// Load environment variables from .env file
-async function loadEnvVars() {
-  envVars = await getEnvVars();
-}
+async function loadEnvVars() { envVars = await getEnvVars(); }
+function getProvidersList() { return Object.keys(providerInfo); }
+function getEnvVarsList() { return envVars; }
 
-// Get providers list for dropdown (only providers from ProviderConfig.csv)
-function getProvidersList() {
-  return Object.keys(providerInfo);
-}
-
-// Get env vars list for the API Key dropdown
-function getEnvVarsList() {
-  return envVars;
-}
-
-// Memoization cache for getModelsForProvider, valid for a single render pass.
-// renderConfigTable() resets this at the start of each full render; row-level
-// updates that don't change `entry.provider` reuse the cached value instead of
-// recomputing the Set union for every row.
 let _modelsForProviderCache = new Map();
 function getModelsForProviderMemoized(provider) {
   if (_modelsForProviderCache.has(provider)) return _modelsForProviderCache.get(provider);
@@ -170,62 +143,60 @@ function getModelsForProviderMemoized(provider) {
   return models;
 }
 
-// Build the innerHTML for a single config row. `entry.model` is always included
-// as an option even if it isn't in getModelsForProvider()'s list, so an imported
-// or previously-saved model is never shown as "(None)".
-function buildRowHtml(entry, idx) {
+function buildRowHtml(entry, realIdx, displayIdx) {
   const providerModels = getModelsForProviderMemoized(entry.provider);
-  const modelOptions = entry.model && !providerModels.includes(entry.model)
-    ? [entry.model, ...providerModels]
-    : providerModels;
+  const modelOptions = entry.model && !providerModels.includes(entry.model) ? [entry.model, ...providerModels] : providerModels;
   return `
-    <td>${idx+1}</td>
-    <td>
-      <select class="provider-select" data-idx="${idx}">
-        ${getProvidersList().map(p => `<option value="${p}" ${p===entry.provider?'selected':''}>${p}</option>`).join('')}
-      </select>
-    </td>
-    <td>
-      <input type="text" class="baseurl-input" data-idx="${idx}" value="${entry.baseURL || ''}" readonly style="background:#f5f5f5;">
-    </td>
-    <td>
-      <input type="text" class="apikey-input" data-idx="${idx}" value="${entry.apiKeyEnv || ''}" readonly style="background:#f5f5f5;">
-    </td>
-    <td>
-      <select class="model-input" data-idx="${idx}">
-        <option value="">(None)</option>
-        ${modelOptions.map(m => `<option value="${m}" ${m===entry.model?'selected':''}>${m}</option>`).join('')}
-      </select>
-    </td>
-    <td><input type="checkbox" class="enabled-check" data-idx="${idx}" ${entry.enabled?'checked':''}></td>
-    <td><button class="delete-btn" data-idx="${idx}">X</button></td>
+    <td>${displayIdx + 1}</td>
+    <td><select class="provider-select" data-idx="${realIdx}">
+      ${getProvidersList().map(p => `<option value="${p}" ${p===entry.provider?'selected':''}>${p}</option>`).join('')}
+    </select></td>
+    <td><input type="text" class="baseurl-input" data-idx="${realIdx}" value="${entry.baseURL || ''}" readonly style="background:#f5f5f5;"></td>
+    <td><input type="text" class="apikey-input" data-idx="${realIdx}" value="${entry.apiKeyEnv || ''}" readonly style="background:#f5f5f5;"></td>
+    <td><select class="model-input" data-idx="${realIdx}">
+      <option value="">(None)</option>
+      ${modelOptions.map(m => `<option value="${m}" ${m===entry.model?'selected':''}>${m}</option>`).join('')}
+    </select></td>
+    <td><input type="checkbox" class="enabled-check" data-idx="${realIdx}" ${entry.enabled?'checked':''}></td>
+    <td><button class="delete-btn" data-idx="${realIdx}">X</button></td>
   `;
 }
 
-// Render the configuration table with dropdowns. Full rebuild — used on load,
-// add, delete, and provider change (since provider change repopulates the
-// model <select> options for that row). Toggle/model/delete are otherwise
-// handled without a full rebuild via the delegated listener below.
-function renderConfigTable() {
+function renderApiModelsTable() {
   _modelsForProviderCache = new Map();
-  configTableBody.innerHTML = '';
-  configEntries.forEach((entry, idx) => {
+  apiModelsTableBody.innerHTML = '';
+  let displayIdx = 0;
+  configEntries.forEach((entry, realIdx) => {
+    if (entry.authType === 'Cookie') return;
     const row = document.createElement('tr');
-    row.dataset.idx = idx;
-    row.innerHTML = buildRowHtml(entry, idx);
-    configTableBody.appendChild(row);
+    row.dataset.idx = realIdx;
+    row.innerHTML = buildRowHtml(entry, realIdx, displayIdx);
+    apiModelsTableBody.appendChild(row);
+    displayIdx++;
   });
 }
 
-// DOM element references used by the table below and by loadDefaultConfig()
-// (called at page load, further down this file). These must be declared
-// before any code that reads them runs — moved up from their original
-// position near the bottom of the file, which threw a
-// "Cannot access 'configTableBody' before initialization" ReferenceError
-// and silently aborted the rest of the script (breaking tab switching,
-// Quick Chat, Dev Logs, etc.) since const/let bindings are not usable
-// before their declaration executes.
-const configTableBody = document.querySelector('#configTable tbody');
+function renderCookieModelsTable() {
+  _modelsForProviderCache = new Map();
+  cookieModelsTableBody.innerHTML = '';
+  let displayIdx = 0;
+  configEntries.forEach((entry, realIdx) => {
+    if (entry.authType !== 'Cookie') return;
+    const row = document.createElement('tr');
+    row.dataset.idx = realIdx;
+    row.innerHTML = buildRowHtml(entry, realIdx, displayIdx);
+    cookieModelsTableBody.appendChild(row);
+    displayIdx++;
+  });
+}
+
+function renderAllConfigTables() {
+  renderApiModelsTable();
+  renderCookieModelsTable();
+}
+
+const apiModelsTableBody = document.querySelector('#apiModelsTable tbody');
+const cookieModelsTableBody = document.querySelector('#cookieModelsTable tbody');
 const addEntryBtn = document.getElementById('addEntryBtn');
 const saveConfigBtn = document.getElementById('saveConfigBtn');
 const loadDefaultsBtn = document.getElementById('loadDefaultsBtn');
@@ -233,11 +204,20 @@ const clearAllBtn = document.getElementById('clearAllBtn');
 const fetchModelsBtn = document.getElementById('fetchModelsBtn');
 const loadConfigFromCsvBtn = document.getElementById('loadConfigFromCsvBtn');
 
-// Single delegated listener for the whole table body, instead of attaching a
-// listener per row on every render. Provider changes still trigger a full
-// re-render (the model <select> options depend on the new provider); enabled
-// toggle, model selection, and delete only touch the affected row/state.
-configTableBody.addEventListener('change', e => {
+function refreshConfigRow(realIdx) {
+  const row = document.querySelector(`tr[data-idx="${realIdx}"]`);
+  if (row && configEntries[realIdx]) {
+    const allRows = document.querySelectorAll('#apiModelsTable tbody tr, #cookieModelsTable tbody tr');
+    let displayIdx = 0;
+    const tableBody = row.closest('tbody');
+    if (tableBody) {
+      displayIdx = Array.from(tableBody.querySelectorAll('tr')).indexOf(row);
+    }
+    row.innerHTML = buildRowHtml(configEntries[realIdx], realIdx, displayIdx);
+  }
+}
+
+apiModelsTableBody.addEventListener('change', e => {
   const row = e.target.closest('tr');
   if (!row) return;
   const idx = Number(row.dataset.idx);
@@ -250,10 +230,12 @@ configTableBody.addEventListener('change', e => {
     if (info) {
       configEntries[idx].baseURL = info.baseURL;
       configEntries[idx].apiKeyEnv = info.apiKeyEnv;
+      configEntries[idx].authType = info.authType || 'Bearer';
     }
-    // Provider change repopulates this row's model options, so a full
-    // re-render is needed here (but nowhere else).
-    renderConfigTable();
+    // Rebuild both tables deferred by one tick. Rebuilding the table synchronously while
+    // the native <select> popup is still closing leaves a stuck invisible popup that
+    // swallows clicks for a while — the "can't click any dropdown after a config change" bug.
+    setTimeout(() => renderAllConfigTables(), 0);
   } else if (e.target.classList.contains('model-input')) {
     configEntries[idx].model = e.target.value;
   } else if (e.target.classList.contains('enabled-check')) {
@@ -261,7 +243,7 @@ configTableBody.addEventListener('change', e => {
   }
 });
 
-configTableBody.addEventListener('click', e => {
+apiModelsTableBody.addEventListener('click', e => {
   const deleteBtn = e.target.closest('.delete-btn');
   if (!deleteBtn) return;
   const row = deleteBtn.closest('tr');
@@ -269,110 +251,112 @@ configTableBody.addEventListener('click', e => {
   const idx = Number(row.dataset.idx);
   if (Number.isNaN(idx)) return;
   configEntries.splice(idx, 1);
-  // Deleting shifts every subsequent row's index, so this does need a full
-  // re-render (dataset.idx values must stay in sync with the array).
-  renderConfigTable();
+  // Defer one tick: rebuilding the table synchronously while a native <select>
+  // popup is still closing leaves a phantom popup that eats clicks.
+  setTimeout(() => renderAllConfigTables(), 0);
 });
 
-// Call on page load
+cookieModelsTableBody.addEventListener('change', e => {
+  const row = e.target.closest('tr');
+  if (!row) return;
+  const idx = Number(row.dataset.idx);
+  if (Number.isNaN(idx) || !configEntries[idx]) return;
+
+  if (e.target.classList.contains('provider-select')) {
+    const selectedProvider = e.target.value;
+    configEntries[idx].provider = selectedProvider;
+    const info = providerInfo[selectedProvider];
+    if (info) {
+      configEntries[idx].baseURL = info.baseURL;
+      configEntries[idx].apiKeyEnv = info.apiKeyEnv;
+      configEntries[idx].authType = info.authType || 'Bearer';
+    }
+    setTimeout(() => renderAllConfigTables(), 0);
+  } else if (e.target.classList.contains('model-input')) {
+    configEntries[idx].model = e.target.value;
+  } else if (e.target.classList.contains('enabled-check')) {
+    configEntries[idx].enabled = e.target.checked;
+  }
+});
+
+cookieModelsTableBody.addEventListener('click', e => {
+  const deleteBtn = e.target.closest('.delete-btn');
+  if (!deleteBtn) return;
+  const row = deleteBtn.closest('tr');
+  if (!row) return;
+  const idx = Number(row.dataset.idx);
+  if (Number.isNaN(idx)) return;
+  configEntries.splice(idx, 1);
+  setTimeout(() => renderAllConfigTables(), 0);
+});
+
 loadDefaultConfig();
 
-// Listen for config-ready from main process (handles async startup race)
-onConfigReady(({ entries }) => {
-  configEntries = entries;
-  renderConfigTable();
-  console.log('Config table updated from main process:', entries.length, 'entries');
+onConfigReady(async ({ entries }) => {
+  await refreshProviderInfo();
+  configEntries = entries.filter(e => providerInfo[e.provider]);
+  renderAllConfigTables();
+  renderPriorityOverrideDropdown();
+  console.log('Config table updated from main process:', configEntries.length, 'entries');
 });
 
-// Tab switching
 document.querySelectorAll('.tab-btn').forEach(btn => {
   btn.addEventListener('click', () => {
+    // Sub-tab buttons have their own handler; skip them here.
+    if (btn.classList.contains('sub-tab-btn')) return;
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById(btn.dataset.tab + '-tab').classList.add('active');
-    // Show config footer only on config tab
     const configFooter = document.getElementById('configFooter');
     if (configFooter) configFooter.style.display = btn.dataset.tab === 'config' ? 'block' : 'none';
-    if (btn.dataset.tab === 'usage') renderTokenUsage(); // refresh when opened
+    if (btn.dataset.tab === 'usage') renderTokenUsage();
   });
 });
 
-// Proxy Control Tab
+document.querySelectorAll('.sub-tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.sub-tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.sub-tab-content').forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(btn.dataset.subtab + '-subtab').classList.add('active');
+  });
+});
+
 const portInput = document.getElementById('portInput');
 const connectBtn = document.getElementById('connectBtn');
 const disconnectBtn = document.getElementById('disconnectBtn');
 const serverAddress = document.getElementById('serverAddress');
-// Positioned next to disconnectBtn in index.html, confirmed present there.
 const priorityModelSelect = document.getElementById('priorityModelSelect');
 
-// Populate the priority-override dropdown from the current known-OK endpoints.
-// Call after proxy start and after any health check completes.
-// Populate the priority-override dropdown from the current known-OK endpoints.
-// Call after proxy start and after any health check completes.
-function priorityKeyOf(entry) {
-  return `${entry.provider}::${entry.model}`;
-}
+function priorityKeyOf(entry) { return `${entry.provider}::${entry.model}`; }
 
 async function renderPriorityOverrideDropdown() {
   if (!priorityModelSelect) return;
-
   let knownOk;
-  try {
-    knownOk = await getKnownOk();
-  } catch (err) {
-    console.warn('Could not load known-OK endpoints for priority dropdown:', err.message);
-    return;
-  }
-
+  try { knownOk = await getKnownOk(); } catch (err) { return; }
   const entries = knownOk || [];
-
-  // If the currently selected priority model is no longer known-OK, clear it.
   if (priorityOverrideKey && !entries.some(entry => priorityKeyOf(entry) === priorityOverrideKey)) {
     priorityOverrideKey = null;
-
-    try {
-      await setPriorityOverride(null);
-    } catch (err) {
-      console.warn('Could not clear stale priority override:', err.message);
-    }
+    try { await setPriorityOverride(null); } catch (err) {}
   }
-
-  // Currently pinned entry first, then the rest sorted by latency ascending.
   const sorted = [...entries].sort((a, b) => {
-    const aKey = priorityKeyOf(a);
-    const bKey = priorityKeyOf(b);
-
-    const aPinned = aKey === priorityOverrideKey;
-    const bPinned = bKey === priorityOverrideKey;
-
+    const aPinned = priorityKeyOf(a) === priorityOverrideKey;
+    const bPinned = priorityKeyOf(b) === priorityOverrideKey;
     if (aPinned && !bPinned) return -1;
     if (bPinned && !aPinned) return 1;
-
     return (a.latency ?? Infinity) - (b.latency ?? Infinity);
   });
-
-  priorityModelSelect.innerHTML =
-    '<option value="">None (auto)</option>' +
-    sorted
-      .map(e => {
-        const key = priorityKeyOf(e);
-        const label = `${e.provider} / ${e.model} (${e.latency}ms)`;
-
-        return `<option value="${key}" ${key === priorityOverrideKey ? 'selected' : ''}>${label}</option>`;
-      })
-      .join('');
+  priorityModelSelect.innerHTML = '<option value="">None (auto)</option>' + sorted.map(e => {
+    const key = priorityKeyOf(e);
+    return `<option value="${key}" ${key === priorityOverrideKey ? 'selected' : ''}>${e.provider} / ${e.model} (${e.latency}ms)</option>`;
+  }).join('');
 }
 
 priorityModelSelect?.addEventListener('change', async e => {
   const key = e.target.value || null;
   priorityOverrideKey = key;
-
-  try {
-    await setPriorityOverride(key);
-  } catch (err) {
-    console.warn('Could not set priority override:', err.message);
-  }
+  try { await setPriorityOverride(key); } catch (err) {}
 });
 
 function setServerStatus(running, port) {
@@ -395,7 +379,8 @@ connectBtn.addEventListener('click', async () => {
     setServerStatus(true, port);
     connectBtn.disabled = true;
     disconnectBtn.disabled = false;
-    renderPriorityOverrideDropdown();
+    // Defer one tick so any closing native <select> popup finishes first.
+    setTimeout(() => renderPriorityOverrideDropdown(), 0);
   } else {
     alert('Failed to start proxy: ' + result.error);
   }
@@ -408,57 +393,68 @@ disconnectBtn.addEventListener('click', async () => {
   disconnectBtn.disabled = true;
 });
 
-// Quick Chat
 const chatMessages = document.getElementById('chatMessages');
 const chatInput = document.getElementById('chatInput');
 const sendBtn = document.getElementById('sendBtn');
 
-// Send on Enter key
-chatInput.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') {
-    e.preventDefault();
-    sendBtn.click();
-  }
-});
+chatInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); sendBtn.click(); } });
 
 sendBtn.addEventListener('click', async () => {
   const text = chatInput.value.trim();
   if (!text) return;
   addMessage('user', text);
   chatInput.value = '';
-
   const running = await isProxyRunning();
-  if (!running) {
-    addMessage('assistant', 'Proxy is not running.');
-    return;
-  }
+  if (!running) { addMessage('assistant', 'Proxy is not running.'); return; }
 
   try {
-    const resp = await fetch(`http://localhost:${portInput.value}/v1/chat/completions`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        messages: [{ role: 'user', content: text }],
-        max_tokens: 200
-      })
-    });
-    const data = await resp.json();
-    const content = data.choices?.[0]?.message?.content || '';
-    if (content) {
-      const meta = data._meta || null;
-      addMessage('assistant', content, meta);
-    } else if (data.error) {
-      addMessage('assistant', `Model error: ${data.error.message || data.error}`);
-    } else {
-      const raw = JSON.stringify(data).substring(0, 300);
-      addMessage('assistant', `No usable content (HTTP ${resp.status}). Response: ${raw}`);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 60000);
+    let resp;
+    try {
+      resp = await fetch(`http://localhost:${portInput.value}/v1/chat/completions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: [{ role: 'user', content: text }], max_tokens: 200 }),
+        signal: controller.signal
+      });
+    } finally {
+      clearTimeout(timeout);
     }
-  } catch (e) {
-    addMessage('assistant', 'Error: ' + e.message);
+    const data = await resp.json();
+    const message = data.choices?.[0]?.message;
+    const finishReason = data.choices?.[0]?.finish_reason;
+    const meta = data._meta || null;
+
+    if (message && Array.isArray(message.tool_calls) && message.tool_calls.length > 0) {
+      // Tool calls response — display them in a readable format
+      const toolCallLines = message.tool_calls.map(tc => {
+        const name = tc.function?.name || 'unknown';
+        const args = tc.function?.arguments || '{}';
+        return `[TOOL_CALL] ${name}(${args})`;
+      });
+      addMessage('assistant', toolCallLines.join('\n'), meta);
+    } else {
+      const content = message?.content || '';
+      const textContent = typeof content === 'string' ? content : JSON.stringify(content);
+      if (textContent && textContent.trim()) {
+        addMessage('assistant', textContent, meta);
+      } else if (data.error) {
+        addMessage('assistant', `Model error: ${data.error.message || data.error}`);
+      } else {
+        const raw = JSON.stringify(data).substring(0, 300);
+        addMessage('assistant', `No usable content (HTTP ${resp.status}). Response: ${raw}`);
+      }
+    }
+   } catch (e) {
+    if (e.name === 'AbortError') {
+      addMessage('assistant', 'Request timed out after 60s.');
+    } else {
+      addMessage('assistant', 'Error: ' + e.message);
+    }
   }
 });
 
-// Developer Logs
 const devLogs = document.getElementById('devLogs');
 const clearLogsBtn = document.getElementById('clearLogsBtn');
 
@@ -469,29 +465,25 @@ onDevLog(({ level, text, time }) => {
   else if (level === 'warn') line.classList.add('log-warn');
   else if (text.includes(window.api.logSuccessMarker)) line.classList.add('log-success');
   devLogs.appendChild(line);
-  // Keep the log panel bounded
-  while (devLogs.children.length > 500) {
-    devLogs.removeChild(devLogs.firstChild);
-  }
+  while (devLogs.children.length > 500) devLogs.removeChild(devLogs.firstChild);
   devLogs.scrollTop = devLogs.scrollHeight;
 });
 
-clearLogsBtn.addEventListener('click', () => {
-  devLogs.innerHTML = '';
-});
+clearLogsBtn.addEventListener('click', () => { devLogs.innerHTML = ''; });
 
 function addMessage(role, content, meta) {
   const div = document.createElement('div');
   const time = new Date().toLocaleTimeString();
+  // Escape HTML to prevent injection
+  const safeContent = String(content).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   if (role === 'assistant' && meta) {
-    div.innerHTML = `<strong>[${time}] ${role}:</strong> ${content}<div class="chat-meta"><span class="meta-provider">${meta.provider}</span> / ${meta.model} · ${meta.elapsed}ms</div>`;
+    div.innerHTML = `<strong>[${time}] ${role}:</strong> ${safeContent}<div class="chat-meta"><span class="meta-provider">${meta.provider}</span> / ${meta.model} · ${meta.elapsed}ms</div>`;
   } else {
-    div.innerHTML = `<strong>[${time}] ${role}:</strong> ${content}`;
+    div.innerHTML = `<strong>[${time}] ${role}:</strong> ${safeContent}`;
   }
   chatMessages.appendChild(div);
   chatMessages.scrollTop = chatMessages.scrollHeight;
 }
-
 
 addEntryBtn.addEventListener('click', () => {
   const providers = getProvidersList();
@@ -501,55 +493,46 @@ addEntryBtn.addEventListener('click', () => {
     baseURL: providerInfo[firstProvider]?.baseURL || '',
     apiKeyEnv: providerInfo[firstProvider]?.apiKeyEnv || '',
     model: '',
-    enabled: true
+    enabled: true,
+    authType: providerInfo[firstProvider]?.authType || 'Bearer'
   });
-  renderConfigTable();
+  setTimeout(() => renderAllConfigTables(), 0);
 });
 
-// Load defaults: populate config from the connected model list file (models.csv),
-// one entry per model row per provider. Falls back to models-config.js models if a
-// provider has no entries in models.csv.
 loadDefaultsBtn.addEventListener('click', () => {
+  const cookieEntries = configEntries.filter(e => e.authType === 'Cookie');
   configEntries = [];
   const providers = getProvidersList();
   providers.forEach(provider => {
     const info = providerInfo[provider];
-    // models.csv data is the source of truth here (auto-connected model list)
     const fileModels = providerModelsFromFile[provider] || [];
     const fallbackModels = info?.models || [];
     const models = fileModels.length > 0 ? fileModels : fallbackModels;
     models.forEach(modelName => {
       if (!modelName) return;
       configEntries.push({
-        provider,
-        baseURL: info?.baseURL || '',
-        apiKeyEnv: info?.apiKeyEnv || '',
-        model: modelName,
-        enabled: true
+        provider, baseURL: info?.baseURL || '', apiKeyEnv: info?.apiKeyEnv || '', model: modelName, enabled: true, authType: info?.authType || 'Bearer'
       });
     });
   });
-  renderConfigTable();
+  configEntries = [...configEntries, ...cookieEntries];
+  // Defer one tick so any closing native <select> popup finishes first.
+  setTimeout(() => renderAllConfigTables(), 0);
 });
 
-// Clear all entries
 clearAllBtn.addEventListener('click', () => {
-  configEntries = [];
-  renderConfigTable();
+  configEntries = configEntries.filter(e => e.authType === 'Cookie');
+  // Defer one tick so any closing native <select> popup finishes first.
+  setTimeout(() => renderAllConfigTables(), 0);
 });
 
-// Fetch All Models: show warning modal, then run fetch-models.js and populate config
 fetchModelsBtn.addEventListener('click', async () => {
   const modal = document.getElementById('fetchModal');
   modal.style.display = 'flex';
-
   const proceedBtn = document.getElementById('fetchModalProceed');
   const cancelBtn = document.getElementById('fetchModalCancel');
-
   const cleanup = () => { modal.style.display = 'none'; };
-
   cancelBtn.onclick = cleanup;
-
   proceedBtn.onclick = async () => {
     cleanup();
     const progressBar = document.getElementById('fetchProgressBar');
@@ -557,45 +540,30 @@ fetchModelsBtn.addEventListener('click', async () => {
     try {
       const result = await runFetchModels();
       if (progressBar) progressBar.style.display = 'none';
-      if (!result.success) {
-        alert('Failed to fetch models: ' + (result.error || 'Unknown error'));
-        return;
-      }
+      if (!result.success) { alert('Failed to fetch models: ' + (result.error || 'Unknown error')); return; }
       const entries = result.entries || [];
-      if (entries.length === 0) {
-        alert('No models were fetched. Check the developer logs for details.');
-        return;
-      }
-      // Rebuild latestProviderModels from fetched entries so dropdown auto-updates
+      if (entries.length === 0) { alert('No models were fetched.'); return; }
       latestProviderModels = {};
       entries.forEach(e => {
         if (!latestProviderModels[e.provider]) latestProviderModels[e.provider] = [];
         latestProviderModels[e.provider].push(e.model);
       });
-      // Populate config: 1 entry per model, with baseURL/apiKeyEnv from ProviderConfig.csv
       configEntries = entries.map(e => {
         const info = providerInfo[e.provider];
-        return {
-          provider: e.provider,
-          baseURL: info?.baseURL || '',
-          apiKeyEnv: info?.apiKeyEnv || '',
-          model: e.model,
-          enabled: true
-        };
+        return { provider: e.provider, baseURL: info?.baseURL || '', apiKeyEnv: info?.apiKeyEnv || '', model: e.model, enabled: true, authType: info?.authType || 'Bearer' };
       });
-      // Save to UltimateConfig.csv + proxy-config.json
       const saveResult = await saveConfig(configEntries);
       if (saveResult.success) {
-        // Update modelFileLabel to reflect LatestModels.csv is now connected
         const modelLabel = document.getElementById('modelFileLabel');
         if (modelLabel) {
           const totalModels = Object.values(latestProviderModels).reduce((sum, arr) => sum + arr.length, 0);
           const totalProviders = Object.keys(latestProviderModels).length;
-          modelLabel.textContent = `Model list connected: ${totalProviders} provider(s) / ${totalModels} model(s) — ${latestModelsFileName}`;
+          modelLabel.textContent = `Model list connected: ${totalProviders} provider(s) / ${totalModels} model(s) — ${latestModelsFileName || '(unknown)'}`;
         }
-        renderConfigTable();
+        // Defer one tick so any closing native <select> popup finishes first.
+        setTimeout(() => renderAllConfigTables(), 0);
         await updateConfigLabel();
-        alert(`Loaded ${configEntries.length} model entries from ${latestModelsFileName}.`);
+        alert(`Loaded ${configEntries.length} model entries from ${latestModelsFileName || '(unknown)'}.`);
       } else {
         alert('Failed to save config: ' + saveResult.error);
       }
@@ -606,38 +574,25 @@ fetchModelsBtn.addEventListener('click', async () => {
   };
 });
 
-// Import config entries from a CSV/Excel file (becomes the source of truth)
 loadConfigFromCsvBtn?.addEventListener('click', async () => {
   const result = await openConfigFileDialog();
   if (result.canceled || !result.filePath) return;
-
   let loadResult;
   const ext = result.filePath.toLowerCase();
-  if (ext.endsWith('.csv')) {
-    loadResult = await parseConfigCsvFile(result.filePath);
-  } else {
-    loadResult = await parseConfigExcelFile(result.filePath);
-  }
-
+  if (ext.endsWith('.csv')) loadResult = await parseConfigCsvFile(result.filePath);
+  else loadResult = await parseConfigExcelFile(result.filePath);
   if (loadResult && loadResult.success) {
-    // Auto-fill baseURL/apiKeyEnv from ProviderConfig.csv for each entry
     configEntries = loadResult.entries.map(entry => {
       const info = providerInfo[entry.provider];
-      if (info) {
-        return {
-          ...entry,
-          baseURL: info.baseURL,
-          apiKeyEnv: info.apiKeyEnv
-        };
-      }
+      if (info) return { ...entry, baseURL: info.baseURL, apiKeyEnv: info.apiKeyEnv, authType: info.authType || entry.authType || 'Bearer' };
       return entry;
     });
-    // Save to UltimateConfig.csv + proxy-config.json (source of truth)
     const saveResult = await saveConfig(configEntries);
     if (saveResult.success) {
-      renderConfigTable();
+      // Defer one tick so any closing native <select> popup finishes first.
+      setTimeout(() => renderAllConfigTables(), 0);
       await updateConfigLabel();
-      alert(`Loaded ${configEntries.length} config entries from ${result.filePath}. Saved to ${ultimateConfigFileName}.`);
+      alert(`Loaded ${configEntries.length} config entries from ${result.filePath}.`);
     } else {
       alert('Failed to save config: ' + saveResult.error);
     }
@@ -646,56 +601,40 @@ loadConfigFromCsvBtn?.addEventListener('click', async () => {
   }
 });
 
-// Update the config file status label
 async function updateConfigLabel() {
   const label = document.getElementById('configFileLabel');
   if (label) {
     const enabledCount = configEntries.filter(e => e.enabled).length;
-    label.textContent = `Config: ${enabledCount}/${configEntries.length} enabled - ${ultimateConfigFileName}`;
+    label.textContent = `Config: ${enabledCount}/${configEntries.length} enabled - ${ultimateConfigFileName || '(unknown)'}`;
   }
 }
 
 saveConfigBtn.addEventListener('click', async () => {
   try {
-    // Apply configuration WITHOUT any health check
-    // First, save the config file (source of truth)
     const saveResult = await saveConfig(configEntries);
-    if (!saveResult.success) {
-      alert('Failed to save config file: ' + saveResult.error);
-      return;
-    }
-    // Update the connected config label
+    if (!saveResult.success) { alert('Failed to save config file: ' + saveResult.error); return; }
     await updateConfigLabel();
-
     const running = await isProxyRunning();
     if (running) {
       const port = parseInt(portInput.value);
       const activeEntries = configEntries.filter(e => e.enabled);
       const result = await startProxy(port, activeEntries);
-      if (result.success) {
-        console.log('Configuration applied. Proxy restarted with updated entries.');
-      } else {
-        alert('Failed to apply configuration: ' + result.error);
-      }
+      if (result.success) console.log('Configuration applied. Proxy restarted.');
+      else alert('Failed to apply configuration: ' + result.error);
     } else {
-      console.log('Configuration saved. Start the proxy to use the updated model list.');
+      console.log('Configuration saved.');
     }
   } catch (err) {
-    console.error('Apply Configuration error:', err);
     alert('Error applying configuration: ' + err.message);
   }
 });
 
-// Health Check Tab
 const pingAllBtn = document.getElementById('pingAllBtn');
 const pingSummary = document.getElementById('pingSummary');
 
 pingAllBtn.addEventListener('click', async () => {
   const activeEntries = configEntries.filter(e => e.enabled);
-  if (activeEntries.length === 0) {
-    pingSummary.innerHTML = '<strong>No enabled entries to ping.</strong>';
-    return;
-  }
+  if (activeEntries.length === 0) { pingSummary.innerHTML = '<strong>No enabled entries to ping.</strong>'; return; }
   pingSummary.innerHTML = '<strong>Pinging...</strong>';
   const okLog = document.getElementById('healthOkLog');
   const failLog = document.getElementById('healthFailLog');
@@ -708,13 +647,13 @@ pingAllBtn.addEventListener('click', async () => {
     if (okLog) okLog.value = okResults.map(r => `${r.provider}\t${r.model}\tOK\t${r.latency || 'N/A'}ms`).join('\n');
     if (failLog) failLog.value = failResults.map(r => `${r.provider}\t${r.model}\t${r.status}\t${r.latency || 'N/A'}ms${r.reason ? ' — ' + r.reason : ''}`).join('\n');
     pingSummary.innerHTML = `<strong>Total OK: ${okResults.length} | Total Failed: ${failResults.length}</strong>`;
-    renderPriorityOverrideDropdown();
+    // Defer one tick so any closing native <select> popup finishes first.
+    setTimeout(() => renderPriorityOverrideDropdown(), 0);
   } catch (err) {
     pingSummary.innerHTML = `<strong>Health check failed: ${err.message}</strong>`;
   }
 });
 
-// Token Usage Tab
 const refreshUsageBtn = document.getElementById('refreshUsageBtn');
 const usageTableBody = document.querySelector('#usageTable tbody');
 const usageSummary = document.getElementById('usageSummary');
@@ -722,21 +661,164 @@ const usageSummary = document.getElementById('usageSummary');
 async function renderTokenUsage() {
   const usage = await window.api.getTokenUsage();
   usageTableBody.innerHTML = '';
-  if (!usage || usage.length === 0) {
-    usageSummary.innerHTML = '<strong>No token usage recorded yet.</strong>';
-    return;
-  }
+  if (!usage || usage.length === 0) { usageSummary.innerHTML = '<strong>No token usage recorded yet.</strong>'; return; }
   let totalRequests = 0, totalPrompt = 0, totalCompletion = 0, totalTokens = 0;
   usage.forEach((u, i) => {
     const row = document.createElement('tr');
     row.innerHTML = `<td>${i + 1}</td><td>${u.provider}</td><td>${u.model}</td><td>${u.requests}</td><td>${u.promptTokens.toLocaleString()}</td><td>${u.completionTokens.toLocaleString()}</td><td><strong>${u.totalTokens.toLocaleString()}</strong></td>`;
     usageTableBody.appendChild(row);
-    totalRequests += u.requests;
-    totalPrompt += u.promptTokens;
-    totalCompletion += u.completionTokens;
-    totalTokens += u.totalTokens;
+    totalRequests += u.requests; totalPrompt += u.promptTokens; totalCompletion += u.completionTokens; totalTokens += u.totalTokens;
   });
   usageSummary.innerHTML = `<strong>Models: ${usage.length} | Requests: ${totalRequests} | Prompt: ${totalPrompt.toLocaleString()} | Completion: ${totalCompletion.toLocaleString()} | Total: ${totalTokens.toLocaleString()}</strong>`;
 }
 
 refreshUsageBtn.addEventListener('click', renderTokenUsage);
+
+const addWebProviderBtn = document.getElementById('addWebProviderBtn');
+const webProviderModal = document.getElementById('webProviderModal');
+const webProviderPresetSelect = document.getElementById('webProviderPresetSelect');
+const webProviderNameInput = document.getElementById('webProviderNameInput');
+const webProviderUrlInput = document.getElementById('webProviderUrlInput');
+const webProviderCookieInput = document.getElementById('webProviderCookieInput');
+const webProviderModalProceed = document.getElementById('webProviderModalProceed');
+const webProviderModalCancel = document.getElementById('webProviderModalCancel');
+
+let webProviderPresets = {};
+
+async function loadWebProviderPresets() {
+  try {
+    const presets = await window.api.getWebProviderPresets();
+    webProviderPresets = presets || {};
+    const presetKeys = Object.keys(webProviderPresets);
+    // Rebuild the preset dropdown from the real preset list (Qwen, Kimi, ...).
+    if (webProviderPresetSelect) {
+      webProviderPresetSelect.innerHTML = '<option value="">— Custom —</option>' +
+        presetKeys.map(k => `<option value="${k}">${k}</option>`).join('');
+    }
+    // Also keep the "Clear Session" provider dropdown in sync.
+    const clearSelect = document.getElementById('clearWebProviderSelect');
+    if (clearSelect) {
+      const current = clearSelect.value;
+      clearSelect.innerHTML = presetKeys.map(k => `<option value="${k}">${k}</option>`).join('') || '<option value="Qwen">Qwen</option>';
+      if (presetKeys.includes(current)) clearSelect.value = current;
+    }
+  } catch (err) {
+    console.warn('Could not load web provider presets:', err.message);
+  }
+}
+
+function showWebProviderStatus(html) {
+  const status = document.getElementById('webProviderModalStatus');
+  if (status) { status.innerHTML = html; status.style.display = 'block'; }
+}
+function showWebProviderForm() {
+  const form = document.getElementById('webProviderModalForm');
+  const status = document.getElementById('webProviderModalStatus');
+  if (form) form.style.display = 'block';
+  if (status) status.style.display = 'none';
+}
+
+addWebProviderBtn?.addEventListener('click', () => {
+  // Always rebuild the cached refs: a previous setup run may have left the modal
+  // in a stale state (form swapped out, buttons hidden).
+  webProviderNameInput.value = 'Qwen';
+  webProviderUrlInput.value = 'https://chat.qwen.ai/';
+  webProviderCookieInput.value = '';
+  if (webProviderPresetSelect) webProviderPresetSelect.value = 'Qwen';
+  webProviderModal.style.display = 'flex';
+  showWebProviderForm();
+  webProviderModalProceed.style.display = '';
+  webProviderModalCancel.style.display = '';
+  webProviderModalProceed.disabled = false;
+  webProviderModalCancel.disabled = false;
+  webProviderNameInput.focus();
+  toggleCookieField();
+});
+
+webProviderModalCancel?.addEventListener('click', () => { webProviderModal.style.display = 'none'; });
+
+// Selecting a preset prefills Name + Login URL from the main-process preset table.
+webProviderPresetSelect?.addEventListener('change', () => {
+  const preset = webProviderPresets[webProviderPresetSelect.value];
+  if (preset) {
+    webProviderNameInput.value = webProviderPresetSelect.value;
+    webProviderUrlInput.value = preset.loginUrl;
+  }
+});
+
+// The cookie field is always available: leave it blank to auto-retrieve via the
+// browser automation, or paste a cookie to skip the browser entirely.
+// Kimi-style providers: you can paste the `refresh_token` found in DevTools →
+// Application → Local Storage → https://www.kimi.com directly — it is detected
+// (JWT, eyJ...) and stored as the Bearer authToken.
+function toggleCookieField() {
+  if (webProviderCookieInput) webProviderCookieInput.style.display = 'block';
+}
+webProviderNameInput?.addEventListener('input', () => {
+  if (webProviderPresetSelect && webProviderPresets[webProviderNameInput.value.trim()]) {
+    webProviderPresetSelect.value = webProviderNameInput.value.trim();
+    webProviderUrlInput.value = webProviderPresets[webProviderNameInput.value.trim()].loginUrl;
+  }
+});
+
+webProviderModalProceed?.addEventListener('click', async () => {
+  const name = webProviderNameInput.value.trim();
+  const url = webProviderUrlInput.value.trim();
+  if (!name || !url) { alert('Please enter both a provider name and a login URL.'); return; }
+
+  const useAutoRetrieve = (webProviderCookieInput.value.trim().length === 0);
+
+  // Show status WITHOUT destroying the form DOM: swapping innerHTML would orphan
+  // the cached element refs (preset select, name/url inputs), leaving the modal
+  // form dead on the next open ("dropdown not responsive" bug).
+  showWebProviderForm();
+  showWebProviderStatus(useAutoRetrieve
+    ? `<h3>Setting up ${name}...</h3><p>A browser window will open. Please log in and send <strong>ONE</strong> test message in the chat.</p><p>The script is listening for the chat API request. This may take up to 2 minutes.</p><div class="progress-bar-container" style="width: 100%; margin-top: 15px;"><div class="progress-bar-fill" style="width: 100%; animation: progress-indeterminate 1.5s ease-in-out infinite;"></div></div><p style="font-size: 12px; color: #666; margin-top: 10px;">Do not close the browser window or this app.</p>`
+    : `<h3>Saving ${name} cookie…</h3><p>Storing the pasted cookie (no browser opened, no ping performed).</p>`);
+  webProviderModalProceed.disabled = true;
+  webProviderModalCancel.disabled = true;
+
+  try {
+    const result = useAutoRetrieve
+      ? await window.api.runWebProviderSetup(name, url)
+      : await window.api.setProviderCookie(name, webProviderCookieInput.value.trim());
+     if (result.success) {
+       showWebProviderStatus(`<h3>✅ Success!</h3><p>Web provider added.</p>
+         <p style="font-size:13px;color:#666;">${name} has been added to your config (model "${name}-chat"). Restart the proxy to pick it up.</p>
+         <button id="webProviderModalClose" style="margin-top:12px;padding:6px 14px;">Close</button>`);
+       document.getElementById('webProviderModalClose')?.addEventListener('click', () => {
+         webProviderModal.style.display = 'none';
+       });
+       // Do not auto-close or auto-reload — let the user dismiss when ready.
+    } else {
+      alert('Failed: ' + (result.error || 'Unknown error'));
+      showWebProviderForm();
+      webProviderModalProceed.disabled = false;
+      webProviderModalCancel.disabled = false;
+    }
+  } catch (err) {
+    alert('Failed: ' + (err.message || 'Unknown error'));
+    showWebProviderForm();
+    webProviderModalProceed.disabled = false;
+    webProviderModalCancel.disabled = false;
+  }
+});
+
+const clearWebProviderSessionBtn = document.getElementById('clearWebProviderSessionBtn');
+clearWebProviderSessionBtn?.addEventListener('click', () => {
+  const providerName = document.getElementById('clearWebProviderSelect')?.value || 'Qwen';
+  // Defer one tick: opening a blocking native confirm()/alert() while a <select>
+  // popup is still closing leaves a stuck invisible popup layer that eats clicks.
+  setTimeout(async () => {
+    if (!confirm(`Are you sure you want to clear all stored ${providerName} cookies and session data?`)) return;
+    const result = await window.api.clearWebProviderSession(providerName);
+    if (result.success) {
+      alert(`${providerName} session cleared. Please use "Add Web Provider" to log in again.`);
+    } else {
+      alert(`Failed to clear ${providerName} session: ` + result.error);
+    }
+  }, 0);
+});
+
+// Load provider presets (Qwen, Kimi, ...) once the renderer is ready.
+loadWebProviderPresets();

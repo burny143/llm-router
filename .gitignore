@@ -12,6 +12,11 @@ LatestModels.csv
 known-ok.json
 token-usage.json
 settings.json
+web-provider-rules.json
+
+# --- Browser login profiles (contain real session cookies — never commit) ---
+data/browser-profiles/
+src/BACKUP/
 
 # --- OS / editor ---
 .DS_Store

@@ -1,22 +1,81 @@
+// main.js
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
-const { exec } = require('child_process');
+const { exec, spawn } = require('child_process');
 const axios = require('axios');
-
-const { startProxy, stopProxy, isProxyRunning, setHealthResults, extractContent, getTokenUsage, getProxyStats, getKnownOk, setPriorityOverride } = require('./proxy-server');
-const { saveResults, loadResults, saveSettings, loadSettings, saveConfigBoth, syncConfigFromCsv, pruneConfigEntries, loadProviderConfig, CONFIG_CSV, PROVIDER_CONFIG_CSV, getFilePath } = require('./state-store');
+const https = require('https');
+const { startProxy, stopProxy, isProxyRunning, setHealthResults, extractContent, getTokenUsage, getProxyStats, getKnownOk, setPriorityOverride, injectUserText } = require('./proxy-server');
+const { saveResults, loadResults, saveSettings, loadSettings, saveConfigBoth, syncConfigFromCsv, pruneConfigEntries, loadProviderConfig, CONFIG_CSV, PROVIDER_CONFIG_CSV, getFilePath, envPrefixFor, parseCsv } = require('./state-store');
 const { IPC_CHANNELS } = require('./shared-constants');
-require('dotenv').config({ path: getFilePath('env') }); // Load .env (path from file-registry.json) so process.env has the API keys
+require('dotenv').config({ path: getFilePath('env') });
+
+const chromeAgent = new https.Agent({
+  ciphers: 'TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384',
+  ecdhCurve: 'X25519:prime256v1:secp384r1',
+  minVersion: 'TLSv1.2',
+  rejectUnauthorized: false
+});
+
+let webRules = {};
+function reloadWebRules() {
+  try {
+    const rulesPath = getFilePath('webProviderRules');
+    if (fs.existsSync(rulesPath)) {
+      webRules = JSON.parse(fs.readFileSync(rulesPath, 'utf-8'));
+    } else {
+      webRules = {};
+    }
+  } catch (e) {
+    console.warn('Could not load web-provider-rules.json:', e.message);
+  }
+}
+reloadWebRules();
 
 let mainWindow;
-let availableModels = [];    // Models from the connected model-list file
-let availableProviders = []; // Providers from the connected model-list file
-let availableProviderModels = {}; // Map: provider -> models[] from model-list file
-let latestProviderModels = {}; // Map: provider -> models[] from LatestModels.csv (primary)
-let modelsFile = '';         // Path of the connected model-list file (auto-loaded like .env)
-let configEntries = [];      // Proxy entries from the connected config file (source of truth)
-let pendingConfigReady = null; // Queued config-ready payload, flushed once the renderer has finished loading
+let availableModels = [];
+let availableProviders = [];
+let availableProviderModels = {};
+let latestProviderModels = {};
+let modelsFile = '';
+let configEntries = [];
+let pendingConfigReady = null;
+
+// Known web (Cookie-auth) provider presets. Each preset pre-fills the "Add Web
+// Provider" modal (name, login URL) and seeds ProviderConfig.csv + rules with a
+// sensible default baseURL/samplePayload when a cookie is pasted manually.
+const WEB_PROVIDER_PRESETS = {
+  Qwen: {
+    loginUrl: 'https://chat.qwen.ai/',
+    baseURL: 'https://chat.qwen.ai/api/v2/chat/completions',
+    origin: 'https://chat.qwen.ai',
+    referer: 'https://chat.qwen.ai/',
+    samplePayload: { model: 'openai', question: 'hi', stream: true }
+  },
+  Kimi: {
+    loginUrl: 'https://www.kimi.com/',
+    // NOTE: Kimi's web API is a token-exchange protocol (refresh_token -> convId
+    // -> completion/stream) served from kimi.moonshot.cn, NOT an OpenAI-style
+    // endpoint. baseURL below is display metadata only; when an authToken is
+    // present the proxy routes requests through kimi-web-client.js instead.
+    baseURL: 'https://kimi.moonshot.cn/api/chat',
+    origin: 'https://kimi.moonshot.cn',
+    referer: 'https://kimi.moonshot.cn/',
+    samplePayload: {
+      copilot_ctx: null,
+      is_think: true,
+      kimiplus_id: '',
+      messages: [{ role: 'user', content: 'hi' }],
+      model: 'kimi',
+      on_site_url: 'https://www.kimi.com/zh-cn',
+      origin: 'web',
+      query: 'hi',
+      type: 'chat',
+      use_research: false,
+      stream: true
+    }
+  }
+};
 
 function loadHealthResults() {
   const saved = loadResults();
@@ -33,13 +92,12 @@ function sendToRenderer(channel, ...args) {
   }
 }
 
-// Forward main-process logs to the renderer's Developer Logs panel
 function forwardLogsToRenderer() {
   const levels = ['log', 'info', 'warn', 'error'];
   levels.forEach(level => {
     const original = console[level].bind(console);
     console[level] = (...args) => {
-      original(...args); // keep CMD output
+      original(...args);
       const text = args.map(a => {
         if (typeof a === 'string') return a;
         if (a instanceof Error) return a.stack || a.message;
@@ -58,26 +116,10 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      // Explicitly disabled: Electron 20+ defaults `sandbox` to true when
-      // unset, which restricts preload.js's require() to a small whitelist
-      // of built-ins (electron, events, timers, url, ...). That silently
-      // breaks `require('./shared-constants')` with
-      // "Error: module not found: ./shared-constants" thrown by the
-      // sandboxed preloadRequire shim, which in turn means
-      // contextBridge.exposeInMainWorld never runs and window.api is never
-      // defined in the renderer. contextIsolation:true is kept as the real
-      // security boundary between preload and page content.
       sandbox: false
     }
   });
-
   mainWindow.loadFile(path.join(__dirname, 'index.html'));
-
-  // The renderer's onConfigReady listener isn't guaranteed to be registered
-  // until the page has actually finished loading, even though `mainWindow`
-  // itself exists synchronously. Flush anything queued via queueConfigReady()
-  // once the page is ready, so we never fire config-ready into a listener
-  // that isn't there yet.
   mainWindow.webContents.once('did-finish-load', () => {
     if (pendingConfigReady) {
       sendToRenderer(IPC_CHANNELS.CONFIG_READY, pendingConfigReady);
@@ -86,18 +128,195 @@ function createWindow() {
   });
 }
 
-// Queue a config-ready payload for delivery once the renderer has finished loading.
-// Use this instead of calling sendToRenderer(IPC_CHANNELS.CONFIG_READY, ...) directly.
 function queueConfigReady(payload) {
   pendingConfigReady = payload;
-  // If the page already finished loading by the time this is called, flush immediately.
   if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.webContents.isLoading()) {
     sendToRenderer(IPC_CHANNELS.CONFIG_READY, pendingConfigReady);
     pendingConfigReady = null;
   }
 }
 
-// IPC handlers for proxy control
+function addOrUpdateWebProviderEntry(providerName) {
+  const providerMap = loadProviderConfig();
+  const info = providerMap[providerName];
+  if (!info) {
+    console.warn(`Web provider setup: "${providerName}" not found in ${path.basename(PROVIDER_CONFIG_CSV)} after capture.`);
+    return;
+  }
+  const placeholderModel = `${providerName}-chat`;
+  configEntries = configEntries.filter(e => !(e.provider === providerName && e.model === placeholderModel));
+  configEntries.push({
+    provider: providerName,
+    baseURL: info.baseURL,
+    apiKeyEnv: info.apiKeyEnv,
+    model: placeholderModel,
+    enabled: true,
+    authType: info.authType || 'Bearer'
+  });
+  saveConfigBoth(configEntries);
+  console.log(`Web provider "${providerName}" added to config as ${placeholderModel} (authType: ${info.authType || 'Bearer'}).`);
+}
+
+ipcMain.handle(IPC_CHANNELS.RUN_WEB_PROVIDER_SETUP, async (event, providerName, startUrl) => {
+  return new Promise((resolve) => {
+    const scriptPath = path.join(__dirname, 'setup-web-provider.js');
+    const child = spawn('node', [scriptPath, providerName, startUrl], { cwd: __dirname });
+    let output = '';
+    child.stdout.on('data', (data) => { output += data.toString(); console.log(data.toString()); });
+    child.stderr.on('data', (data) => { output += data.toString(); console.error(data.toString()); });
+    child.on('close', (code) => {
+      // The child process runs its own headed Playwright browser for login/capture
+      // and tears those native OS windows down before exiting. Closing a native
+      // browser window triggers an OS-level activation event that doesn't reliably
+      // return focus to the Electron window (esp. on Windows), which is the source
+      // of the post-capture "dropdown freeze." Reclaim focus immediately when the
+      // child exits — for either success or failure.
+      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.focus();
+      if (code === 0) {
+        require('dotenv').config({ path: getFilePath('env'), override: true });
+        reloadWebRules();
+        addOrUpdateWebProviderEntry(providerName);
+        queueConfigReady({ entries: configEntries });
+        resolve({ success: true, output });
+      } else {
+        resolve({ success: false, error: output });
+      }
+    });
+  });
+});
+
+ipcMain.handle(IPC_CHANNELS.GET_WEB_PROVIDER_PRESETS, () => {
+  // Expose only the UI-facing fields; full preset (baseURL/samplePayload) stays
+  // in main for seeding config. Renderer uses these to prefill the modal.
+  return Object.fromEntries(
+    Object.entries(WEB_PROVIDER_PRESETS).map(([name, p]) => [name, { loginUrl: p.loginUrl, baseURL: p.baseURL }])
+  );
+});
+
+ipcMain.handle(IPC_CHANNELS.CLEAR_WEB_PROVIDER_SESSION, async (event, providerName) => {
+  try {
+    const name = providerName || 'Qwen';
+    const envKey = `${envPrefixFor(name)}_COOKIE`;
+    const envPath = getFilePath('env');
+    if (fs.existsSync(envPath)) {
+      let content = fs.readFileSync(envPath, 'utf-8');
+      content = content.split('\n').filter(line => !line.startsWith(`${envKey}=`)).join('\n');
+      fs.writeFileSync(envPath, content);
+    }
+    
+    const rulesPath = getFilePath('webProviderRules');
+    if (fs.existsSync(rulesPath)) {
+      const rules = JSON.parse(fs.readFileSync(rulesPath, 'utf-8'));
+      delete rules[name];
+      fs.writeFileSync(rulesPath, JSON.stringify(rules, null, 2));
+    }
+    
+    const browserClient = require('./browser-http-client');
+    // Only tear down THIS provider's browser session. Closing every provider's
+    // Playwright windows would (a) silently destroy other providers' valid
+    // logged-in sessions, and (b) close unrelated native browser windows mid-
+    // flow, stealing OS focus from the Electron window and leaving native
+    // <select> popups unresponsive afterwards.
+    const profileKey = envPrefixFor(name).toLowerCase();
+
+    // Reclaim focus for the Electron UI right away — closing a Playwright
+    // window triggers an OS-level activation event that doesn't reliably return
+    // to mainWindow on Windows, so don't wait on the profile flush before
+    // refocusing.
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.focus();
+
+    // Close the matching session in the background; don't block the response
+    // (and the UI) on Playwright's disk flush of the browser profile.
+    browserClient.close(profileKey)
+      .then(() => { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.focus(); })
+      .catch((err) => console.warn(`Background close of ${name} web session failed:`, err && err.message ? err.message : err));
+
+    console.log(`${name} web session cleared successfully.`);
+    return { success: true };
+  } catch (err) {
+    console.error(`Failed to clear ${providerName || 'Qwen'} web session:`, err.message);
+    return { success: false, error: err.message };
+  }
+});
+
+// Manually paste a cookie for a web (Cookie-auth) provider — no browser, no ping.
+// Stores <PREFIX>_COOKIE in .env, upserts the ProviderConfig.csv row, and seeds
+// web-provider-rules.json with a default sample payload + headers (so payload
+// translation has something to clone). Does NOT probe the provider afterwards.
+ipcMain.handle(IPC_CHANNELS.SET_PROVIDER_COOKIE, async (event, providerName, cookie) => {
+  try {
+    const prefix = envPrefixFor(providerName);
+    const envKey = `${prefix}_COOKIE`;
+    const envPath = getFilePath('env');
+    if (fs.existsSync(envPath)) {
+      let content = fs.readFileSync(envPath, 'utf-8');
+      content = content.split('\n').filter(line => !line.startsWith(`${envKey}=`)).join('\n');
+      const safeValue = String(cookie).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+      content = `${content}\n${envKey}="${safeValue}"\n`.trim();
+      fs.writeFileSync(envPath, content + '\n');
+    }
+    require('dotenv').config({ path: envPath, override: true });
+
+    const preset = WEB_PROVIDER_PRESETS[providerName];
+
+    // Upsert ProviderConfig.csv row
+    const csvPath = getFilePath('providerConfig');
+    const existingCsv = fs.existsSync(csvPath) ? fs.readFileSync(csvPath, 'utf-8') : '';
+    let header = existingCsv ? existingCsv.split(/\r?\n/)[0].split(',').map(h => h.trim()).filter(Boolean) : [];
+    ['provider', 'baseURL', 'apiKeyEnv', 'modelsEndpoint', 'authType'].forEach(h => { if (!header.includes(h)) header.push(h); });
+    let rows = existingCsv ? parseCsv(existingCsv) : [];
+    rows = rows.filter(r => r.provider !== providerName);
+    const newRow = {};
+    header.forEach(h => { newRow[h] = ''; });
+    newRow.provider = providerName;
+    newRow.apiKeyEnv = envKey;
+    newRow.authType = 'Cookie';
+    if (preset) {
+      newRow.baseURL = preset.baseURL;
+    }
+    rows.push(newRow);
+    const escapeCsv = (v) => { const s = v == null ? '' : String(v); return (s.includes(',') || s.includes('"') || s.includes('\n')) ? `"${s.replace(/"/g, '""')}"` : s; };
+    fs.writeFileSync(csvPath, [header.join(','), ...rows.map(r => header.map(h => escapeCsv(r[h])).join(','))].join('\n') + '\n');
+
+    // Seed web-provider-rules.json if not already captured
+    const rulesPath = getFilePath('webProviderRules');
+    let rules = {};
+    if (fs.existsSync(rulesPath)) { try { rules = JSON.parse(fs.readFileSync(rulesPath, 'utf-8')) || {}; } catch (e) { rules = {}; } }
+    if (!rules[providerName]) {
+      rules[providerName] = {
+        samplePayload: preset ? preset.samplePayload : { question: 'hi', stream: true },
+        headers: { 'Content-Type': 'application/json' },
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        origin: preset ? preset.origin : '',
+        referer: preset ? preset.referer : '',
+        profileKey: prefix.toLowerCase()
+      };
+    }
+    // A JWT (eyJ...) pasted here is Kimi's Local Storage `refresh_token`, which
+    // the API expects as a Bearer token — NOT a cookie. Detect it and store it
+    // as authToken so the runtime sends `Authorization: Bearer <token>`.
+    const trimmedCookie = String(cookie).trim();
+    const looksLikeJwt = /^eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(trimmedCookie);
+    if (looksLikeJwt) {
+      rules[providerName].authToken = trimmedCookie;
+      console.log(`[${providerName}] pasted value detected as a JWT refresh_token — stored as authToken.`);
+    }
+    fs.writeFileSync(rulesPath, JSON.stringify(rules, null, 2));
+
+    const masked = String(cookie).replace(/^[^\s]+={0,2}/, m => m.slice(0, Math.min(m.length, 4)) + '...').replace(/[^=;:.\-_a-zA-Z0-9]/g, '');
+    reloadWebRules();
+    // Same post-registration as the browser-capture path: add a config entry so
+    // the provider shows up in the config table + provider dropdown immediately.
+    addOrUpdateWebProviderEntry(providerName);
+    queueConfigReady({ entries: configEntries });
+    console.log(`[${providerName}] cookie saved (${masked.length} chars). No ping performed.`);
+    return { success: true };
+  } catch (err) {
+    console.error(`Failed to save ${providerName} cookie:`, err.message);
+    return { success: false, error: err.message };
+  }
+});
+
 ipcMain.handle(IPC_CHANNELS.START_PROXY, async (event, port, entries) => {
   try {
     await startProxy(port, entries);
@@ -116,16 +335,11 @@ ipcMain.handle(IPC_CHANNELS.IS_PROXY_RUNNING, () => {
   return isProxyRunning();
 });
 
-// Return the default models configuration (from models-config.js)
 ipcMain.handle(IPC_CHANNELS.GET_DEFAULT_CONFIG, () => {
   const defaultConfig = require('./models-config');
   return defaultConfig;
 });
 
-// Canonical default basenames for the data files (LatestModels.csv, ProviderConfig.csv,
-// UltimateConfig.csv, ...), resolved from state-store.js's file registry/defaults —
-// the single source of truth. The renderer calls this once on startup so its fallback
-// labels are never hardcoded literals that could go stale if a filename changes here.
 ipcMain.handle(IPC_CHANNELS.GET_DEFAULT_FILE_NAMES, () => {
   return {
     latestModelsFileName: path.basename(getFilePath('latestModels')),
@@ -134,11 +348,9 @@ ipcMain.handle(IPC_CHANNELS.GET_DEFAULT_FILE_NAMES, () => {
   };
 });
 
-// Get available environment variables from .env file
 ipcMain.handle(IPC_CHANNELS.GET_ENV_VARS, () => {
   const envPath = getFilePath('env');
   const envVars = [];
-
   if (fs.existsSync(envPath)) {
     const content = fs.readFileSync(envPath, 'utf-8');
     const lines = content.split('\n');
@@ -158,7 +370,6 @@ ipcMain.handle(IPC_CHANNELS.GET_ENV_VARS, () => {
   return envVars;
 });
 
-// Load LatestModels.csv (primary source for model dropdown)
 function loadLatestModels() {
   const latestPath = getFilePath('latestModels');
   if (!fs.existsSync(latestPath)) return;
@@ -173,7 +384,6 @@ function loadLatestModels() {
       if (firstComma === -1) continue;
       const provider = line.substring(0, firstComma);
       const model = line.substring(firstComma + 1);
-      // Skip error entries
       if (model.startsWith('ERROR:')) continue;
       if (provider && model) {
         if (!providerModels[provider]) providerModels[provider] = [];
@@ -188,7 +398,6 @@ function loadLatestModels() {
   }
 }
 
-// Apply a parsed model list: remember the file (like .env), extract models + providers.
 function connectModelFile(filePath, rows) {
   const { models, providers, providerModels } = extractModelsFromRows(rows);
   availableModels = models;
@@ -200,12 +409,9 @@ function connectModelFile(filePath, rows) {
   return { models, providers, providerModels };
 }
 
-// Like .env: if a model list file was connected before, auto-load it at startup.
-// Falls back to models.csv if that file exists.
 function autoConnectModelFile() {
   const settings = loadSettings();
   let filePath = settings.modelsFile;
-  // Fallback to models.csv if no saved file or saved file no longer exists
   const modelsCsv = getFilePath('models');
   if ((!filePath || !fs.existsSync(filePath)) && fs.existsSync(modelsCsv)) {
     filePath = modelsCsv;
@@ -233,7 +439,6 @@ function autoConnectModelFile() {
   }
 }
 
-// Get the currently connected model list (models + providers + provider-to-model map + source file)
 ipcMain.handle(IPC_CHANNELS.GET_CONNECTED_MODEL_LIST, () => {
   return {
     models: availableModels,
@@ -241,105 +446,74 @@ ipcMain.handle(IPC_CHANNELS.GET_CONNECTED_MODEL_LIST, () => {
     providerModels: availableProviderModels,
     latestProviderModels: latestProviderModels,
     file: modelsFile,
-    // Basenames so the renderer can build display strings without hardcoding filenames.
     latestModelsFileName: path.basename(getFilePath('latestModels')),
     providerConfigFileName: path.basename(PROVIDER_CONFIG_CSV)
   };
 });
 
-// --- Config File (source of truth for proxy entries) ---
-// UltimateConfig.csv is the editable truth file — proxy-config.json is synced from it.
-
-// Build model lists for each provider from ProviderConfig.csv
-// Uses live model sources (LatestModels.csv, connected model-list) before fallback to models-config.js
 function buildModelListsForProviders(providerMap) {
   const modelLists = [];
-  // Priority 3 fallback catalog — hoisted out of the loop since require()
-  // is cached anyway and re-requiring on every iteration was sloppy.
   const defaultConfig = require('./models-config');
-
   for (const [provider, info] of Object.entries(providerMap)) {
     const modelSet = new Set();
-    
-    // Priority 1: LatestModels.csv (fetched live)
     if (latestProviderModels[provider]) {
       latestProviderModels[provider].forEach(m => modelSet.add(m));
     }
-    
-    // Priority 2: Connected model-list file
     if (availableProviderModels[provider]) {
       availableProviderModels[provider].forEach(m => modelSet.add(m));
     }
-    
-    // Priority 3: Fallback to models-config.js (hardcoded catalog)
     const defaultModels = defaultConfig
       .filter(group => group.provider === provider)
       .map(group => group.models)
       .flat();
     defaultModels.forEach(m => modelSet.add(m));
-    
-    // Add deduplicated models to lists
     modelSet.forEach(model => {
       modelLists.push({
         provider,
         baseURL: info.baseURL,
         apiKeyEnv: info.apiKeyEnv,
         model,
-        enabled: true
+        enabled: true,
+        authType: info.authType || 'Bearer'
       });
     });
   }
-  
   return modelLists;
 }
 
-// Auto-connect config file on startup (like .env)
 async function autoConnectConfigFile() {
-  // Check if UltimateConfig.csv already exists (non-empty)
   const configPath = getFilePath('ultimateConfig');
   const configExists = fs.existsSync(configPath) && fs.readFileSync(configPath, 'utf-8').trim().length > 0;
-  
   if (configExists) {
-    // Load existing config and prune orphaned providers
     let entries = syncConfigFromCsv();
     const providerMap = loadProviderConfig();
     const result = pruneConfigEntries(entries, providerMap);
     entries = result.pruned;
     const changed = result.changed;
     configEntries = entries;
-    
-    // Persist pruned config if any entries were dropped
     if (changed) {
       saveConfigBoth(entries);
     }
     console.log(`Loaded existing config: ${configEntries.length} entries (pruned to match ${path.basename(PROVIDER_CONFIG_CSV)}).`);
-    // Notify renderer here too — previously this branch never sent config-ready,
-    // so the renderer had no way to know the existing config had loaded.
     queueConfigReady({ entries: configEntries });
   } else {
-    // Generate from ProviderConfig.csv (first-time setup)
     const providerMap = loadProviderConfig();
-    const modelLists = await buildModelListsForProviders(providerMap);
+    const modelLists = buildModelListsForProviders(providerMap);
     configEntries = modelLists;
     saveConfigBoth(configEntries);
     console.log(`Generated config: ${configEntries.length} entries (created from ${path.basename(PROVIDER_CONFIG_CSV)}).`);
-
-    // Notify renderer that config is ready (queued until the page has finished loading)
     queueConfigReady({ entries: configEntries });
   }
 }
 
-// Load config entries from the connected config file
 ipcMain.handle(IPC_CHANNELS.GET_CONNECTED_CONFIG, () => {
   return { entries: configEntries, file: CONFIG_CSV, fileName: path.basename(CONFIG_CSV) };
 });
 
-// Load provider configuration (provider -> baseURL, apiKeyEnv from ProviderConfig.csv)
 ipcMain.handle(IPC_CHANNELS.GET_PROVIDER_CONFIG, () => {
   return loadProviderConfig();
 });
 
-// Save current config entries to UltimateConfig.csv (and regenerate proxy-config.json)
 ipcMain.handle(IPC_CHANNELS.SAVE_CONFIG, async (event, entries) => {
   try {
     saveConfigBoth(entries);
@@ -351,7 +525,6 @@ ipcMain.handle(IPC_CHANNELS.SAVE_CONFIG, async (event, entries) => {
   }
 });
 
-// Open file dialog to select config file (optional - for manual override)
 ipcMain.handle(IPC_CHANNELS.OPEN_CONFIG_FILE_DIALOG, async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
     title: 'Select Proxy Config File (CSV or Excel)',
@@ -368,7 +541,6 @@ ipcMain.handle(IPC_CHANNELS.OPEN_CONFIG_FILE_DIALOG, async () => {
   return { canceled: false, filePath: result.filePaths[0] };
 });
 
-// Parse CSV config file (provider,baseURL,apiKeyEnv,model,enabled)
 ipcMain.handle(IPC_CHANNELS.PARSE_CONFIG_CSV_FILE, async (event, filePath) => {
   const csv = require('csv-parser');
   return new Promise((resolve, reject) => {
@@ -382,7 +554,8 @@ ipcMain.handle(IPC_CHANNELS.PARSE_CONFIG_CSV_FILE, async (event, filePath) => {
           baseURL: r.baseURL || r.baseUrl || '',
           apiKeyEnv: r.apiKeyEnv || r.apiKey || '',
           model: r.model || '',
-          enabled: r.enabled !== 'false' && r.enabled !== false
+          enabled: r.enabled !== 'false' && r.enabled !== false,
+          authType: r.authType || 'Bearer'
         })).filter(e => e.provider && e.model);
         resolve({ success: true, entries, rowCount: results.length });
       })
@@ -390,7 +563,6 @@ ipcMain.handle(IPC_CHANNELS.PARSE_CONFIG_CSV_FILE, async (event, filePath) => {
   });
 });
 
-// Parse Excel config file
 ipcMain.handle(IPC_CHANNELS.PARSE_CONFIG_EXCEL_FILE, async (event, filePath) => {
   const XLSX = require('xlsx');
   try {
@@ -403,7 +575,8 @@ ipcMain.handle(IPC_CHANNELS.PARSE_CONFIG_EXCEL_FILE, async (event, filePath) => 
       baseURL: r.baseURL || r.baseUrl || '',
       apiKeyEnv: r.apiKeyEnv || r.apiKey || '',
       model: r.model || '',
-      enabled: r.enabled !== 'false' && r.enabled !== false
+      enabled: r.enabled !== 'false' && r.enabled !== false,
+      authType: r.authType || 'Bearer'
     })).filter(e => e.provider && e.model);
     return { success: true, entries, rowCount: rows.length };
   } catch (err) {
@@ -411,7 +584,6 @@ ipcMain.handle(IPC_CHANNELS.PARSE_CONFIG_EXCEL_FILE, async (event, filePath) => 
   }
 });
 
-// Run fetch-models.js to update LatestModels.csv from ProviderConfig.csv
 ipcMain.handle(IPC_CHANNELS.RUN_FETCH_MODELS, async () => {
   return new Promise((resolve) => {
     exec('node fetch-models.js', { cwd: __dirname }, (error, stdout, stderr) => {
@@ -420,7 +592,6 @@ ipcMain.handle(IPC_CHANNELS.RUN_FETCH_MODELS, async () => {
         resolve({ success: false, error: error.message, output: stdout + stderr });
         return;
       }
-      // Read and parse LatestModels.csv after fetch
       try {
         const csvText = fs.readFileSync(getFilePath('latestModels'), 'utf-8');
         const lines = csvText.trim().split(/\r?\n/);
@@ -428,9 +599,6 @@ ipcMain.handle(IPC_CHANNELS.RUN_FETCH_MODELS, async () => {
         for (let i = 1; i < lines.length; i++) {
           const cols = lines[i].split(',');
           if (cols.length >= 2 && cols[0] && cols[1]) {
-            // Skip error entries (e.g. "ERROR: too many requests") so they
-            // never get persisted into configEntries / UltimateConfig.csv /
-            // proxy-config.json as if they were real model names.
             if (cols[1].startsWith('ERROR:')) continue;
             entries.push({ provider: cols[0], model: cols[1] });
           }
@@ -444,12 +612,10 @@ ipcMain.handle(IPC_CHANNELS.RUN_FETCH_MODELS, async () => {
   });
 });
 
-// Return the current set of known-OK endpoints (provider/model/latency) for the priority dropdown
 ipcMain.handle(IPC_CHANNELS.GET_KNOWN_OK, () => {
   return getKnownOk();
 });
 
-// Set (or clear, with null/undefined) the pinned provider/model priority override
 ipcMain.handle(IPC_CHANNELS.SET_PRIORITY_OVERRIDE, (event, providerModelKey) => {
   try {
     setPriorityOverride(providerModelKey || null);
@@ -459,57 +625,130 @@ ipcMain.handle(IPC_CHANNELS.SET_PRIORITY_OVERRIDE, (event, providerModelKey) => 
   }
 });
 
-// Token usage report per provider/model
 ipcMain.handle(IPC_CHANNELS.GET_TOKEN_USAGE, () => {
   return getTokenUsage();
 });
 
-// Live proxy stats: request count + connected clients
 ipcMain.handle(IPC_CHANNELS.GET_PROXY_STATS, () => {
   return getProxyStats();
 });
 
-// Health check: ping all enabled models (in parallel)
 ipcMain.handle(IPC_CHANNELS.HEALTH_CHECK, async (event, entries) => {
   console.log(`Health check: pinging ${entries.length} enabled model(s)...`);
-
   const checkOne = async (entry) => {
     const startTime = Date.now();
     const apiKey = process.env[entry.apiKeyEnv];
-    if (!apiKey) {
-      console.log(`  [SKIP] ${entry.provider}/${entry.model} — No API key`);
+    // Kimi-style providers authenticate via `authToken` (refresh_token) in the
+    // rules file — the cookie env var is not required for them.
+    const rule0 = entry.authType === 'Cookie' ? (webRules[entry.provider] || null) : null;
+    if (!apiKey && !(rule0 && rule0.authToken)) {
+      console.log(`[SKIP] ${entry.provider}/${entry.model} — No API key`);
       return { provider: entry.provider, model: entry.model, status: 'Failed', reason: 'No API key', latency: Date.now() - startTime };
     }
-
+    const authType = entry.authType || 'Bearer';
+    const headers = { 'Content-Type': 'application/json' };
+    let payload = {
+      model: entry.model,
+      messages: [{ role: 'user', content: 'ping' }],
+      max_tokens: 5
+    };
+    if (authType === 'Cookie') {
+      headers['Cookie'] = apiKey;
+      headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36';
+      headers['sec-ch-ua'] = '"Chromium";v="128", "Not;A=Brand";v="24", "Google Chrome";v="128"';
+      headers['sec-ch-ua-mobile'] = '?0';
+      headers['sec-ch-ua-platform'] = '"Windows"';
+      headers['sec-fetch-dest'] = 'empty';
+      headers['sec-fetch-mode'] = 'cors';
+      headers['sec-fetch-site'] = 'same-origin';
+      headers['accept'] = '*/*';
+      headers['accept-language'] = 'en-US,en;q=0.9';
+      const rule = webRules[entry.provider];
+      if (rule) {
+        if (rule.headers) {
+          for (const [key, value] of Object.entries(rule.headers)) {
+            if (!headers[key.toLowerCase()]) headers[key] = value;
+          }
+        } else {
+          if (rule.userAgent) headers['User-Agent'] = rule.userAgent;
+          if (rule.origin) headers['Origin'] = rule.origin;
+          if (rule.referer) headers['Referer'] = rule.referer;
+        }
+        headers['Cookie'] = apiKey;
+        headers['Content-Type'] = 'application/json';
+        if (rule.samplePayload) {
+          payload = JSON.parse(JSON.stringify(rule.samplePayload));
+          if (!injectUserText(payload, 'ping')) {
+            let replaced = false;
+            for (const key in payload) {
+              if (typeof payload[key] === 'string' && payload[key].length > 2 && !replaced) {
+                payload[key] = 'ping';
+                replaced = true;
+              } else if (typeof payload[key] === 'object' && payload[key] !== null) {
+                for (const subKey in payload[key]) {
+                  if (typeof payload[key][subKey] === 'string' && payload[key][subKey].length > 2 && !replaced) {
+                    payload[key][subKey] = 'ping';
+                    replaced = true;
+                  }
+                }
+              }
+            }
+          }
+          // Keep a top-level `query` mirror (e.g. Kimi) in sync with the ping text.
+          if (typeof payload.query === 'string') payload.query = 'ping';
+        }
+        // Kimi-style providers authenticate via the Local Storage `refresh_token`
+        // (Bearer), not via cookies — attach it when the capture saved one.
+        if (rule.authToken) {
+          headers['Authorization'] = `Bearer ${rule.authToken}`;
+        }
+      }
+    } else {
+      headers['Authorization'] = `Bearer ${apiKey}`;
+    }
     try {
-      const payload = {
-        model: entry.model,
-        messages: [{ role: 'user', content: 'ping' }],
-        max_tokens: 1
-      };
-      console.log(`  [CHECK] ${entry.provider}/${entry.model} → ${entry.baseURL}`);
-      const resp = await axios.post(entry.baseURL, payload, {
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`
-        },
-        timeout: 15000
-      });
+      console.log(`[CHECK] ${entry.provider}/${entry.model} → ${entry.baseURL}`);
+      let resp;
+      if (authType === 'Cookie') {
+        const rule = webRules[entry.provider];
+        // Kimi-style providers authenticate via a `refresh_token` (stored as
+        // `authToken` in the rules) and speak their own token-exchange API — no
+        // browser/cookies involved. Route those through the dedicated client.
+        if (rule && rule.authToken) {
+          const kimiClient = require('./kimi-web-client');
+          resp = await kimiClient.completion({
+            model: entry.model,
+            messages: [{ role: 'user', content: 'ping' }],
+            refreshToken: rule.authToken,
+            useSearch: false
+          });
+        } else {
+          const browserClient = require('./browser-http-client');
+          const profileKey = (rule && rule.profileKey) || envPrefixFor(entry.provider).toLowerCase();
+          resp = await browserClient.request(entry.baseURL, payload, headers, apiKey, profileKey);
+        }
+      } else {
+        resp = await axios.post(entry.baseURL, payload, { 
+          headers, 
+          timeout: 15000,
+          httpsAgent: authType === 'Cookie' ? chromeAgent : undefined
+        });
+      }
       const hasContent = resp.status === 200 && extractContent(resp.data) !== null;
       const latency = Date.now() - startTime;
       const status = hasContent ? 'OK' : `Failed (${resp.status} - no usable content)`;
-      console.log(`  [${status}] ${entry.provider}/${entry.model} — ${latency}ms`);
+      console.log(`[${status}] ${entry.provider}/${entry.model} — ${latency}ms`);
+      if (!hasContent) {
+        console.log(`Raw response: ${JSON.stringify(resp.data).slice(0, 300)}`);
+      }
       return { provider: entry.provider, model: entry.model, status, latency };
     } catch (err) {
       const latency = Date.now() - startTime;
-      console.log(`  [FAILED] ${entry.provider}/${entry.model} — ${err.message} (${latency}ms)`);
+      console.log(`[FAILED] ${entry.provider}/${entry.model} — ${err.message} (${latency}ms)`);
       return { provider: entry.provider, model: entry.model, status: 'Failed', reason: err.message, latency };
     }
   };
-
-  // Run all checks in parallel
   const results = await Promise.all(entries.map(checkOne));
-
   const okCount = results.filter(r => r.status === 'OK').length;
   setHealthResults(results);
   console.log(`Health check complete: ${okCount}/${results.length} endpoints OK. Routing updated live.`);
@@ -518,17 +757,11 @@ ipcMain.handle(IPC_CHANNELS.HEALTH_CHECK, async (event, entries) => {
 
 function extractModelsFromRows(rows) {
   if (!rows || rows.length === 0) return { models: [], providers: [], providerModels: {} };
-
-  // Get all column names from the first row
   const columns = Object.keys(rows[0]);
-
-  // Priority order for model column detection
   const modelColumnCandidates = [
     'model', 'model_name', 'modelname', 'model-id', 'modelid',
     'name', 'modelName', 'Model', 'Model Name', 'ModelName'
   ];
-
-  // Find the best matching column
   let modelColumn = null;
   for (const candidate of modelColumnCandidates) {
     const found = columns.find(c => c.toLowerCase() === candidate.toLowerCase());
@@ -537,8 +770,6 @@ function extractModelsFromRows(rows) {
       break;
     }
   }
-
-  // If no standard column found, use the first column that has string values
   if (!modelColumn) {
     for (const col of columns) {
       const sampleValues = rows.slice(0, 5).map(r => r[col]).filter(v => v != null && v !== '');
@@ -548,28 +779,21 @@ function extractModelsFromRows(rows) {
       }
     }
   }
-
-  // Fallback to first column
   if (!modelColumn && columns.length > 0) {
     modelColumn = columns[0];
   }
-
   const models = modelColumn
     ? [...new Set(rows.map(r => r[modelColumn]).filter(v => v != null && v !== ''))]
     : [];
-
-  // Extract unique providers if the file has a provider column
   let providers = [];
   let providerModels = {};
   const providerColumn = columns.find(c => c.toLowerCase() === 'provider');
   if (providerColumn) {
     providers = [...new Set(rows.map(r => r[providerColumn]).filter(v => v != null && v !== ''))];
-    // Build map: provider -> models[]
     providers.forEach(p => {
       providerModels[p] = [...new Set(rows.filter(r => r[providerColumn] === p).map(r => r[modelColumn]).filter(v => v != null && v !== ''))];
     });
   }
-
   return { models, providers, providerModels };
 }
 

@@ -126,6 +126,37 @@ npm run dev        # Runs via start.js
 | **Model List** (`models.csv`) | Dropdown options for Provider + Model | Auto-loaded on startup from `settings.json`; persists path; reload on file change via "Load Model File" |
 | **Config File** (`UltimateConfig.csv`) | Source of truth for proxy entries | Auto-loaded on startup; Apply Configuration writes back to it + `proxy-config.json` |
 
+### Web Providers (Cookie Auth) — e.g. Qwen / Kimi Chat
+- **"Add Web Provider (Cookie)" button** (Admin/Configuration tab): pick a preset (Qwen,
+  Kimi) from the dropdown or type a custom provider name + login URL, then a real headed
+  browser opens (Playwright Chromium/Chrome/Edge), you log in and send **one test message**,
+  the chat API request is captured automatically (URL, headers, payload, cookies).
+- The captured session cookie is stored in `data/.env` as `<PREFIX>_COOKIE` (e.g.
+  `QWEN_COOKIE`, `KIMI_COOKIE`), the provider row is upserted into `ProviderConfig.csv` with
+  `authType=Cookie`, and captured request/header rules are saved to
+  `data/web-provider-rules.json`.
+- **Qwen**: requests are sent through `src/browser-http-client.js` (Playwright in-page fetch)
+  to bypass WAF/TLS-fingerprint blocking; the browser runs minimized with a persistent profile
+  in `data/browser-profiles/` so login state is reused until the cookie expires.
+- **Kimi (kimi.moonshot.cn)**: uses a **token-exchange protocol** instead of cookies.
+  The captured JWT `refresh_token` is stored as `authToken` in `web-provider-rules.json`
+  (not as a cookie). At request time the proxy routes Kimi through `src/kimi-web-client.js`,
+  a plain-axios client that performs the full dance:
+  `GET /api/auth/token/refresh` (Bearer refresh_token) → access_token (300 s TTL, cached) →
+  `GET /api/user` → userId → `POST /api/chat` → convId → `POST /api/chat/{convId}/completion/stream`
+  (SSE, `cmpl`/`all_done`/`error`/`search_plus`) → `DELETE /api/chat/{convId}` cleanup.
+  No Playwright is involved — WAF/TLS bypass is achieved via browser-like headers and fake
+  cookies. The client auto-refreshes the 5-min access_token from the long-lived refresh_token.
+- The proxy translates your OpenAI-style request into the web API's captured payload shape
+  (`injectUserText()`), and normalizes the web API response back into OpenAI-style JSON
+  (`extractContent()` handles `answer`, `text`, `result`, `message`, `data.data.*`, SSE
+  `data:` frames, raw JSON-line streams, and a longest-string fallback).
+- **Clear Session** (with the provider dropdown) removes that provider's cookie + rules
+  (does not touch the provider row); re-run "Add Web Provider" to log in again. For Kimi,
+  the token is removed from `web-provider-rules.json`; no cookie exists to clear.
+- Existing Bearer/API-key providers are unaffected — only rows with `authType=Cookie` take
+  the cookie/token path.
+
 ### Developer Logs
 - Main-process `console.log/warn/error` forwarded to **Proxy Control** tab panel
 - Capped at 500 lines, color-coded (error=red, warn=yellow, OK=green)
@@ -145,8 +176,12 @@ in `data/` and are resolved via `file-registry.json` → `state-store.getFilePat
 | `src/main.js` | Electron main process: window, IPC, health check, log forwarding, startup auto-load | `proxy-server.js`, `state-store.js`, `models-config.js`, `dotenv` |
 | `src/preload.js` | Context bridge → `window.api` (typed IPC surface) | `electron` (contextBridge, ipcRenderer) |
 | `src/renderer.js` | All UI logic: config table, quick chat, dev logs, health tab, token usage tab | `window.api` (from preload) |
-| `src/proxy-server.js` | Express proxy + routing engine (`probeSequential`, `probeParallel`, `learnSuccess`, `learnFailure`, `extractContent`, `recordUsage`) | `axios`, `dotenv`, `state-store.js` |
+| `src/proxy-server.js` | Express proxy + routing engine (`probeSequential`, `probeParallel`, `learnSuccess`, `learnFailure`, `extractContent`, `recordUsage`, `injectUserText`) | `axios`, `dotenv`, `state-store.js`, `browser-http-client.js` (cookie auth), `kimi-web-client.js` (Kimi token flow) |
 | `src/state-store.js` | JSON/CSV persistence + `getFilePath(role)` registry resolution | `fs`, `path` |
+| `src/setup-web-provider.js` | Playwright capture script (spawned by main.js): headed browser, capture chat request + cookies, write `.env` + ProviderConfig.csv + web-provider-rules.json | `playwright`, `dotenv`, `state-store.js` |
+| `src/browser-http-client.js` | Playwright in-page-fetch HTTP client for cookie-auth providers (WAF/TLS bypass) | `playwright`, `state-store.js` |
+| `src/kimi-web-client.js` | **NEW (2026-08-05)** — plain-axios Kimi token-exchange client: refresh_token → access_token (300s cache) → userId → convId → SSE completion → cleanup; zero Playwright; used by proxy-server.js and main.js health check | `axios` |
+| `src/tls-http-client.js` | **Archived** (dead code) — required uninstalled `tls-client` package; moved to `archive/` 2026-08-05 | — |
 | `src/models-config.js` | **Default catalog** — 17 providers with base URLs, env var names, model lists | (standalone) |
 | `src/fetch-models.js` | Model fetcher (regenerates `data/LatestModels.csv` + `data/models.csv`) | `axios`, `dotenv`, `state-store.js` |
 | `src/index.html` | Four tabs: Proxy Control, Admin/Configuration, Health Check, Token Usage | `style.css`, `renderer.js` (same folder) |
@@ -180,7 +215,8 @@ in `data/` and are resolved via `file-registry.json` → `state-store.getFilePat
 │  Layer 1: ProviderConfig.csv  ◄─── PRIMARY PROVIDER METADATA      │
 │  ├─ Purpose: Single source of truth for provider endpoint URLs   │
 │  │         and API key environment variable names                 │
-│  ├─ Schema: provider,baseURL,apiKeyEnv,modelsEndpoint  │
+│  ├─ Schema: provider,baseURL,apiKeyEnv,modelsEndpoint,authType  │
+│  │         (authType: Bearer default, or Cookie for web providers)│
 │  ├─ Rows: 12 providers (Kilo Gateway, NVIDIA NIM, etc.)         │
 │  ├─ Loaded: By state-store.js → provider lookup map              │
 │  ├─ Used by: renderer.js (autofill baseURL/apiKeyEnv)            │
@@ -265,6 +301,7 @@ can insert/eject a file by editing this JSON — no code changes, no restart of 
 | `token-usage.json` | Persisted token counters per `provider::model` | `saveUsage()` from `recordUsage()` in proxy-server |
 | `settings.json` | `{ "modelsFile": "/abs/path/to/connected.csv" }` — model-list auto-connect target | `saveSettings()` when connecting model file |
 | `proxy-config.json` | Auto-generated from `UltimateConfig.csv` for fast reload | `saveConfigBoth()` |
+| `web-provider-rules.json` | Captured request/header rules per web provider: `{provider: {samplePayload, headers, userAgent, origin, referer, profileKey, authToken?}}` — Kimi stores its refresh_token JWT as `authToken` here | `setup-web-provider.js` (capture), `SET_PROVIDER_COOKIE` (manual paste) |
 
 ---
 
@@ -274,19 +311,9 @@ can insert/eject a file by editing this JSON — no code changes, no restart of 
 **File**: `ProviderConfig.csv` (one row per provider)
 
 ```csv
-provider,baseURL,apiKeyEnv,modelsEndpoint
-Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,https://api.kilo.ai/api/gateway/models
-NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,https://integrate.api.nvidia.com/v1/models
-Mistral,https://api.mistral.ai/v1/chat/completions,MISTRAL_API_KEY,https://api.mistral.ai/v1/models
-Codestral,https://codestral.mistral.ai/v1/chat/completions,CODESTRAL_API_KEY,https://api.mistral.ai/v1/models
-Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,https://router.huggingface.co/v1/models
-Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,https://ai-gateway.vercel.sh/v1/models
-Zen,https://api.z.ai/api/v1/chat/completions,ZEN_API_KEY,https://api.z.ai/api/v1/models
-Cerebras,https://api.cerebras.ai/v1/chat/completions,CEREBRAS_API_KEY,https://api.cerebras.ai/v1/models
-Groq,https://api.groq.com/v1/chat/completions,GROQ_API_KEY,https://api.groq.com/openai/v1/models
-Cohere,https://api.cohere.com/v1/chat,COHERE_API_KEY,https://api.cohere.com/v1/models
-Fireworks,https://api.fireworks.ai/inference/v1/chat/completions,FIREWORKS_API_KEY,https://api.fireworks.ai/inference/v1/models
-Command,https://api.cohere.com/v1/chat,COMMAND_API_KEY,https://api.cohere.com/v1/models
+provider,baseURL,apiKeyEnv,modelsEndpoint,authType
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,,Bearer
+Qwen,https://chat.qwen.ai/api/v2/chat/completions?chat_id=...,QWEN_COOKIE,,Cookie
 ```
 
 **Purpose**: Single source of truth for provider endpoint URLs and API key env var names.
@@ -412,12 +439,15 @@ loadDefaultConfig()
 | **Load Defaults** | Clears table, adds 1 entry per model in `models.csv` (per provider present in ProviderConfig.csv) with autofilled baseURL/apiKeyEnv; falls back to models-config.js models for providers missing from models.csv |
 | **Clear All** | Removes all entries from table |
 | **Import Config from CSV/Excel** | Opens file dialog → loads external config → auto-fills baseURL/apiKeyEnv from ProviderConfig.csv → saves to UltimateConfig.csv |
+| **+ Add Web Provider (Cookie)** | Opens modal (preset dropdown: Qwen/Kimi/Custom + provider name + login URL) → spawns `setup-web-provider.js` → headed browser capture of a cookie-authed chat provider (see [Web Providers](#web-providers-cookie-auth--eg-qwen--kimi-chat)) |
+| **Clear Session** | With the provider dropdown: removes `<PREFIX>_COOKIE` from `.env` + that provider's rules; browser profile untouched |
 | **Apply Configuration** | Saves current table to UltimateConfig.csv + proxy-config.json; if proxy running, restarts with new entries (no health check) |
 | Config Table | Columns: #, Provider (dropdown), Base URL (readonly), API Key Env Var (readonly), Model (dropdown), Enabled (checkbox), Actions (delete) |
 
-**Provider Dropdown**: Only shows providers from `ProviderConfig.csv` (12 providers)
+**Provider Dropdown**: Only shows providers from `ProviderConfig.csv` (16 providers incl. Qwen)
 
 **Model Dropdown**: Filtered to selected provider's models from `models.csv` + `models-config.js`
+(web providers get a `<Provider>-chat` placeholder model added automatically on capture)
 
 ### 3. Health Check Tab
 | Element | Function |
@@ -442,15 +472,17 @@ loadDefaultConfig()
 | File | Description | Format |
 |------|-------------|--------|
 | `file-registry.json` | File-path notepad: maps every data-file role to its path | JSON |
-| `.env` | API keys (not committed) | `KEY=VALUE` |
+| `.env` | API keys + web-provider cookies (e.g. `QWEN_COOKIE`) (not committed) | `KEY=VALUE` |
 | `env.example` | Template for .env | `KEY=VALUE` |
-| `ProviderConfig.csv` | Provider metadata (12 providers) | `provider,baseURL,apiKeyEnv,modelsEndpoint` |
+| `ProviderConfig.csv` | Provider metadata | `provider,baseURL,apiKeyEnv,modelsEndpoint,authType` |
 | `UltimateConfig.csv` | Proxy config source of truth (1038 entries) | `provider,baseURL,apiKeyEnv,model,enabled` |
 | `proxy-config.json` | Auto-generated from UltimateConfig.csv (1038 entries) | JSON array |
 | `models.csv` | All available models for dropdowns (41 rows, top 5 per provider) | `provider,model` |
 | `known-ok.json` | Persisted routing priority | `[{provider,model,status,latency}]` |
 | `token-usage.json` | Per-model token counters | `{"provider::model":{prompt,completion,total}}` |
-| `settings.json` | `{ "modelsFile": "/abs/path" }` | JSON |
+| `settings.json` | `{ "modelsFile": "/abs/path/to/connected.csv" }` | JSON |
+| `web-provider-rules.json` | Captured request/header rules per web provider: `{provider: {samplePayload, headers, userAgent, origin, referer, profileKey, authToken?}}` — Kimi stores its refresh_token JWT as `authToken` | JSON |
+| `browser-profiles/` | Persistent Playwright browser profiles per provider (login state, NOT committed) | dir |
 
 ### Sample / Reference Files
 
@@ -483,6 +515,8 @@ llm-proxy-gui/
 │   ├── preload.js         # Context bridge
 │   ├── proxy-server.js    # Express proxy + routing
 │   ├── state-store.js     # JSON/CSV persistence + getFilePath() registry resolve
+│   ├── setup-web-provider.js # Playwright capture script for cookie-authed providers
+│   ├── browser-http-client.js # Playwright in-page-fetch client (cookie auth / WAF bypass)
 │   ├── models-config.js   # Default catalog (17 providers) — fallback
 │   ├── fetch-models.js    # Model fetcher script (reads ProviderConfig.csv)
 │   ├── start.js           # Dev launcher (npx electron .)
@@ -498,7 +532,9 @@ llm-proxy-gui/
 │   ├── known-ok.json      # Routing priority (runtime)
 │   ├── token-usage.json   # Token counters (runtime)
 │   ├── settings.json      # Model-list path (runtime)
-│   ├── .env               # API keys (gitignored)
+│   ├── web-provider-rules.json # Captured request/header rules per web provider
+│   ├── browser-profiles/  # Playwright login profiles (NOT committed)
+│   ├── .env               # API keys + cookies (gitignored)
 │   └── env.example        # .env template
 ├── samples/               # Sample/reference data
 │   ├── sample-config.csv
@@ -522,9 +558,13 @@ llm-proxy-gui/
   "dotenv": "^16.4.1",
   "electron": "^43.2.0",
   "express": "^4.18.2",
+  "playwright": "^1.62.1",
   "xlsx": "^0.18.5"
 }
 ```
+> Note: `playwright` browsers are not auto-installed by `npm install`. If the cookie-setup
+> browser fails to launch, run `npx playwright install chromium` (or use a system Chrome/Edge,
+> which `setup-web-provider.js` and `browser-http-client.js` prefer).
 
 ### NPM Scripts
 ```bash
@@ -533,10 +573,14 @@ npm run dev  # node start.js
 ```
 
 ### Adding a New Provider
-1. Add row to `ProviderConfig.csv`: `provider,baseURL,apiKeyEnv,modelsEndpoint`
-2. Add row(s) to `models.csv`: `provider,model`
-3. Add env var to `.env` (e.g., `NEW_PROVIDER_API_KEY=...`)
-4. Add env var to `env.example`
+1. Add row to `ProviderConfig.csv`: `provider,baseURL,apiKeyEnv,modelsEndpoint,authType`
+   (omit `authType` or use `Bearer` for API-key providers; `Cookie` for web providers)
+2. For Bearer: add env var to `.env` (e.g., `NEW_PROVIDER_API_KEY=...`) and `env.example`
+3. For Cookie providers: use **"+ Add Web Provider (Cookie)"** to capture the cookie and
+   request shape automatically (it writes ProviderConfig.csv + .env + web-provider-rules.json)
+   - For Kimi-style token providers: the capture detects a JWT `refresh_token` (regex `^eyJ...`)
+     and stores it as `authToken` in `web-provider-rules.json`; no cookie env var is required
+4. Add row(s) to `models.csv`: `provider,model`
 5. Restart app → provider appears in dropdowns, autofill works
 
 ### Removing a Provider
@@ -561,6 +605,8 @@ npm run dev  # node start.js
 
 ### Medium Priority
 - [x] Streaming support (`/v1/chat/completions` with `stream: true`) — SSE replay of the buffered winner (2026-08-04)
+- [x] Web providers via cookie auth (Qwen chat) — Playwright capture + Cookie header routing + payload/response translation (2026-08-05)
+- [x] **Kimi token-exchange flow (no browser)** — `kimi-web-client.js`: refresh_token → access_token (300s cache) → userId → convId → SSE completion → cleanup; plain axios + browser headers, zero Playwright (2026-08-05)
 - [ ] Provider-specific request/response normalization (Anthropic, Google, etc.)
 - [ ] Config validation on import (warn on unknown providers, missing models)
 - [ ] Export config to CSV/Excel button
@@ -588,6 +634,14 @@ npm run dev  # node start.js
 | Deleting a provider row in ProviderConfig.csv left stale entries in UltimateConfig.csv + proxy-config.json | `pruneConfigEntries()` on startup drops + persists removal of entries for providers no longer listed in ProviderConfig.csv |
 | Startup race: renderer could read config before main finished loading → table blank/flash | main now `await`s `autoConnectConfigFile()` before `createWindow()` and pushes a `config-ready` event; renderer listens for it |
 | Dead/leaked-code hygiene | Archived `model-config.js`/`QueryModelsList.csv`/`structure.txt`; removed dead preload APIs (`getLoadedModels`, `parseCsvFile`, `parseExcelFile`, `openModelFileDialog`); scrubbed real-looking `COMMAND_API_KEY` from `env.example`, fixed `OPENCODE_ZEN_API_KEY`→`ZEN_API_KEY`, commented stale `GOOGLE_AI_STUDIO_API_KEY` in `.env` |
+| **Dropdown unclickable after config changes** (renderer.js) | Select `change` handler rebuilt entire table synchronously while native `<select>` popup was closing → stuck invisible popup ate clicks; now `refreshConfigRow(idx)` only updates one row, deferred one tick (`setTimeout(..., 0)`) |
+| **Add-Web-Provider modal dropdown dead after a setup attempt** (renderer.js + index.html) | Proceed handler replaced `modalBox.innerHTML` with status, restoring it on failure; cached element refs pointed at detached DOM nodes → lost listeners; fixed by never swapping form DOM (status goes in separate `#webProviderModalStatus` div; modal open handler resets form every time) |
+| **Kimi capture auto-chat failed on disabled Send button** (setup-web-provider.js) | `fill()` doesn't enable Vue contenteditable Send button; old code pressed Enter then `click()` burned the 30s actionability timeout on `<button disabled>`; now types via real keystrokes (`page.keyboard.type`), polls Send for enabled (≤5s), clicks when enabled, Enter as fallback; caller prints manual guidance if auto-chat fails |
+| **Clear Web Provider Session closed every browser session** (main.js + browser-http-client.js) | `browserClient.close()` now takes a `profileKey` filter (`${origin}::${profileKey}`); main.js computes `envPrefixFor(name).toLowerCase()` and only closes that provider's session; `mainWindow.focus()` called immediately after close to reclaim OS focus |
+| **Provider missing from dropdown/config after paste/capture** (main.js + renderer.js) | Paste path never added config entry + queued config-ready; capture path didn't queue config-ready; `providerInfo` was startup-frozen. Fixed: `addOrUpdateWebProviderEntry()` + `queueConfigReady()` in both paths; `refreshProviderInfo()` merges ProvidersConfig.csv; `onConfigReady` async refreshes + re-renders table + priority dropdown |
+| **8 sync table rebuilds deferred** (renderer.js) | Wrapped remaining `renderConfigTable()`/`renderPriorityOverrideDropdown()` calls in `setTimeout(..., 0)` at delete/add/load/clear/fetch/load buttons; initial startup + `onConfigReady` stay synchronous |
+| **Kimi health-check 404 / no usable content** (proxy-server.js + main.js) | New `src/kimi-web-client.js` implements Kimi's token-exchange protocol (refresh_token → access_token 300s → userId → convId → SSE completion → cleanup) on `kimi.moonshot.cn` with plain axios + browser headers; proxy-server.js and main.js health check route through this client when `rule.authToken` exists; apiKey gate relaxed for token-auth providers |
+| **CLEAR_WEB_PROVIDER_SESSION blocked UI on Playwright flush** (main.js) | Handler now reclaims `mainWindow.focus()` immediately, fires `browserClient.close(profileKey)` detached (background), returns `{success:true}` to renderer instantly; belt-and-suspenders `.then()` re-focuses after flush; `.catch()` → `console.warn` so background errors aren't silently swallowed |
 
 ---
 
@@ -597,4 +651,4 @@ MIT — see `package.json` for details.
 
 ---
 
-*Generated from project scan on 2026-08-04. All file paths, line counts, and schemas verified against actual codebase.*
+*Generated from project scan on 2026-08-04; Kimi token-exchange flow, CLEAR_WEB_PROVIDER_SESSION fix, and dropdown/config bug fixes added 2026-08-05. All file paths, line counts, and schemas verified against actual codebase.*

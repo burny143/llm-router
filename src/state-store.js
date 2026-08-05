@@ -1,3 +1,5 @@
+// state-store.js — MUST live in src/ (one folder below PROJECT_ROOT): PROJECT_ROOT is
+// derived from __dirname, so moving this file breaks every data-file path resolution.
 const fs = require('fs');
 const path = require('path');
 
@@ -20,7 +22,8 @@ const DEFAULT_PATHS = {
   tokenUsage: 'data/token-usage.json',
   settings: 'data/settings.json',
   env: 'data/.env',
-  providerFlags: 'data/provider-flags.json'
+  providerFlags: 'data/provider-flags.json',
+  webProviderRules: 'data/web-provider-rules.json'
 };
 
 let fileRegistry = {};
@@ -33,9 +36,29 @@ try {
 }
 
 // Resolve a data-file role to an absolute path (registry first, then default).
+// An explicit empty-string override in file-registry.json IS honored (hasOwnProperty
+// instead of truthiness), and an unknown role logs a warning instead of silently
+// becoming a literal relative path segment.
 function getFilePath(role) {
-  const value = fileRegistry[role] || DEFAULT_PATHS[role] || role;
+  let value;
+  if (Object.prototype.hasOwnProperty.call(fileRegistry, role)) {
+    value = fileRegistry[role];
+  } else if (Object.prototype.hasOwnProperty.call(DEFAULT_PATHS, role)) {
+    value = DEFAULT_PATHS[role];
+  } else {
+    console.warn(`getFilePath('${role}'): unknown role — not in file-registry.json or defaults; treating it as a literal path.`);
+    value = role;
+  }
   return path.isAbsolute(value) ? value : path.join(PROJECT_ROOT, value);
+}
+
+// Derive the upper-snake env-var prefix for a provider name (e.g. "Qwen" -> "QWEN").
+// Used by the web-provider capture + runtime cookie paths so both share the
+// SAME provider profile dir on disk (capture device == request device).
+function envPrefixFor(providerName) {
+  let key = String(providerName || '').toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  if (/^\d/.test(key)) key = '_' + key;
+  return key;
 }
 
 // Keep the legacy constants working for any code that still destructures them.
@@ -93,7 +116,7 @@ function parseCsvWithFilter(text, requiredCol) {
 
 // Convert config entries to CSV string with proper escaping
 function configToCsv(entries) {
-  const lines = ['provider,baseURL,apiKeyEnv,model,enabled'];
+  const lines = ['provider,baseURL,apiKeyEnv,model,enabled,authType'];
   entries.forEach(e => {
     const escape = (value) => {
       if (value == null) return '';
@@ -108,7 +131,8 @@ function configToCsv(entries) {
       escape(e.baseURL),
       escape(e.apiKeyEnv),
       escape(e.model),
-      e.enabled ? 'true' : 'false'
+      e.enabled ? 'true' : 'false',
+      escape(e.authType || 'Bearer')
     ].join(','));
   });
   return lines.join('\n');
@@ -213,7 +237,8 @@ function loadProviderConfig() {
         if (provider) {
           providerMap[provider] = {
             baseURL: row.baseURL || '',
-            apiKeyEnv: row.apiKeyEnv || ''
+            apiKeyEnv: row.apiKeyEnv || '',
+            authType: row.authType || 'Bearer'
           };
         }
       });
@@ -268,4 +293,4 @@ function loadUsage() {
   return {};
 }
 
-module.exports = { saveResults, loadResults, saveUsage, loadUsage, saveSettings, loadSettings, saveConfig, loadConfig, saveConfigBoth, syncConfigFromCsv, pruneConfigEntries, loadProviderConfig, CONFIG_CSV, PROVIDER_CONFIG_CSV, getFilePath, parseCsv, DEFAULT_PATHS };
+module.exports = { saveResults, loadResults, saveUsage, loadUsage, saveSettings, loadSettings, saveConfig, loadConfig, saveConfigBoth, syncConfigFromCsv, pruneConfigEntries, loadProviderConfig, CONFIG_CSV, PROVIDER_CONFIG_CSV, getFilePath, parseCsv, envPrefixFor, DEFAULT_PATHS };

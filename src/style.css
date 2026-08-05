@@ -30,6 +30,15 @@ body {
 .tab-content.active {
   display: block;
 }
+.sub-tabs {
+  display: flex;
+  gap: 5px;
+  margin-bottom: 10px;
+}
+.sub-tab-btn {
+  padding: 6px 12px;
+  font-size: 12px;
+}
 .control-panel {
   display: flex;
   align-items: center;
@@ -233,10 +242,6 @@ button.btn-primary:hover {
   white-space: pre-wrap;
   word-break: break-all;
   color: #333;
-}
-#healthResults h3 {
-  margin: 12px 0 4px 0;
-  font-size: 14px;
 }
 .config-footer {
   display: none; /* shown only when the "config" tab is active, via renderer.js tab-switch JS */

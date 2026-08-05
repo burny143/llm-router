@@ -22,37 +22,45 @@ This application uses a multi-layer configuration system with clear separation o
 
 **Location**: `ProviderConfig.csv` (in `data/`)
 
-**Format**: CSV with 4 columns
+**Format**: CSV with 5 columns (`authType` optional; missing/empty ⇒ `Bearer`)
 
 ```csv
-provider,baseURL,apiKeyEnv,modelsEndpoint
-Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,https://api.kilo.ai/api/gateway/models
-NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,https://integrate.api.nvidia.com/v1/models
-Mistral,https://api.mistral.ai/v1/chat/completions,MISTRAL_API_KEY,https://api.mistral.ai/v1/models
-... (12 providers total)
+provider,baseURL,apiKeyEnv,modelsEndpoint,authType
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,,Bearer
+Qwen,https://chat.qwen.ai/api/v2/chat/completions?chat_id=...,QWEN_COOKIE,,Cookie
+... (16 providers total)
 ```
 
-**Editable By**: Users (via UI or direct file editing)
+**Editable By**: Users (via UI or direct file editing); the **"+ Add Web Provider (Cookie)"**
+button upserts `authType=Cookie` rows automatically
 
 **Managed By**: Application startup (for UltimateConfig generation)
 
 **Key Fields**:
 - `provider`: Unique provider identifier (must match across all config files)
-- `baseURL`: API endpoint base URL for chat completions
-- `apiKeyEnv`: Environment variable name containing API key (must match `.env`)
+- `baseURL`: API endpoint base URL for chat completions (for Cookie providers: the captured
+  chat API URL, may include a `chat_id` query param)
+- `apiKeyEnv`: Environment variable name containing the credential (must match `.env`) —
+  for Cookie providers this is `<PREFIX>_COOKIE` (a `name=value; ...` cookie string, not an API key)
 - `modelsEndpoint`: URL to query for available models from this provider
+  (⚠ currently empty for all rows — restore before relying on "Fetch All Models")
+- `authType`: `Bearer` (default, sends `Authorization: Bearer <key>`) or `Cookie` (sends
+  `Cookie: <env value>` + browser-like headers via Playwright; no Bearer header)
 
 **Usage**:
 - Powers **provider dropdown** in Admin/Configuration tab
 - Provides **autofill** for baseURL and apiKeyEnv in UltimateConfig table
 - Source for building **UltimateConfig.csv** model lists (app-generated)
 - Used by `fetch-models.js` to discover available models from each provider
+- `authType` propagates into every config entry (state-store `loadProviderConfig()` /
+  `configToCsv()` / main.js `buildModelListsForProviders()`), so the router knows at request
+  time whether to authenticate with a Bearer token or a session cookie
 
 **Example Provider Entries**:
 ```csv
-Google AI Studio,https://generativelanguage.googleapis.com/v1beta/models,GOOGLE_AI_STUDIO_API_KEY,https://generativelanguage.googleapis.com/v1beta/models
-Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,https://api.kilo.ai/api/gateway/models
-Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,https://ai-gateway.vercel.sh/v1/models
+Google AI Studio,https://generativelanguage.googleapis.com/v1beta/models,GOOGLE_AI_STUDIO_API_KEY,https://generativelanguage.googleapis.com/v1beta/models,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,,Bearer
+Qwen,https://chat.qwen.ai/api/v2/chat/completions?chat_id=c13a9a0f...,QWEN_COOKIE,,Cookie
 ```
 
 ---
@@ -63,14 +71,14 @@ Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GAT
 
 **Location**: `UltimateConfig.csv` (in `data/`)
 
-**Format**: CSV with 5 columns
+**Format**: CSV with 6 columns
 
 ```csv
-provider,baseURL,apiKeyEnv,model,enabled
-Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,frontier,true
-Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,balanced,true
-NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,yi-large,true
-... (1,021 entries total)
+provider,baseURL,apiKeyEnv,model,enabled,authType
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,frontier,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,balanced,true,Bearer
+Qwen,https://chat.qwen.ai/api/v2/chat/completions?chat_id=...,QWEN_COOKIE,Qwen-chat,true,Cookie
+... (entries total)
 ```
 
 **Editable By**: **NEVER** - completely managed by the application
@@ -273,7 +281,11 @@ ANTHROPIC_API_KEY=your_anthropic_key_here
 
 **Usage**:
 - **API key storage** for all external providers
-- **Read by**: Proxy server and fetch-models.js
+- **Web-provider session cookies**: `QWEN_COOKIE="name=value; name2=value2; ..."` — written
+  automatically by the "+ Add Web Provider (Cookie)" flow (`setup-web-provider.js`), never
+  stored in web-provider-rules.json, never logged
+- **Read by**: Proxy server, fetch-models.js, setup-web-provider.js (auto-login creds
+  `<PREFIX>_EMAIL`/`<PREFIX>_PASSWORD` are optional)
 - **Security**: Never committed to version control
 - **Template**: env.example provides defaults
 
@@ -283,6 +295,8 @@ ANTHROPIC_API_KEY=your_anthropic_key_here
 KILO_GATEWAY_API_KEY=kgw_xxx
 NVIDIA_NIM_API_KEY=nvidia_xxx
 GOOGLE_AI_STUDIO_API_KEY=google_xxx
+# Web provider cookie (set automatically by "Add Web Provider"):
+QWEN_COOKIE="acw_tc=abc123; cf_clearance=xyz; ..."
 ...
 ```
 
@@ -364,6 +378,31 @@ GOOGLE_AI_STUDIO_API_KEY=google_xxx
 
 **Editable By**: Application (when user loads new model file)
 **Managed By**: Application (`saveSettings`/`loadSettings`)
+
+#### web-provider-rules.json
+
+**Purpose**: Captured request/header rules for cookie-authenticated web providers (e.g.
+Qwen Chat). Keyed by provider name; written by `setup-web-provider.js` during
+"+ Add Web Provider (Cookie)", read at boot by main.js + proxy-server.js.
+
+**Format**: Object keyed by provider
+
+```json
+{
+  "Qwen": {
+    "samplePayload": { "model": "openai", "question": "Hello", "stream": false },
+    "headers": { "accept": "application/json, text/plain, */*", "origin": "https://chat.qwen.ai", ... },
+    "userAgent": "Mozilla/5.0 ...",
+    "origin": "https://chat.qwen.ai",
+    "referer": "https://chat.qwen.ai/"
+  }
+}
+```
+
+**Editable By**: Application (`setup-web-provider.js`); "Clear Qwen Session" deletes the
+provider's key
+**Managed By**: Application. The cookie itself is NOT here — it lives in `.env`
+(`QWEN_COOKIE`); the rules only carry the request shape + browser headers.
 
 ---
 
@@ -465,13 +504,15 @@ cp .env .env.backup
 
 | File | Depends On | Provides To | Purpose |
 |------|------------|-------------|---------|
-| `ProviderConfig.csv` | `.env` (API key names) | `UltimateConfig.csv`, `models-config.js` | Provider metadata and discovery endpoints |
+| `ProviderConfig.csv` | `.env` (credential names) | `UltimateConfig.csv`, `models-config.js` | Provider metadata, discovery endpoints, `authType` |
 | `UltimateConfig.csv` | `ProviderConfig.csv` | `proxy-config.json`, `proxy-server.js` | Proxy model configuration |
 | `proxy-config.json` | `UltimateConfig.csv` | `proxy-server.js` | Fast JSON cache of proxy config |
 | `models.csv` | `.env` (optional) | `renderer.js` | User-selectable model list |
 | `LatestModels.csv` | `ProviderConfig.csv`, `.env` | `renderer.js` | Live model discovery results |
 | `models-config.js` | N/A | `UltimateConfig.csv` | Fallback model catalog |
-| `.env` | N/A | All files using API keys | Secure API key storage |
+| `.env` | N/A | All files using API keys + `setup-web-provider.js` (cookie storage) | Secure API key + web-provider cookie storage |
+| `web-provider-rules.json` | `.env` (cookie), `setup-web-provider.js` (writer) | `proxy-server.js`, `main.js` (request shaping for Cookie auth) | Captured request payload/header rules per web provider |
+| `browser-profiles/` | Playwright browsers | `browser-http-client.js`, `setup-web-provider.js` | Persistent login state for cookie-authed providers (never committed) |
 
 ---
 

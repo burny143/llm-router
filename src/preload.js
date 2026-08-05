@@ -1,3 +1,4 @@
+// preload.js
 const { contextBridge, ipcRenderer } = require('electron');
 const { IPC_CHANNELS, LOG_MARKERS } = require('./shared-constants');
 
@@ -21,6 +22,10 @@ contextBridge.exposeInMainWorld('api', {
   runFetchModels: () => ipcRenderer.invoke(IPC_CHANNELS.RUN_FETCH_MODELS),
   getKnownOk: () => ipcRenderer.invoke(IPC_CHANNELS.GET_KNOWN_OK),
   setPriorityOverride: (key) => ipcRenderer.invoke(IPC_CHANNELS.SET_PRIORITY_OVERRIDE, key),
+  runWebProviderSetup: (providerName, startUrl) => ipcRenderer.invoke(IPC_CHANNELS.RUN_WEB_PROVIDER_SETUP, providerName, startUrl),
+  clearWebProviderSession: (providerName) => ipcRenderer.invoke(IPC_CHANNELS.CLEAR_WEB_PROVIDER_SESSION, providerName),
+  setProviderCookie: (providerName, cookie) => ipcRenderer.invoke(IPC_CHANNELS.SET_PROVIDER_COOKIE, providerName, cookie),
+  getWebProviderPresets: () => ipcRenderer.invoke(IPC_CHANNELS.GET_WEB_PROVIDER_PRESETS),
   logSuccessMarker: LOG_MARKERS.SUCCESS,
   onDevLog: (callback) => {
     const handler = (_event, data) => callback(data);

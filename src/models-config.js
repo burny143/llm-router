@@ -8,11 +8,9 @@ module.exports = [
     baseURL: 'https://api.anthropic.com/v1/messages',
     apiKeyEnv: 'ANTHROPIC_API_KEY',
     models: [
-      'claude-3-5-sonnet-20241022',
-      'claude-3-5-haiku-20241022',
-      'claude-3-opus-20240229',
-      'claude-3-sonnet-20240229',
-      'claude-3-haiku-20240307'
+      'claude-opus-4-8',
+      'claude-sonnet-4-6',
+      'claude-haiku-4-5-20251001'
     ]
   },
   {
@@ -20,11 +18,10 @@ module.exports = [
     baseURL: 'https://api.openai.com/v1/chat/completions',
     apiKeyEnv: 'OPENAI_API_KEY',
     models: [
+      'gpt-5.5',
+      'gpt-5.4',
       'gpt-4o',
-      'gpt-4o-mini',
-      'gpt-4-turbo',
-      'gpt-4',
-      'gpt-3.5-turbo'
+      'gpt-4o-mini'
     ]
   },
   {
@@ -32,9 +29,9 @@ module.exports = [
     baseURL: 'https://generativelanguage.googleapis.com/v1beta/models',
     apiKeyEnv: 'GOOGLE_AI_STUDIO_API_KEY',
     models: [
-      'gemini-1.5-pro',
-      'gemini-1.5-flash',
-      'gemini-1.0-pro'
+      'gemini-3.1-flash-lite',
+      'gemini-2.5-pro',
+      'gemini-2.5-flash'
     ]
   },
   {

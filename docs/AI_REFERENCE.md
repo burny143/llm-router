@@ -58,12 +58,15 @@ separate one. `startProxy()`/`stopProxy()` are called from renderer via IPC.
 
 | File | Requires | Exports / Role |
 |------|----------|----------------|
-| `src/main.js` | `electron`, `axios`, `dotenv`, `proxy-server.js`, `state-store.js`, `models-config.js`, `child_process`, `path`, `fs` | Electron main: window, IPC, health check, log forwarding, startup auto-load |
+| `src/main.js` | `electron`, `axios`, `dotenv`, `https`, `proxy-server.js`, `state-store.js`, `models-config.js`, `child_process` (exec+spawn), `path`, `fs` | Electron main: window, IPC, health check, log forwarding, startup auto-load, web-provider setup spawn |
 | `src/preload.js` | `electron` (contextBridge, ipcRenderer) | Exposes `window.api` (the ONLY bridge to renderer) |
-| `src/renderer.js` | none (uses `window.api` from preload) | All UI: config table, quick chat, dev logs, health tab, token usage |
-| `src/proxy-server.js` | `express`, `axios`, `dotenv`, `state-store.js` | `startProxy, stopProxy, isProxyRunning, setHealthResults, getKnownOk, getTokenUsage, extractContent` |
+| `src/renderer.js` | none (uses `window.api` from preload) | All UI: config table, quick chat, dev logs, health tab, token usage, web-provider modal |
+| `src/proxy-server.js` | `express`, `axios`, `dotenv`, `state-store.js`, `browser-http-client.js` (lazy) | `startProxy, stopProxy, isProxyRunning, setHealthResults, getKnownOk, getTokenUsage, extractContent, injectUserText` |
 | `src/state-store.js` | `fs`, `path` | `saveResults/loadResults, saveUsage/loadUsage, saveSettings/loadSettings, saveConfig/loadConfig, saveConfigBoth, syncConfigFromCsv, pruneConfigEntries, loadProviderConfig, getFilePath` + file-path resolution via registry |
-| `src/models-config.js` | (standalone) | **Fallback default catalog** — 17 provider groups `{provider, baseURL, apiKeyEnv, models[]}`. Uses `api.kilocode.ai` for Kilo. |
+| `src/setup-web-provider.js` | `playwright`, `fs`, `path`, `dotenv`, `state-store.js` | Capture script (spawned by main `run-web-provider-setup`): headed browser, capture chat POST, write `.env` + ProviderConfig.csv + web-provider-rules.json; CLI: `node src\setup-web-provider.js <Name> <URL>` |
+| `src/browser-http-client.js` | `playwright`, `state-store.js` | Playwright in-page-fetch HTTP client for `authType=Cookie` requests (WAF/TLS-fingerprint bypass); lazy per-origin minimized persistent contexts under `data/browser-profiles/` |
+| `src/tls-http-client.js` | `tls-client` (NOT installed) | **ARCHIVED (2026-08-05)** — dead code; never required by main/proxy; moved to `archive/` |
+| `src/models-config.js` | (standalone) | **Fallback default catalog** — 17 provider groups `{provider, baseURL, apiKeyEnv, models[]}`. Uses `api.kilocode.ai` for Kilo. Model IDs updated 2026-08-05 to current catalogs (Claude Opus 4.8 / Sonnet 4.6 / Haiku 4.5, GPT-5.x, Gemini 2.5/3.1). |
 | `model-config.js` | (standalone) | **MOVED TO `archive/`** — legacy/alternate catalog, different URLs (e.g. Anthropic via `cc.freemodel.dev`). **Not loaded anywhere**; kept only for reference. |
 | `src/fetch-models.js` | `fs`, `axios`, `dotenv` | CLI script (run via IPC `run-fetch-models` or `node src\fetch-models.js`): reads `ProviderConfig.csv`, hits each `modelsEndpoint`, writes `LatestModels.csv` + `models.csv` |
 | `src/index.html` | `style.css`, `renderer.js` | 4 tabs: Proxy Control / Admin-Configuration / Health Check / Token Usage |
@@ -74,19 +77,21 @@ separate one. `startProxy()`/`stopProxy()` are called from renderer via IPC.
 **All data-file paths resolve through `state-store.getFilePath(role)`** (registry first,
 default filename fallback) into `data/`. `file-registry.json` (project root) is the map —
 edit it to point a role at a different file. Roles: `providerConfig`, `ultimateConfig`,
-`proxyConfig`, `models`, `latestModels`, `knownOk`, `tokenUsage`, `settings`, `env`.
+`proxyConfig`, `models`, `latestModels`, `knownOk`, `tokenUsage`, `settings`, `env`,
+`webProviderRules`.
 
 | File | Schema | Read by | Written by | Source of truth? |
 |------|--------|---------|------------|------------------|
-| `.env` | `KEY=VALUE` | main.js (`dotenv`), proxy-server.js (`dotenv`), fetch-models.js | user (NOT committed) | API keys |
-| `ProviderConfig.csv` | `provider,baseURL,apiKeyEnv,modelsEndpoint` | `state-store.loadProviderConfig()` → main.js `get-provider-config` → renderer `providerInfo`; also fetch-models.js | user (hand-edit) | **YES — provider list** |
-| `UltimateConfig.csv` | `provider,baseURL,apiKeyEnv,model,enabled` | `state-store.syncConfigFromCsv()` | `state-store.saveConfigBoth()` (Apply Config / prune) | **YES — proxy entries** |
+| `.env` | `KEY=VALUE` | main.js (`dotenv`), proxy-server.js (`dotenv`), fetch-models.js, setup-web-provider.js | user (NOT committed); setup-web-provider.js appends `<PREFIX>_COOKIE` | API keys + web-provider cookies |
+| `ProviderConfig.csv` | `provider,baseURL,apiKeyEnv,modelsEndpoint,authType` (`authType`: `Bearer` default / `Cookie`) | `state-store.loadProviderConfig()` → main.js `get-provider-config` → renderer `providerInfo`; also fetch-models.js | user (hand-edit); setup-web-provider.js upserts `authType=Cookie` rows | **YES — provider list** |
+| `UltimateConfig.csv` | `provider,baseURL,apiKeyEnv,model,enabled,authType` | `state-store.syncConfigFromCsv()` | `state-store.saveConfigBoth()` (Apply Config / prune / web-provider placeholder) | **YES — proxy entries** |
 | `proxy-config.json` | JSON array of config entries | `state-store.loadConfig()` (fallback when CSV missing) | `state-store.saveConfig()` / `saveConfigBoth()` | NO — auto-generated cache |
 | `models.csv` | `provider,model` | main.js `autoConnectModelFile()` → dropdown sources | user or `fetch-models.js` (top 5/provider) | dropdown options |
 | `LatestModels.csv` | `provider,model` (may contain `ERROR:...` rows) | main.js `loadLatestModels()` (skips `ERROR:` rows) | `fetch-models.js` | model dropdown (primary) |
 | `known-ok.json` | `[{provider, model, status, latency}]` | main.js `loadHealthResults()` → `setHealthResults()` | `state-store.saveResults()` (health check + runtime learning) | routing priority cache |
 | `token-usage.json` | `{"provider::model": {provider, model, requests, promptTokens, completionTokens, totalTokens}}` | proxy-server.js `loadUsage()` at boot | proxy-server.js `recordUsage()` → `saveUsage()` | token counters |
 | `settings.json` | `{"modelsFile": "/abs/path.csv"}` | main.js `autoConnectModelFile()` | `state-store.saveSettings()` | model-list auto-connect target |
+| `web-provider-rules.json` | `{provider: {samplePayload, headers, userAgent, origin, referer}}` | main.js + proxy-server.js at boot (cookie-auth request shaping) | setup-web-provider.js; `clear-web-provider-session` deletes `rules[provider]` | cookie-auth request rules (no cookies inside — those live in `.env`) |
 
 ---
 
@@ -104,7 +109,7 @@ Renderer **cannot** touch Node/fs — everything goes through these.
 | `get-env-vars` | `getEnvVars()` | — | key names parsed from `.env` |
 | `get-connected-model-list` | `getConnectedModelList()` | — | `{models, providers, providerModels, latestProviderModels, file}` |
 | `get-connected-config` | `getConnectedConfig()` | — | `{entries, file}` (entries = configEntries in main) |
-| `get-provider-config` | `getProviderConfig()` | — | `{provider: {baseURL, apiKeyEnv}}` from ProviderConfig.csv |
+| `get-provider-config` | `getProviderConfig()` | — | `{provider: {baseURL, apiKeyEnv, authType}}` from ProviderConfig.csv |
 | `save-config` | `saveConfig(entries)` | entries[] | `{success}` / `{success:false, error}` — writes CSV+JSON |
 | `open-config-file-dialog` | `openConfigFileDialog()` | — | `{canceled}` / `{canceled:false, filePath}` |
 | `parse-config-csv-file` | `parseConfigCsvFile(filePath)` | abs path | `{success, entries, rowCount}` |
@@ -114,6 +119,10 @@ Renderer **cannot** touch Node/fs — everything goes through these.
 | `health-check` | `healthCheck(entries)` | entries[] | results[] (ping every enabled model in parallel) |
 | `dev-log` (event) | `onDevLog(callback)` | — | `{level, text, time}` pushed from main's console interception |
 | `config-ready` (event) | `onConfigReady(callback)` | — | `{entries}` pushed from main after startup config load (handles the async startup race between main's config load and renderer's `loadDefaultConfig()`) |
+| `run-web-provider-setup` | `runWebProviderSetup(name, url)` | provider name, login URL | `{success, output}` / `{success:false, error}` — spawns `node src\setup-web-provider.js <name> <url>`; on success reloads `.env` (override) + adds `<name>-chat` placeholder entry |
+| `clear-web-provider-session` | `clearWebProviderSession(providerName)` | provider name | `{success}` / `{success:false, error}` — strips `<PREFIX>_COOKIE=` from `.env`, deletes `rules[provider]`, closes browser client |
+| `get-web-provider-presets` | `getWebProviderPresets()` | — | `{Qwen:{loginUrl,baseURL}, Kimi:{loginUrl,baseURL}, ...}` — UI-facing preset fields for the Add Web Provider modal dropdown |
+| `set-provider-cookie` | `setProviderCookie(name, cookie)` | provider name, cookie string | `{success}` / `{success:false, error}` — stores `<PREFIX>_COOKIE` in `.env`, upserts ProviderConfig.csv row, seeds web-provider-rules.json from presets (no browser, no ping) |
 
 **Removed dead APIs (2026-08-04):** `get-loaded-models` / `getLoadedModels()`,
 `parse-csv-file`, `parse-excel-file`, `open-model-file-dialog` were exposed in preload.js but
@@ -165,16 +174,27 @@ POST /v1/chat/completions
   ├─ orderEntries() → known-OK (fastest first) → untested → known-failed
   ├─ if knownOk.length > 0 → probeSequential(okCandidates)   // stops at first success
   ├─ else / all failed → probeParallel(ordered)              // first success wins
-  ├─ probeOne(entry) → axios.post(baseURL) → extractContent() validates real text
+  ├─ probeOne(entry):
+  │    authType = entry.authType || 'Bearer'
+  │    if Bearer → axios.post(baseURL, {model:entry.model, messages, ...rest},
+  │                          {Authorization: Bearer <env[apiKeyEnv]>})
+  │    if Cookie  → payload = clone(rule.samplePayload) with user message injected
+  │                 via injectUserText() (fallback: replace first long string field)
+  │                 headers = Cookie: <env[apiKeyEnv]> + UA/Origin/Referer from rules
+  │                 POST via browser-http-client.request() (in-page fetch, WAF bypass)
+  │    → extractContent() validates real text (choices/answer/text/result/message/
+  │      data.data.*/raw SSE/longest-string fallback)
   │     ├─ success → learnSuccess(entry, elapsed) → saveResults() → known-ok.json
   │     └─ fail/no-content → learnFailure(entry) → demote + saveResults()
   └─ respond with normalized OpenAI payload + _meta {provider, model, elapsed}
 ```
 
 ### Health check (main.js `health-check` handler)
-Parallel `axios.post` of `{model, messages:[{role:'user',content:'ping'}], max_tokens:1}` to
-each enabled entry; validates content via `extractContent()`; results → `setHealthResults()`
-(rebuilds known-ok live, no proxy restart) + forwarded to renderer.
+Parallel probes of `{model, messages:[{role:'user',content:'ping'}], max_tokens:5}` to each
+enabled entry. **Bearer** entries go through `axios.post`; **Cookie** entries go through
+`browser-http-client` with the same headers/payload-shaping rules as `probeOne()` (sample
+payload with `ping` injected). Validates content via `extractContent()`; results →
+`setHealthResults()` (rebuilds known-ok live, no proxy restart) + forwarded to renderer.
 
 ---
 
@@ -198,6 +218,7 @@ ProviderConfig.csv must match a key name here (renderer's dropdown is built from
 | `COHERE_API_KEY` | Cohere | ✅ |
 | `FIREWORKS_API_KEY` | Fireworks | ✅ |
 | `COMMAND_API_KEY` | Command | ✅ |
+| `QWEN_COOKIE` | Qwen (authType=Cookie) | ✅ (after "Add Web Provider" capture) — full `name=value; name2=value2` cookie string, NOT an API key |
 | `ANTHROPIC_API_KEY` | *(Anthropic — NOT in ProviderConfig.csv)* | ❌ (only in env.example) |
 | `OPENAI_API_KEY` | *(OpenAI — NOT in ProviderConfig.csv)* | ❌ |
 | `OPENROUTER_API_KEY` | *(OpenRouter — NOT in ProviderConfig.csv)* | ❌ |
@@ -214,15 +235,17 @@ remain in env.example for providers NOT in ProviderConfig.csv — harmless place
 
 **ProviderConfig.csv** — one row per provider, THE provider registry:
 ```
-provider,baseURL,apiKeyEnv,modelsEndpoint
-Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,https://api.kilo.ai/api/gateway/models
+provider,baseURL,apiKeyEnv,modelsEndpoint,authType
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,,Bearer
+Qwen,https://chat.qwen.ai/api/v2/chat/completions?chat_id=...,QWEN_COOKIE,,Cookie
 ...
 ```
+`authType` is optional; missing/empty ⇒ `Bearer` (unchanged legacy behavior).
 
 **UltimateConfig.csv** — proxy entries (editable truth):
 ```
-provider,baseURL,apiKeyEnv,model,enabled
-Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,frontier,true
+provider,baseURL,apiKeyEnv,model,enabled,authType
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,frontier,true,Bearer
 ...
 ```
 

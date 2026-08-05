@@ -1,5 +1,5 @@
+// shared-constants.js
 // Central registry of IPC channel names used between main.js / preload.js / renderer.js.
-
 // Marker substring used to flag a "success" line in the Developer Logs panel.
 // proxy-server.js's request-success log line and renderer.js's log-line
 // coloring both reference this constant instead of each duplicating the
@@ -46,6 +46,12 @@ const IPC_CHANNELS = {
 
   // Logging
   DEV_LOG: 'dev-log',
+
+   // Web provider setup (Qwen / Kimi / any Cookie-auth chat site)
+  RUN_WEB_PROVIDER_SETUP: 'run-web-provider-setup',
+  CLEAR_WEB_PROVIDER_SESSION: 'clear-web-provider-session',
+  SET_PROVIDER_COOKIE: 'set-provider-cookie',
+  GET_WEB_PROVIDER_PRESETS: 'get-web-provider-presets',
 };
 
 module.exports = { IPC_CHANNELS, LOG_MARKERS };
