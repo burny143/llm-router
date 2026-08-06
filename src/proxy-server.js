@@ -6,8 +6,8 @@ const axios = require('axios');
 const { getFilePath, envPrefixFor } = require('./state-store');
 require('dotenv').config({ path: getFilePath('env') });
 const { saveResults, loadUsage, saveUsage, loadAssistantConfig } = require('./state-store');
-const { translateRequest, translateResponse, createStreamingToolCallTranslator, parseToolCallsFromText } = require('./tool-calling-translator');
-const { LOG_MARKERS } = require('./shared-constants');
+const { translateRequest, translateResponse, parseToolCallsFromText } = require('./tool-calling-translator');
+const { LOG_MARKERS, DEFAULT_COOKIE_USER_AGENT } = require('./shared-constants');
 const largeContextDispatcher = require('./large-context-dispatcher');
 
 // --- WEB PROVIDER RULES (for Cookie auth & payload translation) ---
@@ -42,6 +42,50 @@ let knownOk = [];
 let knownFailedKeys = new Set();
 let totalRequests = 0;
 let priorityOverrideKey = null;
+// --- NEW: priority lock / rotation ---
+// `priorityLocked`: when true, orderEntries() will NOT silently drop the pin
+// just because the pinned entry fell out of knownOk (which is what caused
+// the renderer's dropdown to go stale before — the backend forgot the pin,
+// but nothing told the UI). A locked pin instead falls back for just that
+// one request (findWinner still moves on if the pinned entry itself fails)
+// while staying pinned for the next request, so a transient blip doesn't
+// permanently lose the user's choice.
+let priorityLocked = false;
+// `routingMode` 'rotate': round-robins across the current knownOk list
+// instead of always racing fastest-first, so load spreads across multiple
+// healthy models instead of hammering the single fastest one every time.
+let rotateIndex = 0;
+
+// Small ring buffer of human-readable routing events (pin cleared, model
+// demoted, fallback used, lock engaged/disengaged) so the UI can show a
+// "why did it downgrade" log next to the priority selector instead of the
+// reason being buried in the general Developer Logs console feed.
+const ROUTING_LOG_MAX = 50;
+let routingLog = [];
+function pushRoutingEvent(kind, text) {
+  routingLog.push({ kind, text, time: Date.now() });
+  if (routingLog.length > ROUTING_LOG_MAX) routingLog = routingLog.slice(-ROUTING_LOG_MAX);
+  console.log(`[routing] ${text}`);
+  if (typeof onPriorityStateChange === 'function') {
+    try { onPriorityStateChange(getPriorityState()); } catch (_) { /* best-effort */ }
+  }
+}
+function getRoutingLog() {
+  return routingLog.slice().reverse(); // newest first
+}
+function getPriorityState() {
+  return {
+    priorityOverrideKey,
+    priorityLocked,
+    routingMode: assistantConfig.routingMode || 'auto'
+  };
+}
+// Optional callback wired up by main.js so priority-state changes (whether
+// user-initiated or the backend auto-clearing a stale pin) can be pushed to
+// every renderer live instead of the UI having to poll for them.
+let onPriorityStateChange = null;
+function setPriorityStateListener(fn) { onPriorityStateChange = fn; }
+
 let tokenUsage = loadUsage();
 const activeSockets = new Set();
 let usageSaveTimer = null;
@@ -236,14 +280,60 @@ function learnSuccess(entry, elapsed) {
   saveResults(knownOk.map(k => ({ provider: k.provider, model: k.model, status: 'OK', latency: k.latency })));
 }
 
+// --- NEW: ping-before-demote ---
+// A real request failure alone used to demote a model immediately. That's
+// too trigger-happy for a one-off transient blip (dropped connection, a
+// slow cold start). Now, when routing is about to move on to the next
+// candidate, fire one short, cheap "ping" request at the one that just
+// failed — only if THAT doesn't get a response does it actually get
+// demoted. Reuses probeOne so auth/payload handling for every provider
+// type (Bearer, Cookie, Kimi refresh-token) stays identical to a real
+// request; the only difference is the minimal message and short timeout.
+const PING_TIMEOUT_MS = 8000;
+
+async function pingEntry(entry) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), PING_TIMEOUT_MS);
+  try {
+    await probeOne(entry, { messages: [{ role: 'user', content: 'ping' }], rest: {} }, controller.signal);
+    return true;
+  } catch (_) {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// Confirms an entry is actually unreachable before demoting it from
+// known-OK / clearing its priority pin. Call this instead of learnFailure()
+// directly wherever a candidate just failed and routing is about to fall
+// back to the next one.
+async function verifyAndDemote(entry) {
+  const responded = await pingEntry(entry);
+  if (responded) {
+    pushRoutingEvent('ping-ok', `${entry.provider}/${entry.model} failed a request but responded to a follow-up ping — keeping it known-OK.`);
+    return;
+  }
+  pushRoutingEvent('ping-failed', `${entry.provider}/${entry.model} did not respond to a follow-up ping — demoting.`);
+  learnFailure(entry);
+}
+
 function learnFailure(entry) {
   const key = keyOf(entry);
   const wasOk = knownOk.some(k => keyOf(k) === key);
   knownOk = knownOk.filter(k => keyOf(k) !== key);
   knownFailedKeys.add(key);
   if (wasOk) {
-    console.log(`[${entry.provider}/${entry.model}] demoted from known-OK after request failure.`);
+    pushRoutingEvent('demoted', `${entry.provider}/${entry.model} demoted from known-OK after a request failure.`);
     saveResults(knownOk.map(k => ({ provider: k.provider, model: k.model, status: 'OK', latency: k.latency })));
+  }
+  if (priorityOverrideKey === key) {
+    if (priorityLocked) {
+      pushRoutingEvent('lock-fallback', `Locked priority model ${entry.provider}/${entry.model} failed — falling back for this request only, pin stays locked.`);
+    } else {
+      priorityOverrideKey = null;
+      pushRoutingEvent('pin-cleared', `Priority pin on ${entry.provider}/${entry.model} cleared after a request failure — reverted to auto routing.`);
+    }
   }
 }
 
@@ -304,6 +394,43 @@ function injectUserText(obj, text, depth = 0) {
     if (obj[k] && typeof obj[k] === 'object' && injectUserText(obj[k], text, depth + 1)) return true;
   }
   return false;
+}
+
+// Shared fallback used wherever a Cookie-auth captured sample payload needs
+// the outgoing user text spliced in. Tries the general injectUserText()
+// walk first; if that finds no recognizable message shape, falls back to
+// overwriting the first sufficiently-long string field it finds (checking
+// top-level fields, then one level of nested object fields), and finally
+// keeps a top-level `query` mirror (used by some web UIs, e.g. Kimi) in
+// sync with the injected text. Used by both probeOne() here and the
+// HEALTH_CHECK handler in main.js so the two "ping the provider" code
+// paths can't drift out of sync with each other.
+function injectUserTextWithFallback(payload, text) {
+  if (!injectUserText(payload, text)) {
+    let replaced = false;
+    for (const key in payload) {
+      if (typeof payload[key] === 'string' && payload[key].length > 2 && !replaced) {
+        payload[key] = text;
+        replaced = true;
+      } else if (typeof payload[key] === 'object' && payload[key] !== null) {
+        for (const subKey in payload[key]) {
+          if (
+            typeof payload[key][subKey] === 'string' &&
+            payload[key][subKey].length > 2 &&
+            !replaced
+          ) {
+            payload[key][subKey] = text;
+            replaced = true;
+          }
+        }
+      }
+    }
+  }
+  // Some web UIs (e.g. Kimi) mirror the last user message in a top-level
+  // `query` field alongside the `messages` array — sync it too, otherwise
+  // the server sees a stale sample value.
+  if (typeof payload.query === 'string') payload.query = text;
+  return payload;
 }
 
 function extractChunkText(chunk) {
@@ -653,9 +780,34 @@ function orderEntries() {
   const okSpeed = new Map();
   knownOk.forEach((e, i) => okSpeed.set(keyOf(e), i));
 
-  if (priorityOverrideKey && !okSpeed.has(priorityOverrideKey)) {
-    console.log(`Priority override "${priorityOverrideKey}" is no longer known-OK; clearing pin and reverting to auto ordering.`);
+  // A locked pin is allowed to sit outside knownOk (learnFailure() already
+  // logged the fallback-for-this-request reason) — only an *unlocked* pin
+  // gets auto-cleared here, and that clear itself now goes through
+  // pushRoutingEvent so the UI actually finds out about it instead of the
+  // pin just quietly vanishing.
+  if (priorityOverrideKey && !priorityLocked && !okSpeed.has(priorityOverrideKey)) {
+    const stale = modelEntries.find(e => keyOf(e) === priorityOverrideKey);
+    pushRoutingEvent('pin-cleared', `Priority pin "${stale ? `${stale.provider}/${stale.model}` : priorityOverrideKey}" is no longer known-OK; clearing pin and reverting to auto ordering.`);
     priorityOverrideKey = null;
+  }
+
+  // 'rotate' routing mode: round-robin across the current known-OK set
+  // instead of always racing fastest-first, so load spreads across every
+  // healthy model rather than hammering the single fastest one on every
+  // request. The priority pin (if any, locked or not) still wins outright.
+  if (assistantConfig.routingMode === 'rotate' && knownOk.length > 0 && !priorityOverrideKey) {
+    const rotated = knownOk.map(keyOf);
+    rotateIndex = rotateIndex % rotated.length;
+    const pickedKey = rotated[rotateIndex];
+    rotateIndex += 1;
+    const rank = (entry) => {
+      const k = keyOf(entry);
+      if (k === pickedKey) return -1;
+      if (okSpeed.has(k)) return okSpeed.get(k);
+      if (knownFailedKeys.has(k)) return knownOk.length + 999;
+      return knownOk.length;
+    };
+    return [...modelEntries].sort((a, b) => rank(a) - rank(b));
   }
 
   const rank = (entry) => {
@@ -690,8 +842,7 @@ async function probeOne(entry, { messages, rest }, signal) {
 
   if (authType === 'Cookie') {
     if (apiKey) headers['Cookie'] = apiKey;
-    headers['User-Agent'] =
-      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
+    headers['User-Agent'] = DEFAULT_COOKIE_USER_AGENT;
 
     const rule = webRules[entry.provider] || null;
     if (rule) {
@@ -705,34 +856,29 @@ async function probeOne(entry, { messages, rest }, signal) {
         // Keep the payload's own stream setting (captured payloads are usually
         // stream:true). probeOne waits for the full body (SSE until [DONE]),
         // then normalizes it into one OpenAI-style JSON object for the client.
+        //
+        // BUGFIX: this used to inject only the LAST user message's flattened
+        // text, which silently dropped the system prompt (identity lock, tool
+        // definitions, project root/context) and any earlier turns whenever a
+        // provider's captured payload shape only has one text field to fill —
+        // that's exactly why a Kimi-style backend answered "what are you"
+        // with its own vendor identity instead of staying in character as
+        // this app's coding agent (see [REQ] log: only a single role:"user"
+        // message survived). Inject the FULL role-labeled conversation
+        // instead, so identity/tools/context always reach the model
+        // regardless of how simple the captured payload's message shape is.
+        const fullConversationText = (messages || [])
+          .map((m) => {
+            const text = flattenMessageContent(m && m.content);
+            return text ? `[${String((m && m.role) || 'user').toUpperCase()}]\n${text}` : '';
+          })
+          .filter(Boolean)
+          .join('\n\n');
+
         const lastUserMessage = messages.filter(m => m.role === 'user').pop();
-        const lastMsg = flattenMessageContent(lastUserMessage ? lastUserMessage.content : '');
+        const fallbackText = flattenMessageContent(lastUserMessage ? lastUserMessage.content : '');
 
-        if (!injectUserText(payload, lastMsg)) {
-          let replaced = false;
-          for (const key in payload) {
-            if (typeof payload[key] === 'string' && payload[key].length > 3 && !replaced) {
-              payload[key] = lastMsg;
-              replaced = true;
-            } else if (typeof payload[key] === 'object' && payload[key] !== null) {
-              for (const subKey in payload[key]) {
-                if (
-                  typeof payload[key][subKey] === 'string' &&
-                  payload[key][subKey].length > 3 &&
-                  !replaced
-                ) {
-                  payload[key][subKey] = lastMsg;
-                  replaced = true;
-                }
-              }
-            }
-          }
-        }
-
-        // Some web UIs (e.g. Kimi) mirror the last user message in a top-level
-        // `query` field alongside the `messages` array — sync it too, otherwise
-        // the server sees a stale sample value.
-        if (typeof payload.query === 'string') payload.query = lastMsg;
+        injectUserTextWithFallback(payload, fullConversationText || fallbackText);
       }
 
       // Kimi-style providers authenticate via the Local Storage `refresh_token`
@@ -853,7 +999,7 @@ async function runSingleCompletion(entry, messages, opts = {}) {
     return { text, entry: result.entry, elapsed: result.elapsed, raw: result.data };
   } catch (err) {
     clearTimeout(timer);
-    if (!isCancelledError(err)) learnFailure(entry);
+    if (!isCancelledError(err)) await verifyAndDemote(entry);
     throw err;
   }
 }
@@ -914,7 +1060,7 @@ async function probeSequential(entries, ctx) {
     clearTimeout(timer);
 
     if (result) return result;
-    learnFailure(entry);
+    await verifyAndDemote(entry);
   }
   return null;
 }
@@ -940,8 +1086,9 @@ function probeParallel(entries, ctx) {
         },
         (err) => {
           if (!isCancelledError(err)) {
-            learnFailure(entry);
             console.log(`[${entry.provider}/${entry.model}] FAILED`);
+            // Fire-and-forget: don't hold up the race waiting on a ping.
+            verifyAndDemote(entry).catch(() => {});
           }
           if (--pending === 0 && !winnerResolved) resolve(null);
         }
@@ -1120,9 +1267,11 @@ function getKnownOk() {
   return knownOk.map(e => ({ provider: e.provider, model: e.model, latency: e.latency }));
 }
 
-function setPriorityOverride(entryKey) {
+function setPriorityOverride(entryKey, locked) {
   priorityOverrideKey = entryKey;
-  console.log(`Priority override set to: ${entryKey || 'None (auto)'}`);
+  priorityLocked = entryKey ? !!locked : false;
+  const label = entryKey ? entryKey.replace('::', '/') : 'None (auto)';
+  pushRoutingEvent('pin-set', `Priority ${priorityLocked ? '🔒 locked' : 'set'} to: ${label}`);
 }
 
 function getProxyStats() {
@@ -1270,10 +1419,14 @@ module.exports = {
   setHealthResults,
   getKnownOk,
   setPriorityOverride,
+  getRoutingLog,
+  getPriorityState,
+  setPriorityStateListener,
   getProxyStats,
   getTokenUsage,
   extractContent,
   injectUserText,
+  injectUserTextWithFallback,
   getConnectedClients,
   reloadAssistantConfig,
   previewToolFormat,

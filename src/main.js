@@ -5,9 +5,9 @@ const fs = require('fs');
 const { exec, spawn } = require('child_process');
 const axios = require('axios');
 const https = require('https');
-const { startProxy, stopProxy, isProxyRunning, setHealthResults, extractContent, getTokenUsage, getProxyStats, getKnownOk, setPriorityOverride, injectUserText, reloadAssistantConfig, previewToolFormat } = require('./proxy-server');
+const { startProxy, stopProxy, isProxyRunning, setHealthResults, extractContent, getTokenUsage, getProxyStats, getKnownOk, setPriorityOverride, getRoutingLog, getPriorityState, setPriorityStateListener, injectUserTextWithFallback, reloadAssistantConfig, previewToolFormat } = require('./proxy-server');
 const { saveResults, loadResults, saveSettings, loadSettings, saveConfigBoth, syncConfigFromCsv, pruneConfigEntries, loadProviderConfig, CONFIG_CSV, PROVIDER_CONFIG_CSV, getFilePath, envPrefixFor, parseCsv, loadAssistantConfig, saveAssistantConfig } = require('./state-store');
-const { IPC_CHANNELS } = require('./shared-constants');
+const { IPC_CHANNELS, DEFAULT_COOKIE_USER_AGENT } = require('./shared-constants');
 const { initAgentController } = require('./agent-controller');
 require('dotenv').config({ path: getFilePath('env') });
 
@@ -287,7 +287,7 @@ ipcMain.handle(IPC_CHANNELS.SET_PROVIDER_COOKIE, async (event, providerName, coo
       rules[providerName] = {
         samplePayload: preset ? preset.samplePayload : { question: 'hi', stream: true },
         headers: { 'Content-Type': 'application/json' },
-        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        userAgent: DEFAULT_COOKIE_USER_AGENT,
         origin: preset ? preset.origin : '',
         referer: preset ? preset.referer : '',
         profileKey: prefix.toLowerCase()
@@ -376,20 +376,15 @@ function loadLatestModels() {
   if (!fs.existsSync(latestPath)) return;
   try {
     const text = fs.readFileSync(latestPath, 'utf-8');
-    const lines = text.trim().split(/\r?\n/);
+    const rows = parseCsv(text);
     const providerModels = {};
-    for (let i = 1; i < lines.length; i++) {
-      const line = lines[i].trim();
-      if (!line) continue;
-      const firstComma = line.indexOf(',');
-      if (firstComma === -1) continue;
-      const provider = line.substring(0, firstComma);
-      const model = line.substring(firstComma + 1);
+    for (const row of rows) {
+      const provider = row.provider;
+      const model = row.model;
+      if (!provider || !model) continue;
       if (model.startsWith('ERROR:')) continue;
-      if (provider && model) {
-        if (!providerModels[provider]) providerModels[provider] = [];
-        providerModels[provider].push(model);
-      }
+      if (!providerModels[provider]) providerModels[provider] = [];
+      providerModels[provider].push(model);
     }
     latestProviderModels = providerModels;
     const totalModels = Object.values(providerModels).reduce((sum, arr) => sum + arr.length, 0);
@@ -595,13 +590,12 @@ ipcMain.handle(IPC_CHANNELS.RUN_FETCH_MODELS, async () => {
       }
       try {
         const csvText = fs.readFileSync(getFilePath('latestModels'), 'utf-8');
-        const lines = csvText.trim().split(/\r?\n/);
+        const rows = parseCsv(csvText);
         const entries = [];
-        for (let i = 1; i < lines.length; i++) {
-          const cols = lines[i].split(',');
-          if (cols.length >= 2 && cols[0] && cols[1]) {
-            if (cols[1].startsWith('ERROR:')) continue;
-            entries.push({ provider: cols[0], model: cols[1] });
+        for (const row of rows) {
+          if (row.provider && row.model) {
+            if (row.model.startsWith('ERROR:')) continue;
+            entries.push({ provider: row.provider, model: row.model });
           }
         }
         console.log('fetch-models.js completed:', entries.length, 'models fetched');
@@ -617,13 +611,29 @@ ipcMain.handle(IPC_CHANNELS.GET_KNOWN_OK, () => {
   return getKnownOk();
 });
 
-ipcMain.handle(IPC_CHANNELS.SET_PRIORITY_OVERRIDE, (event, providerModelKey) => {
+ipcMain.handle(IPC_CHANNELS.SET_PRIORITY_OVERRIDE, (event, providerModelKey, locked) => {
   try {
-    setPriorityOverride(providerModelKey || null);
+    setPriorityOverride(providerModelKey || null, !!locked);
     return { success: true };
   } catch (e) {
     return { success: false, error: e.message };
   }
+});
+
+// --- NEW: priority lock / rotate + live resync ---
+ipcMain.handle(IPC_CHANNELS.GET_ROUTING_LOG, () => {
+  return getRoutingLog();
+});
+
+ipcMain.handle(IPC_CHANNELS.GET_PRIORITY_STATE, () => {
+  return getPriorityState();
+});
+
+// Pushed to every window whenever the backend changes priorityOverrideKey/
+// lock/routingMode for any reason — including auto-clearing a stale pin,
+// which previously happened silently with no way for the UI to find out.
+setPriorityStateListener((state) => {
+  sendToRenderer(IPC_CHANNELS.PRIORITY_STATE_CHANGED, state);
 });
 
 ipcMain.handle(IPC_CHANNELS.GET_TOKEN_USAGE, () => {
@@ -678,7 +688,7 @@ ipcMain.handle(IPC_CHANNELS.HEALTH_CHECK, async (event, entries) => {
     };
     if (authType === 'Cookie') {
       headers['Cookie'] = apiKey;
-      headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36';
+      headers['User-Agent'] = DEFAULT_COOKIE_USER_AGENT;
       headers['sec-ch-ua'] = '"Chromium";v="128", "Not;A=Brand";v="24", "Google Chrome";v="128"';
       headers['sec-ch-ua-mobile'] = '?0';
       headers['sec-ch-ua-platform'] = '"Windows"';
@@ -702,24 +712,7 @@ ipcMain.handle(IPC_CHANNELS.HEALTH_CHECK, async (event, entries) => {
         headers['Content-Type'] = 'application/json';
         if (rule.samplePayload) {
           payload = JSON.parse(JSON.stringify(rule.samplePayload));
-          if (!injectUserText(payload, 'ping')) {
-            let replaced = false;
-            for (const key in payload) {
-              if (typeof payload[key] === 'string' && payload[key].length > 2 && !replaced) {
-                payload[key] = 'ping';
-                replaced = true;
-              } else if (typeof payload[key] === 'object' && payload[key] !== null) {
-                for (const subKey in payload[key]) {
-                  if (typeof payload[key][subKey] === 'string' && payload[key][subKey].length > 2 && !replaced) {
-                    payload[key][subKey] = 'ping';
-                    replaced = true;
-                  }
-                }
-              }
-            }
-          }
-          // Keep a top-level `query` mirror (e.g. Kimi) in sync with the ping text.
-          if (typeof payload.query === 'string') payload.query = 'ping';
+          injectUserTextWithFallback(payload, 'ping');
         }
         // Kimi-style providers authenticate via the Local Storage `refresh_token`
         // (Bearer), not via cookies — attach it when the capture saved one.

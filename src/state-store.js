@@ -90,7 +90,13 @@ function parseCsv(text) {
   for (let i = 0; i < text.length; i++) {
     const ch = text[i];
     if (ch === '"') {
-      inQuotes = !inQuotes;
+      if (inQuotes && text[i + 1] === '"') {
+        // Escaped quote ("") inside a quoted field -> literal " character.
+        cur += '"';
+        i++; // consume both quote characters
+      } else {
+        inQuotes = !inQuotes;
+      }
     } else if ((ch === ',' || ch === '\n' || ch === '\r') && !inQuotes) {
       if (ch === '\r') continue;
       if (ch === '\n') {
@@ -277,8 +283,10 @@ const DEFAULT_AGENT_CONFIG = {
   // turn-level processChatCompletion + AGENT_STREAM_CHUNK path.
   streamResponses: true,
   // --- NEW: diff preview / undo --- off by default: writes go through the
-  // diff-preview accept/reject flow. When true, executeWriteFile uses the
-  // lighter-weight approval-only flow instead.
+  // diff-preview accept/reject flow ("Quick approval" off). When true,
+  // executeWriteFile uses the lighter-weight Approve/Deny-only flow instead
+  // ("Quick approval" on). Either setting always pauses for an explicit
+  // user decision before writing — this only controls which prompt is shown.
   alwaysApproveWrites: false
 };
 

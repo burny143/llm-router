@@ -5,6 +5,14 @@
 // coloring both reference this constant instead of each duplicating the
 // literal 'OK (' string, so a wording change in one can't silently break
 // coloring in the other.
+// Single shared fake User-Agent string used anywhere the app needs to look
+// like a real desktop Chrome browser (Playwright cookie-capture flows and
+// Cookie-auth proxy requests to web chat providers like Kimi/Qwen). Having
+// one constant instead of several hand-copied literals means the Chrome
+// version can't silently drift out of sync between call sites.
+const DEFAULT_COOKIE_USER_AGENT =
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
+
 const LOG_MARKERS = {
   SUCCESS: 'OK (',
   // Tagged prefixes used by proxy-server.js so renderer.js can split the single
@@ -29,6 +37,13 @@ const IPC_CHANNELS = {
   // Priority override / known-OK
   GET_KNOWN_OK: 'get-known-ok',
   SET_PRIORITY_OVERRIDE: 'set-priority-override',
+  // --- NEW: priority lock / rotate + live resync ---
+  GET_ROUTING_LOG: 'get-routing-log',
+  GET_PRIORITY_STATE: 'get-priority-state',
+  // main -> renderer: pushed any time priorityOverrideKey/lock/routingMode
+  // changes for ANY reason (user action or an auto-clear on failure), so
+  // every open dropdown can resync immediately instead of going stale.
+  PRIORITY_STATE_CHANGED: 'priority-state-changed',
 
   // Config defaults / env
   GET_DEFAULT_CONFIG: 'get-default-config',
@@ -122,4 +137,4 @@ const IPC_CHANNELS = {
   AGENT_UNDO_STATE: 'agent:undo-state',
 };
 
-module.exports = { IPC_CHANNELS, LOG_MARKERS };
+module.exports = { IPC_CHANNELS, LOG_MARKERS, DEFAULT_COOKIE_USER_AGENT };

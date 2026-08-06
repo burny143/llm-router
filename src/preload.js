@@ -21,7 +21,14 @@ contextBridge.exposeInMainWorld('api', {
   getProxyStats: () => ipcRenderer.invoke(IPC_CHANNELS.GET_PROXY_STATS),
   runFetchModels: () => ipcRenderer.invoke(IPC_CHANNELS.RUN_FETCH_MODELS),
   getKnownOk: () => ipcRenderer.invoke(IPC_CHANNELS.GET_KNOWN_OK),
-  setPriorityOverride: (key) => ipcRenderer.invoke(IPC_CHANNELS.SET_PRIORITY_OVERRIDE, key),
+  setPriorityOverride: (key, locked) => ipcRenderer.invoke(IPC_CHANNELS.SET_PRIORITY_OVERRIDE, key, locked),
+  getRoutingLog: () => ipcRenderer.invoke(IPC_CHANNELS.GET_ROUTING_LOG),
+  getPriorityState: () => ipcRenderer.invoke(IPC_CHANNELS.GET_PRIORITY_STATE),
+  onPriorityStateChanged: (callback) => {
+    const handler = (_event, data) => callback(data);
+    ipcRenderer.on(IPC_CHANNELS.PRIORITY_STATE_CHANGED, handler);
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.PRIORITY_STATE_CHANGED, handler);
+  },
   runWebProviderSetup: (providerName, startUrl) => ipcRenderer.invoke(IPC_CHANNELS.RUN_WEB_PROVIDER_SETUP, providerName, startUrl),
   clearWebProviderSession: (providerName) => ipcRenderer.invoke(IPC_CHANNELS.CLEAR_WEB_PROVIDER_SESSION, providerName),
   setProviderCookie: (providerName, cookie) => ipcRenderer.invoke(IPC_CHANNELS.SET_PROVIDER_COOKIE, providerName, cookie),

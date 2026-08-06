@@ -836,3 +836,32 @@ button.btn-primary:hover {
   border-top: 1px solid #eee;
   padding-top: 8px;
 }
+
+/* --- NEW: priority model lock + routing log panel --- */
+.priority-lock-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  margin-left: 8px;
+  cursor: pointer;
+}
+.priority-lock-label input:disabled { cursor: not-allowed; }
+.priority-routing-log {
+  margin: 4px 0 8px;
+  padding: 6px 8px;
+  background: #fafafa;
+  border: 1px solid #eee;
+  border-radius: 4px;
+  font-size: 11px;
+  max-height: 110px;
+  overflow-y: auto;
+  font-family: monospace;
+}
+.priority-log-empty { color: #999; font-style: italic; }
+.priority-log-row { padding: 1px 0; white-space: pre-wrap; word-break: break-word; }
+.priority-log-time { color: #999; margin-right: 6px; }
+.priority-log-pin-cleared { color: #c0392b; }
+.priority-log-demoted { color: #e0a800; }
+.priority-log-lock-fallback { color: #e0a800; }
+.priority-log-pin-set { color: #28a745; }

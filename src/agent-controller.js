@@ -73,6 +73,194 @@ const MAX_SEARCH_MATCHES = 200;
 const COMMAND_TIMEOUT_MS = 30000;
 const MCP_REQUEST_TIMEOUT_MS = 15000;
 const MAX_AGENT_STEPS = 25; // guards against a runaway tool-call chain
+// --- NEW: agent-loop resilience (keep-alive) ---
+// Previously a single failed model call (transient network blip, one bad
+// probe before the routing layer's own retry/fallback kicks in) aborted the
+// ENTIRE task immediately via AGENT_ERROR. This retries the model call
+// itself a few times with a short backoff before giving up on the turn —
+// separate from (and on top of) proxy-server.js's own per-candidate
+// retryCount, which only covers one candidate before findWinner moves on.
+const MODEL_CALL_MAX_ATTEMPTS = 3;
+const MODEL_CALL_RETRY_DELAY_MS = 1500;
+// If the model issues the exact same tool call (name + args) this many
+// times in a row, it's stuck in a loop rather than making progress —
+// interrupt with a corrective nudge instead of silently burning the whole
+// step budget on the same failing action.
+const STUCK_LOOP_THRESHOLD = 3;
+// If the step budget runs out but the last few steps show real progress
+// (successful tool calls, no repeated failures), grant a bounded number of
+// extra steps once rather than just giving up — a real "keep going until
+// actually done" behavior instead of a hard cliff.
+const STEP_LIMIT_EXTENSION = 10;
+
+function sleep(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }
+
+function toolCallSignature(call) {
+  const name = call.function && call.function.name;
+  const args = call.function && call.function.arguments;
+  return `${name}:${args}`;
+}
+
+async function runAgentTurn(sendToRenderer, userText, uploadedFiles) {
+  if (running) throw new Error('Agent is already processing a turn.');
+  running = true;
+  abortRequested = false;
+  try {
+    let content = userText || '';
+    if (Array.isArray(uploadedFiles) && uploadedFiles.length) {
+      const ctx = uploadedFiles
+        .filter((f) => f && f.content != null)
+        .map((f) => `--- uploaded: ${f.filename} ---\n${f.content}`)
+        .join('\n\n');
+      if (ctx) content = `${content}\n\n[Attached files]\n${ctx}`;
+    }
+    sessionMessages.push({ role: 'user', content });
+
+    const mode = getMode();
+    const skills = (mode === 'project' ? [...globalSkills, ...projectSkills] : globalSkills)
+      .filter((s) => s.enabled !== false);
+    const skillsBlock = skills.length
+      ? `\n\nActive skills:\n${skills.map((s) => `- ${s.name}: ${s.description || ''}`).join('\n')}`
+      : '';
+    const tools = buildToolDefs(mode);
+    const messagesForModel = [{ role: 'system', content: buildSystemPrompt(mode) + skillsBlock }, ...sessionMessages];
+
+    let stepLimit = MAX_AGENT_STEPS;
+    let extensionGranted = false;
+    let recentToolSignatures = [];
+    let finalMessage = null;
+
+    for (let step = 0; step < stepLimit; step++) {
+      if (abortRequested) { sendToRenderer(IPC_CHANNELS.AGENT_DONE, { aborted: true }); return; }
+
+      // --- NEW: streaming support ---
+      const streamingEnabled = globalConfig.streamResponses !== false;
+      let message;
+
+      // --- NEW: retry-on-transient-error (keep-alive) ---
+      let lastCallError = null;
+      for (let attempt = 1; attempt <= MODEL_CALL_MAX_ATTEMPTS; attempt++) {
+        if (abortRequested) break;
+        try {
+          if (streamingEnabled) {
+            sendToRenderer(IPC_CHANNELS.AGENT_STREAM_START, {});
+            let fullText = '';
+            const streamResult = await proxy().processChatCompletionStream(messagesForModel, { tools }, (token) => {
+              fullText += token;
+              sendToRenderer(IPC_CHANNELS.AGENT_STREAM_TOKEN, { token });
+            });
+            message = {
+              role: 'assistant',
+              content: streamResult.content || fullText || null,
+              ...(streamResult.tool_calls ? { tool_calls: streamResult.tool_calls } : {})
+            };
+            sendToRenderer(IPC_CHANNELS.AGENT_STREAM_END, {
+              fullText: message.content || '',
+              tool_calls: streamResult.tool_calls || null
+            });
+          } else {
+            const response = await proxy().processChatCompletion(messagesForModel, { tools });
+            message = (response && response.choices && response.choices[0] && response.choices[0].message) || {};
+            if (message.content) {
+              // Fallback path when streaming is off: whole message in one chunk.
+              sendToRenderer(IPC_CHANNELS.AGENT_STREAM_CHUNK, { text: message.content });
+            }
+          }
+          lastCallError = null;
+          break;
+        } catch (err) {
+          lastCallError = err;
+          if (attempt < MODEL_CALL_MAX_ATTEMPTS) {
+            sendToRenderer(IPC_CHANNELS.AGENT_ERROR, {
+              message: `Model call failed (attempt ${attempt}/${MODEL_CALL_MAX_ATTEMPTS}): ${err.message} — retrying.`,
+              recoverable: true
+            });
+            await sleep(MODEL_CALL_RETRY_DELAY_MS);
+          }
+        }
+      }
+      if (lastCallError) {
+        sendToRenderer(IPC_CHANNELS.AGENT_ERROR, { message: lastCallError.message });
+        return;
+      }
+      if (abortRequested) { sendToRenderer(IPC_CHANNELS.AGENT_DONE, { aborted: true }); return; }
+
+      messagesForModel.push(message);
+      sessionMessages.push(message);
+
+      const toolCalls = message.tool_calls;
+      if (!Array.isArray(toolCalls) || toolCalls.length === 0) {
+        finalMessage = message;
+        break;
+      }
+
+      // --- NEW: stuck-loop detection (keep-alive) ---
+      // Track only single-tool-call steps (the common "stuck" shape); a
+      // multi-call step resets the streak since it's clearly doing
+      // something different each time.
+      if (toolCalls.length === 1) {
+        const sig = toolCallSignature(toolCalls[0]);
+        recentToolSignatures.push(sig);
+        if (recentToolSignatures.length > STUCK_LOOP_THRESHOLD) recentToolSignatures.shift();
+        const allSame = recentToolSignatures.length === STUCK_LOOP_THRESHOLD &&
+          recentToolSignatures.every((s) => s === recentToolSignatures[0]);
+        if (allSame) {
+          const nudge = {
+            role: 'user',
+            content: `[system: you've called the same tool with the same arguments ${STUCK_LOOP_THRESHOLD} times in a row without making progress. ` +
+              `Stop repeating it — either try a genuinely different approach, or if the task is actually complete, say so and stop.]`
+          };
+          messagesForModel.push(nudge);
+          sessionMessages.push(nudge);
+          recentToolSignatures = [];
+        }
+      } else {
+        recentToolSignatures = [];
+      }
+
+      for (const call of toolCalls) {
+        if (abortRequested) break;
+        const name = call.function && call.function.name;
+        let args = {};
+        try { args = JSON.parse((call.function && call.function.arguments) || '{}'); } catch (_) { args = {}; }
+
+        sendToRenderer(IPC_CHANNELS.AGENT_TOOL_START, { id: call.id, name, args });
+        const result = await executeTool(sendToRenderer, name, args);
+        sendToRenderer(IPC_CHANNELS.AGENT_TOOL_RESULT, { id: call.id, name, result });
+
+        const toolMsg = {
+          role: 'tool',
+          tool_call_id: call.id,
+          content: typeof result === 'string' ? result : (result.message || JSON.stringify(result))
+        };
+        messagesForModel.push(toolMsg);
+        sessionMessages.push(toolMsg);
+      }
+
+      // --- NEW: bounded step-limit extension (keep-alive) ---
+      // Reaching the budget with clear signs of steady progress (no stuck
+      // loop just resolved) earns ONE extension rather than a hard stop, so
+      // a genuinely long task isn't cut off mid-way through real work.
+      if (step === stepLimit - 1 && !extensionGranted) {
+        extensionGranted = true;
+        stepLimit += STEP_LIMIT_EXTENSION;
+        sendToRenderer(IPC_CHANNELS.AGENT_ERROR, {
+          message: `Step budget reached but the task appears to be progressing — granting ${STEP_LIMIT_EXTENSION} more steps.`,
+          recoverable: true
+        });
+      }
+    }
+
+    if (!finalMessage) {
+      sendToRenderer(IPC_CHANNELS.AGENT_DONE, { stoppedReason: 'step-limit-reached' });
+      return;
+    }
+
+    sendToRenderer(IPC_CHANNELS.AGENT_DONE, {});
+  } finally {
+    running = false;
+  }
+}
 
 function getMode() { return projectRoot ? 'project' : 'global'; }
 
@@ -210,9 +398,11 @@ async function executeWriteFile(sendToRenderer, args) {
     try { previousContent = fs.readFileSync(abs, 'utf-8'); } catch (_) { previousContent = null; }
   }
 
-  // --- NEW: diff preview --- "Always approve writes" keeps the original,
-  // lighter-weight approval-only flow (no diff round-trip). Otherwise show
-  // the diff and let the user Accept/Reject.
+  // --- NEW: diff preview --- "Quick approval" (alwaysApproveWrites) keeps
+  // the original, lighter-weight Approve/Deny flow (no diff round-trip).
+  // Either way this ALWAYS pauses for an explicit user decision before
+  // writing — "quick" only means "skip the diff", never "skip asking".
+  // Otherwise show the diff and let the user Accept/Reject.
   if (globalConfig.alwaysApproveWrites) {
     const approved = await requestApproval(sendToRenderer, 'write_file', {
       path: args.path,
@@ -773,9 +963,25 @@ async function executeTool(sendToRenderer, name, args) {
 }
 
 // --- System prompt -----------------------------------------------------------
+// IDENTITY_LOCK: routing can send a turn to any configured backend, including
+// Cookie/web-auth providers (e.g. Kimi, Qwen) whose underlying model has its
+// own strongly-trained self-description (vendor name, web/app/extension
+// links, its own content policy). Left unchecked, a generic "what are you" /
+// "tell me about yourself" question can pull that vendor boilerplate out
+// instead of the model staying in character as this project's coding agent —
+// this is a real leak that happened via scratchpad_write. Prepending an
+// explicit override on every turn, for every mode/provider, keeps identity
+// answers consistent regardless of which backend actually served the request.
+const IDENTITY_LOCK =
+  "You are this app's coding agent — not any particular underlying AI vendor or product. " +
+  'If asked what you are, who made you, what app/website/extension you have, or about any ' +
+  "content policy, answer only in terms of this coding agent's own tools and scope described " +
+  'below; do not mention or describe an underlying model\'s vendor name, product links, or policies.';
+
 function buildSystemPrompt(mode) {
   if (mode === 'global') {
     return [
+      IDENTITY_LOCK,
       'You are a helpful coding assistant with no project folder selected (Global mode).',
       'You can reason about code, answer questions, and write code snippets or explanations.',
       'You have a `scratchpad_write` tool that writes to a private temp file — use it to hand the user a file.',
@@ -784,6 +990,7 @@ function buildSystemPrompt(mode) {
     ].join(' ');
   }
   return [
+    IDENTITY_LOCK,
     `You are a coding assistant working on the project at ${projectRoot} (Project mode).`,
     'Tools: list_directory, read_file, write_file, search_code, run_command, scratchpad_write.',
     'Prefer list_directory/search_code to orient yourself before reading or editing files.',
@@ -792,106 +999,9 @@ function buildSystemPrompt(mode) {
 }
 
 // --- The agent loop -----------------------------------------------------------
-async function runAgentTurn(sendToRenderer, userText, uploadedFiles) {
-  if (running) throw new Error('Agent is already processing a turn.');
-  running = true;
-  abortRequested = false;
-  try {
-    let content = userText || '';
-    if (Array.isArray(uploadedFiles) && uploadedFiles.length) {
-      const ctx = uploadedFiles
-        .filter((f) => f && f.content != null)
-        .map((f) => `--- uploaded: ${f.filename} ---\n${f.content}`)
-        .join('\n\n');
-      if (ctx) content = `${content}\n\n[Attached files]\n${ctx}`;
-    }
-    sessionMessages.push({ role: 'user', content });
-
-    const mode = getMode();
-    const skills = (mode === 'project' ? [...globalSkills, ...projectSkills] : globalSkills)
-      .filter((s) => s.enabled !== false);
-    const skillsBlock = skills.length
-      ? `\n\nActive skills:\n${skills.map((s) => `- ${s.name}: ${s.description || ''}`).join('\n')}`
-      : '';
-    const tools = buildToolDefs(mode);
-    const messagesForModel = [{ role: 'system', content: buildSystemPrompt(mode) + skillsBlock }, ...sessionMessages];
-
-    for (let step = 0; step < MAX_AGENT_STEPS; step++) {
-      if (abortRequested) { sendToRenderer(IPC_CHANNELS.AGENT_DONE, { aborted: true }); return; }
-
-      // --- NEW: streaming support ---
-      const streamingEnabled = globalConfig.streamResponses !== false;
-      let message;
-      if (streamingEnabled) {
-        sendToRenderer(IPC_CHANNELS.AGENT_STREAM_START, {});
-        let fullText = '';
-        let streamResult;
-        try {
-          streamResult = await proxy().processChatCompletionStream(messagesForModel, { tools }, (token) => {
-            fullText += token;
-            sendToRenderer(IPC_CHANNELS.AGENT_STREAM_TOKEN, { token });
-          });
-        } catch (err) {
-          sendToRenderer(IPC_CHANNELS.AGENT_ERROR, { message: err.message });
-          return;
-        }
-        message = {
-          role: 'assistant',
-          content: streamResult.content || fullText || null,
-          ...(streamResult.tool_calls ? { tool_calls: streamResult.tool_calls } : {})
-        };
-        sendToRenderer(IPC_CHANNELS.AGENT_STREAM_END, {
-          fullText: message.content || '',
-          tool_calls: streamResult.tool_calls || null
-        });
-      } else {
-        let response;
-        try {
-          response = await proxy().processChatCompletion(messagesForModel, { tools });
-        } catch (err) {
-          sendToRenderer(IPC_CHANNELS.AGENT_ERROR, { message: err.message });
-          return;
-        }
-        message = (response && response.choices && response.choices[0] && response.choices[0].message) || {};
-        if (message.content) {
-          // Fallback path when streaming is off: whole message in one chunk.
-          sendToRenderer(IPC_CHANNELS.AGENT_STREAM_CHUNK, { text: message.content });
-        }
-      }
-
-      messagesForModel.push(message);
-      sessionMessages.push(message);
-
-      const toolCalls = message.tool_calls;
-      if (!Array.isArray(toolCalls) || toolCalls.length === 0) {
-        sendToRenderer(IPC_CHANNELS.AGENT_DONE, {});
-        return;
-      }
-
-      for (const call of toolCalls) {
-        if (abortRequested) break;
-        const name = call.function && call.function.name;
-        let args = {};
-        try { args = JSON.parse((call.function && call.function.arguments) || '{}'); } catch (_) { args = {}; }
-
-        sendToRenderer(IPC_CHANNELS.AGENT_TOOL_START, { id: call.id, name, args });
-        const result = await executeTool(sendToRenderer, name, args);
-        sendToRenderer(IPC_CHANNELS.AGENT_TOOL_RESULT, { id: call.id, name, result });
-
-        const toolMsg = {
-          role: 'tool',
-          tool_call_id: call.id,
-          content: typeof result === 'string' ? result : (result.message || JSON.stringify(result))
-        };
-        messagesForModel.push(toolMsg);
-        sessionMessages.push(toolMsg);
-      }
-    }
-    sendToRenderer(IPC_CHANNELS.AGENT_DONE, { stoppedReason: 'step-limit-reached' });
-  } finally {
-    running = false;
-  }
-}
+// (see runAgentTurn definition above, near MAX_AGENT_STEPS / the keep-alive
+// constants — kept together so the retry/stuck-loop/step-extension knobs
+// live right next to the loop that uses them.)
 
 // --- IPC wiring ---------------------------------------------------------------
 function initAgentController({ ipcMain, dialog, sendToRenderer, getMainWindow }) {

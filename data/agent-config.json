@@ -1,7 +1,8 @@
 {
-  "lastProjectPath": "C:\\__Projects\\AI Projects\\NebulaGame",
+  "lastProjectPath": "C:\\__Projects\\AI Projects\\job-hunter",
   "selectedModel": "Kimi::Kimi-chat",
   "globalMcpServers": [],
   "streamResponses": true,
-  "alwaysApproveWrites": false
+  "alwaysApproveWrites": true,
+  "kimiBoostEnabled": false
 }

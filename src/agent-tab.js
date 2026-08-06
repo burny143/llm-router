@@ -30,6 +30,7 @@
   const selectFolderBtn = el('agentSelectFolderBtn');
   const clearFolderBtn = el('agentClearFolderBtn');
   const modelDropdown = el('agentModelDropdown');
+  const modelLockToggle = el('agentModelLockToggle');
   const refreshFilesBtn = el('agentRefreshFilesBtn');
   const fileTreeEl = el('agentFileTree');
   const uploadFileBtn = el('agentUploadFileBtn');
@@ -407,35 +408,82 @@
   // so picking a model here actually pins routing for every request, agent or not) ---
   async function populateModelDropdown() {
     let known = [];
-    try { known = await api.getKnownOk(); } catch () { known = []; }
+    try { known = await api.getKnownOk(); } catch (_) { known = []; }
 
     let saved = {};
-    try { saved = await api.getAgentConfig(); } catch () { saved = {}; }
+    try { saved = await api.getAgentConfig(); } catch (_) { saved = {}; }
+
+    // Authoritative pin/lock state from the backend, not the agent-config
+    // snapshot — the backend can auto-clear a pin mid-session on failure,
+    // and this is what makes the dropdown actually reflect that instead of
+    // silently continuing to show a model that's no longer pinned.
+    let priorityState = {};
+    try { priorityState = await api.getPriorityState(); } catch (_) { priorityState = {}; }
+    const activeKey = priorityState.priorityOverrideKey || '';
 
     modelDropdown.innerHTML = '<option value="">Auto (known-OK routing)</option>';
+    const seenKeys = new Set(['']);
 
     known.forEach((k) => {
       const key = k.provider + '::' + k.model;
+      seenKeys.add(key);
       const opt = document.createElement('option');
       opt.value = key;
       opt.textContent = k.provider + ' / ' + k.model;
       modelDropdown.appendChild(opt);
     });
 
-    if (saved.selectedModel) modelDropdown.value = saved.selectedModel;
+    // A locked pin can point at a model that has since fallen out of the
+    // known-OK list (e.g. it failed but the lock kept it pinned "for this
+    // request only" — see proxy-server.js's learnFailure). Setting
+    // modelDropdown.value to a key with no matching <option> makes the
+    // native <select> render as blank/empty instead of showing anything,
+    // which is the "dropdown going blank" bug — always add the active key
+    // as an option (even if not in `known`) so the select always has
+    // something real to display.
+    if (activeKey && !seenKeys.has(activeKey)) {
+      const sep = activeKey.indexOf('::');
+      const provider = sep >= 0 ? activeKey.slice(0, sep) : activeKey;
+      const model = sep >= 0 ? activeKey.slice(sep + 2) : '';
+      const opt = document.createElement('option');
+      opt.value = activeKey;
+      opt.textContent = provider + (model ? ' / ' + model : '') + ' (pinned, offline)';
+      modelDropdown.appendChild(opt);
+    }
+
+    modelDropdown.value = activeKey || (saved.selectedModel || '');
+    if (modelLockToggle) {
+      modelLockToggle.checked = !!priorityState.priorityLocked;
+      modelLockToggle.disabled = !activeKey;
+    }
   }
 
   modelDropdown.addEventListener('change', async () => {
     const key = modelDropdown.value || null;
+    if (modelLockToggle) modelLockToggle.disabled = !key;
     try {
-      if (api.setPriorityOverride) await api.setPriorityOverride(key);
+      if (api.setPriorityOverride) await api.setPriorityOverride(key, modelLockToggle ? modelLockToggle.checked : false);
       await api.saveAgentConfig({ selectedModel: key });
     } catch (err) {
       addSystemNote('Could not set model: ' + err.message, true);
     }
   });
 
-  // --- Settings toggles: stream responses / always approve writes ---
+  if (modelLockToggle) {
+    modelLockToggle.addEventListener('change', async () => {
+      try { await api.setPriorityOverride(modelDropdown.value || null, modelLockToggle.checked); }
+      catch (err) { addSystemNote('Could not set lock: ' + err.message, true); }
+    });
+  }
+
+  // Live resync: same PRIORITY_STATE_CHANGED broadcast the Proxy Control tab
+  // listens to, so a pin cleared from either tab (or auto-cleared by the
+  // backend after a failure) is reflected here immediately.
+  if (api.onPriorityStateChanged) {
+    api.onPriorityStateChanged(() => { populateModelDropdown(); });
+  }
+
+  // --- Settings toggles: stream responses / quick approval ---
   async function loadSettingsToggles() {
     let saved = {};
     try { saved = await api.getAgentConfig(); } catch (_) { saved = {}; }
@@ -893,6 +941,15 @@
 
   if (api.onAgentError) {
     api.onAgentError((data) => {
+      // --- NEW: keep-alive notices ---
+      // Several non-fatal notices (retry attempts, a granted step-limit
+      // extension) are sent through this same channel so they show up in the
+      // conversation log, but they must NOT end the "agent is working" UI
+      // state the way a real fatal error does.
+      if (data && data.recoverable) {
+        addSystemNote(data.message);
+        return;
+      }
       setSending(false);
       addSystemNote('Error: ' + data.message, true);
     });
@@ -1063,10 +1120,10 @@
     } else if (key === 'z') {
       e.preventDefault();
       undoLastChange();
-    } else if (key === 'enter' && document.activeElement === inputEl) {
-      e.preventDefault();
-      sendMessage();
     }
+    // NOTE: Enter/Ctrl+Enter while focused in the chat input is handled
+    // exclusively by inputEl's own 'keydown' listener above — do not add a
+    // sendMessage() branch here, or messages will be sent twice.
   });
 
   // --- NEW: keyboard shortcuts --- sidebar file filter (client-side, no IPC) ---
@@ -1107,14 +1164,14 @@
       const modeInfo = await api.getAgentMode();
       applyMode(modeInfo.mode, modeInfo.projectRoot);
       setUndoEnabled(!!modeInfo.canUndo); // --- NEW: undo ---
-    } catch () { applyMode('global', null); }
+    } catch (_) { applyMode('global', null); }
 
     await loadSkills();
     await renderMcp();
     await populateModelDropdown();
     await loadSettingsToggles();
 
-    try { await api.startAgentSession(); } catch () { /* best-effort */ }
+    try { await api.startAgentSession(); } catch (_) { /* best-effort */ }
   }
 
   init();

@@ -33,13 +33,16 @@
           <select id="agentModelDropdown">
             <option value="">Auto (known-OK routing)</option>
           </select>
+          <label class="priority-lock-label" title="Keep this model pinned even if it temporarily fails, instead of auto-reverting to auto-routing">
+            <input type="checkbox" id="agentModelLockToggle" disabled> 🔒
+          </label>
         </div>
         <div class="agent-settings-toggles">
           <label class="agent-toggle-label" title="Stream the assistant's reply token-by-token instead of waiting for the full response">
             <input type="checkbox" id="agentStreamToggle" checked> Stream responses
           </label>
-          <label class="agent-toggle-label" title="Skip the diff preview and auto-approve file writes (still shows a plain approval prompt)">
-            <input type="checkbox" id="agentAlwaysApproveToggle"> Always approve writes
+          <label class="agent-toggle-label" title="ON: a quick Approve/Deny prompt before each file write. OFF: a full diff-preview (Accept/Reject) before each file write. Either way, every write pauses for your decision.">
+            <input type="checkbox" id="agentAlwaysApproveToggle"> Quick approval (skip diff review)
           </label>
         </div>
       </div>
@@ -110,8 +113,8 @@
     </div>
 
     <!-- --- NEW: diff preview --- shown before write_file executes (unless
-         "Always approve writes" is on, in which case the plain approval
-         modal above is used instead) -->
+         "Quick approval" is on, in which case the plain approval modal
+         above is used instead — both always require an explicit click) -->
     <div id="agentDiffModal" class="agent-modal-overlay" style="display:none;">
       <div class="agent-modal agent-diff-modal">
         <h3 id="agentDiffTitle">Review file change</h3>
@@ -191,7 +194,11 @@
           <option value="">None (auto)</option>
         </select>
       </label>
+      <label class="priority-lock-label" title="Keep this model pinned even if it temporarily fails a request, instead of auto-reverting to auto-routing">
+        <input type="checkbox" id="priorityLockToggle" disabled> 🔒 Lock
+      </label>
     </div>
+    <div id="priorityRoutingLog" class="priority-routing-log"></div>
     <div id="serverAddress" class="status stopped">Server stopped</div>
 
     <h3 class="section-header">Connected Applications</h3>
@@ -361,6 +368,7 @@
           <select id="routingModeSelect">
             <option value="auto">Fastest known-good (auto)</option>
             <option value="configOrder">Config order</option>
+            <option value="rotate">Rotate (round-robin known-good)</option>
           </select>
         </td>
       </tr>
