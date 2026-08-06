@@ -295,9 +295,15 @@ loadDefaultConfig();
 onConfigReady(async ({ entries }) => {
   await refreshProviderInfo();
   configEntries = entries.filter(e => providerInfo[e.provider]);
-  renderAllConfigTables();
-  renderPriorityOverrideDropdown();
-  console.log('Config table updated from main process:', configEntries.length, 'entries');
+  // Defer one tick, matching every other renderAllConfigTables()/
+  // renderPriorityOverrideDropdown() call site: rebuilding a <select>-backed
+  // table synchronously while a native dropdown popup is still closing
+  // leaves a stuck invisible popup that swallows clicks for a while.
+  setTimeout(() => {
+    renderAllConfigTables();
+    renderPriorityOverrideDropdown();
+    console.log('Config table updated from main process:', configEntries.length, 'entries');
+  }, 0);
 });
 
 document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -311,15 +317,20 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     const configFooter = document.getElementById('configFooter');
     if (configFooter) configFooter.style.display = btn.dataset.tab === 'config' ? 'block' : 'none';
     if (btn.dataset.tab === 'usage') renderTokenUsage();
+    if (btn.dataset.tab === 'assistant') loadAssistantConfigForm();
   });
 });
 
 document.querySelectorAll('.sub-tab-btn').forEach(btn => {
   btn.addEventListener('click', () => {
-    document.querySelectorAll('.sub-tab-btn').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('.sub-tab-content').forEach(t => t.classList.remove('active'));
+    // Scope to the enclosing top-level tab so independent sub-tab groups
+    // (Config's API/Cookie Models vs Proxy Control's Request/Response Logs)
+    // don't clear each other's active state.
+    const scope = btn.closest('.tab-content') || document;
+    scope.querySelectorAll(':scope > .sub-tabs .sub-tab-btn').forEach(b => b.classList.remove('active'));
+    scope.querySelectorAll(':scope > .sub-tab-content').forEach(t => t.classList.remove('active'));
     btn.classList.add('active');
-    document.getElementById(btn.dataset.subtab + '-subtab').classList.add('active');
+    scope.querySelector('#' + btn.dataset.subtab + '-subtab').classList.add('active');
   });
 });
 
@@ -392,6 +403,41 @@ disconnectBtn.addEventListener('click', async () => {
   connectBtn.disabled = false;
   disconnectBtn.disabled = true;
 });
+
+const connectedAppsCount = document.getElementById('connectedAppsCount');
+const connectedAppsList = document.getElementById('connectedAppsList');
+
+function renderConnectedApps(connectedApps) {
+  if (!connectedAppsCount || !connectedAppsList) return;
+  const clients = (connectedApps && connectedApps.clients) || [];
+  connectedAppsCount.textContent = `Connected applications: ${connectedApps ? connectedApps.count : 0}`;
+  if (clients.length === 0) {
+    connectedAppsList.innerHTML = '<div class="connected-apps-empty">No applications connected.</div>';
+    return;
+  }
+  connectedAppsList.innerHTML = clients.map(c => `
+    <div class="connected-app-card">
+      <div>
+        <div class="app-name">${c.appName}</div>
+        <div class="app-meta">
+          In-flight: ${c.activeRequests} · Total: ${c.totalRequests} · Errors: ${c.errorCount}
+          ${c.lastModel ? ` · Last: ${c.lastProvider}/${c.lastModel}` : ''}
+          ${c.lastActivity ? ` · Last activity: ${c.lastActivity}` : ''}
+        </div>
+      </div>
+      <span class="connected-app-status ${c.status}">${c.status}</span>
+    </div>
+  `).join('');
+}
+
+async function pollProxyStats() {
+  try {
+    const stats = await window.api.getProxyStats();
+    renderConnectedApps(stats && stats.connectedApps);
+  } catch (err) { /* proxy not running yet, or IPC not ready — ignore */ }
+}
+pollProxyStats();
+setInterval(pollProxyStats, 3000);
 
 const chatMessages = document.getElementById('chatMessages');
 const chatInput = document.getElementById('chatInput');
@@ -470,6 +516,77 @@ onDevLog(({ level, text, time }) => {
 });
 
 clearLogsBtn.addEventListener('click', () => { devLogs.innerHTML = ''; });
+
+// --- Request / Response Logs (Task 4) ---
+// Reuses the existing DEV_LOG pipeline: proxy-server.js tags request/response
+// lines with LOG_MARKERS.REQUEST/RESPONSE, we split them out here instead of
+// adding a second IPC channel.
+const requestLogsList = document.getElementById('requestLogsList');
+const responseLogsList = document.getElementById('responseLogsList');
+const reqResLogFilterInput = document.getElementById('reqResLogFilterInput');
+const clearReqResLogsBtn = document.getElementById('clearReqResLogsBtn');
+const reqResLiveTailToggle = document.getElementById('reqResLiveTailToggle');
+
+let requestLogEntries = [];
+let responseLogEntries = [];
+const MAX_REQ_RES_ENTRIES = 500;
+
+function matchesFilter(entry, filterText) {
+  if (!filterText) return true;
+  return JSON.stringify(entry).toLowerCase().includes(filterText.toLowerCase());
+}
+
+function renderLogList(container, entries, kind) {
+  if (!container) return;
+  const filterText = reqResLogFilterInput ? reqResLogFilterInput.value.trim() : '';
+  const filtered = entries.filter(e => matchesFilter(e, filterText));
+  if (filtered.length === 0) {
+    container.innerHTML = '<div style="color:#888; font-style: italic;">No matching entries.</div>';
+    return;
+  }
+  container.innerHTML = filtered.map(e => {
+    const isError = kind === 'response' && (e.error || (e.status && e.status >= 400));
+    const summary = kind === 'request'
+      ? `[${e.time}] ${e.provider}/${e.model} → ${e.method} ${e.url} (${e.payloadSize}b, ~${e.tokenEstimate} tok)`
+      : `[${e.time}] ${e.provider}/${e.model} ← ${e.status ?? 'ERR'} (${e.latency}ms)${e.error ? ' — ' + e.error : ''}`;
+    return `<details class="req-res-log-entry ${isError ? 'status-error' : 'status-ok'}">
+      <summary>${summary.replace(/</g, '&lt;')}</summary>
+      <pre>${JSON.stringify(e, null, 2).replace(/</g, '&lt;')}</pre>
+    </details>`;
+  }).join('');
+}
+
+function renderReqResLogs() {
+  renderLogList(requestLogsList, requestLogEntries, 'request');
+  renderLogList(responseLogsList, responseLogEntries, 'response');
+}
+
+reqResLogFilterInput?.addEventListener('input', renderReqResLogs);
+clearReqResLogsBtn?.addEventListener('click', () => {
+  requestLogEntries = [];
+  responseLogEntries = [];
+  renderReqResLogs();
+});
+
+onDevLog(({ text }) => {
+  const liveTail = reqResLiveTailToggle ? reqResLiveTailToggle.checked : true;
+  if (!liveTail) return;
+  let changed = false;
+  if (window.api.logRequestMarker && text.startsWith(window.api.logRequestMarker)) {
+    try {
+      requestLogEntries.push(JSON.parse(text.slice(window.api.logRequestMarker.length).trim()));
+      if (requestLogEntries.length > MAX_REQ_RES_ENTRIES) requestLogEntries.shift();
+      changed = true;
+    } catch (e) { /* malformed line, ignore */ }
+  } else if (window.api.logResponseMarker && text.startsWith(window.api.logResponseMarker)) {
+    try {
+      responseLogEntries.push(JSON.parse(text.slice(window.api.logResponseMarker.length).trim()));
+      if (responseLogEntries.length > MAX_REQ_RES_ENTRIES) responseLogEntries.shift();
+      changed = true;
+    } catch (e) { /* malformed line, ignore */ }
+  }
+  if (changed) renderReqResLogs();
+});
 
 function addMessage(role, content, meta) {
   const div = document.createElement('div');
@@ -662,17 +779,107 @@ async function renderTokenUsage() {
   const usage = await window.api.getTokenUsage();
   usageTableBody.innerHTML = '';
   if (!usage || usage.length === 0) { usageSummary.innerHTML = '<strong>No token usage recorded yet.</strong>'; return; }
-  let totalRequests = 0, totalPrompt = 0, totalCompletion = 0, totalTokens = 0;
+  let totalRequests = 0, totalPrompt = 0, totalCompletion = 0, totalTokens = 0, totalEstimatedRequests = 0;
   usage.forEach((u, i) => {
+    const estimatedRequests = u.estimatedRequests || 0;
+    const estimatedLabel = estimatedRequests === 0
+      ? 'No'
+      : estimatedRequests === u.requests
+        ? 'Yes (est.)'
+        : `Partial (${estimatedRequests}/${u.requests})`;
     const row = document.createElement('tr');
-    row.innerHTML = `<td>${i + 1}</td><td>${u.provider}</td><td>${u.model}</td><td>${u.requests}</td><td>${u.promptTokens.toLocaleString()}</td><td>${u.completionTokens.toLocaleString()}</td><td><strong>${u.totalTokens.toLocaleString()}</strong></td>`;
+    // No price table exists anywhere in this codebase — cost is a clearly
+    // marked placeholder rather than a fabricated number (Task 3).
+    row.innerHTML = `<td>${i + 1}</td><td>${u.provider}</td><td>${u.model}</td><td>${u.requests}</td><td>${u.promptTokens.toLocaleString()}</td><td>${u.completionTokens.toLocaleString()}</td><td><strong>${u.totalTokens.toLocaleString()}</strong></td><td>${estimatedLabel}</td><td style="color:#888;">N/A (no price table)</td>`;
     usageTableBody.appendChild(row);
     totalRequests += u.requests; totalPrompt += u.promptTokens; totalCompletion += u.completionTokens; totalTokens += u.totalTokens;
+    totalEstimatedRequests += estimatedRequests;
   });
-  usageSummary.innerHTML = `<strong>Models: ${usage.length} | Requests: ${totalRequests} | Prompt: ${totalPrompt.toLocaleString()} | Completion: ${totalCompletion.toLocaleString()} | Total: ${totalTokens.toLocaleString()}</strong>`;
+  usageSummary.innerHTML = `<strong>Models: ${usage.length} | Requests: ${totalRequests} (${totalEstimatedRequests} estimated) | Prompt: ${totalPrompt.toLocaleString()} | Completion: ${totalCompletion.toLocaleString()} | Total: ${totalTokens.toLocaleString()} | Est. Cost: N/A (no price table)</strong>`;
 }
 
 refreshUsageBtn.addEventListener('click', renderTokenUsage);
+
+// --- Assistant Config tab (Task 5) ---
+const systemPromptOverrideInput = document.getElementById('systemPromptOverrideInput');
+const toolCallEmulationToggle = document.getElementById('toolCallEmulationToggle');
+const previewToolFormatBtn = document.getElementById('previewToolFormatBtn');
+const toolFormatPreview = document.getElementById('toolFormatPreview');
+const routingModeSelect = document.getElementById('routingModeSelect');
+const retryCountInput = document.getElementById('retryCountInput');
+const timeoutMsInput = document.getElementById('timeoutMsInput');
+const loggingVerbositySelect = document.getElementById('loggingVerbositySelect');
+const largeContextModeToggle = document.getElementById('largeContextModeToggle');
+const largeContextThresholdInput = document.getElementById('largeContextThresholdInput');
+const largeContextChunkTokensInput = document.getElementById('largeContextChunkTokensInput');
+const largeContextConcurrencyDefaultInput = document.getElementById('largeContextConcurrencyDefaultInput');
+const largeContextConcurrencyCookieInput = document.getElementById('largeContextConcurrencyCookieInput');
+const saveAssistantConfigBtn = document.getElementById('saveAssistantConfigBtn');
+
+let assistantConfigLoaded = false;
+
+async function loadAssistantConfigForm() {
+  try {
+    const config = await window.api.getAssistantConfig();
+    if (systemPromptOverrideInput) systemPromptOverrideInput.value = config.systemPromptOverride || '';
+    if (toolCallEmulationToggle) toolCallEmulationToggle.checked = config.toolCallEmulation !== false;
+    if (routingModeSelect) routingModeSelect.value = config.routingMode || 'auto';
+    if (retryCountInput) retryCountInput.value = config.retryCount ?? 0;
+    if (timeoutMsInput) timeoutMsInput.value = config.timeoutMs ?? 30000;
+    if (loggingVerbositySelect) loggingVerbositySelect.value = config.loggingVerbosity || 'normal';
+    if (largeContextModeToggle) largeContextModeToggle.checked = !!config.largeContextMode;
+    if (largeContextThresholdInput) largeContextThresholdInput.value = config.largeContextThreshold ?? 100000;
+    if (largeContextChunkTokensInput) largeContextChunkTokensInput.value = config.largeContextChunkTokens ?? 20000;
+    const concurrency = config.largeContextConcurrency || { default: 5, cookie: 1 };
+    if (largeContextConcurrencyDefaultInput) largeContextConcurrencyDefaultInput.value = concurrency.default ?? 5;
+    if (largeContextConcurrencyCookieInput) largeContextConcurrencyCookieInput.value = concurrency.cookie ?? 1;
+    assistantConfigLoaded = true;
+  } catch (err) {
+    console.warn('Could not load assistant config:', err.message);
+  }
+}
+
+saveAssistantConfigBtn?.addEventListener('click', async () => {
+  const config = {
+    systemPromptOverride: systemPromptOverrideInput ? systemPromptOverrideInput.value : '',
+    toolCallEmulation: toolCallEmulationToggle ? toolCallEmulationToggle.checked : true,
+    routingMode: routingModeSelect ? routingModeSelect.value : 'auto',
+    retryCount: retryCountInput ? Math.max(0, parseInt(retryCountInput.value, 10) || 0) : 0,
+    timeoutMs: timeoutMsInput ? Math.max(1000, parseInt(timeoutMsInput.value, 10) || 30000) : 30000,
+    loggingVerbosity: loggingVerbositySelect ? loggingVerbositySelect.value : 'normal',
+    largeContextMode: largeContextModeToggle ? largeContextModeToggle.checked : false,
+    largeContextThreshold: largeContextThresholdInput ? Math.max(1000, parseInt(largeContextThresholdInput.value, 10) || 100000) : 100000,
+    largeContextChunkTokens: largeContextChunkTokensInput ? Math.max(1000, parseInt(largeContextChunkTokensInput.value, 10) || 20000) : 20000,
+    largeContextConcurrency: {
+      default: largeContextConcurrencyDefaultInput ? Math.max(1, parseInt(largeContextConcurrencyDefaultInput.value, 10) || 5) : 5,
+      cookie: largeContextConcurrencyCookieInput ? Math.max(1, parseInt(largeContextConcurrencyCookieInput.value, 10) || 1) : 1
+    }
+  };
+  try {
+    const result = await window.api.saveAssistantConfig(config);
+    if (result.success) {
+      alert('Assistant config saved. Changes apply to new requests immediately.');
+    } else {
+      alert('Failed to save assistant config: ' + result.error);
+    }
+  } catch (err) {
+    alert('Error saving assistant config: ' + err.message);
+  }
+});
+
+previewToolFormatBtn?.addEventListener('click', async () => {
+  if (!toolFormatPreview) return;
+  toolFormatPreview.style.display = 'block';
+  toolFormatPreview.textContent = 'Loading preview…';
+  try {
+    const result = await window.api.previewToolFormat();
+    toolFormatPreview.textContent = result.success
+      ? JSON.stringify(result.preview, null, 2)
+      : `Preview failed: ${result.error}`;
+  } catch (err) {
+    toolFormatPreview.textContent = `Preview failed: ${err.message}`;
+  }
+});
 
 const addWebProviderBtn = document.getElementById('addWebProviderBtn');
 const webProviderModal = document.getElementById('webProviderModal');

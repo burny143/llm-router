@@ -23,7 +23,14 @@ const DEFAULT_PATHS = {
   settings: 'data/settings.json',
   env: 'data/.env',
   providerFlags: 'data/provider-flags.json',
-  webProviderRules: 'data/web-provider-rules.json'
+  webProviderRules: 'data/web-provider-rules.json',
+  assistantConfig: 'data/assistant-config.json',
+  // Agent tab (coding-agent feature): global agent settings + global skills list.
+  // Project-scoped skills/MCP servers live under `<projectRoot>/.agent/` instead,
+  // resolved directly by agent-controller.js (they are not part of this registry
+  // since their location moves with the selected project, not the app install).
+  agentConfig: 'data/agent-config.json',
+  agentSkills: 'data/skills.json'
 };
 
 let fileRegistry = {};
@@ -67,6 +74,9 @@ function envPrefixFor(providerName) {
 const STATE_FILE = getFilePath('knownOk');
 const USAGE_FILE = getFilePath('tokenUsage');
 const SETTINGS_FILE = getFilePath('settings');
+const ASSISTANT_CONFIG_FILE = getFilePath('assistantConfig');
+const AGENT_CONFIG_FILE = getFilePath('agentConfig');
+const AGENT_SKILLS_FILE = getFilePath('agentSkills');
 const CONFIG_FILE = getFilePath('proxyConfig');
 const CONFIG_CSV = getFilePath('ultimateConfig');
 const PROVIDER_CONFIG_CSV = getFilePath('providerConfig');
@@ -204,6 +214,116 @@ function loadSettings() {
   return {};
 }
 
+// Default shape for data/assistant-config.json (Assistant Config tab, Task 5).
+// Fields marked "backend-wired" below are actually read by proxy-server.js;
+// the rest (fallbackOrder, rateLimits, rewriteRules) only exist so the UI has
+// something to persist for controls that render as "Pending backend support".
+const DEFAULT_ASSISTANT_CONFIG = {
+  systemPromptOverride: '',        // backend-wired: injected as a system message when non-empty
+  toolCallEmulation: true,         // backend-wired: gates translateRequest/translateResponse
+  routingMode: 'auto',             // backend-wired: 'auto' (fastest known-good) | 'configOrder'
+  retryCount: 0,                   // backend-wired: extra attempts per candidate on transient failure
+  timeoutMs: 30000,                // backend-wired: applies to direct (non Cookie/Kimi) requests only
+  loggingVerbosity: 'normal',      // backend-wired: 'verbose' | 'normal' | 'quiet' — gates Request/Response Logs
+
+  // --- Large Context Dispatcher (backend-wired: large-context-dispatcher.js) ---
+  largeContextMode: false,         // master toggle — when off, oversized prompts flow through the normal path
+  largeContextThreshold: 100000,   // estimated prompt tokens above which the dispatcher intercepts the request
+  largeContextChunkTokens: 20000,  // target tokens per chunk sent to a single lane for summarization
+  largeContextConcurrency: { default: 5, cookie: 1 }, // per-lane concurrency by authType
+  largeContextTimeoutMs: 60000,    // per-chunk (and final assembly) request timeout
+
+  fallbackOrder: [],               // NOT backend-wired — UI placeholder ("Pending backend support")
+  rateLimits: {},                  // NOT backend-wired — UI placeholder ("Pending backend support")
+  rewriteRules: { request: '', response: '' } // NOT backend-wired — UI placeholder ("Pending backend support")
+};
+
+// Persist/load Assistant Config settings (system prompt override, tool-calling
+// emulation toggle, proxy feature knobs). Missing fields are backfilled from
+// DEFAULT_ASSISTANT_CONFIG so older saved files stay forward-compatible.
+function saveAssistantConfig(config) {
+  try {
+    fs.writeFileSync(ASSISTANT_CONFIG_FILE, JSON.stringify(config, null, 2));
+  } catch (err) {
+    console.warn('Could not save assistant config:', err.message);
+  }
+}
+
+function loadAssistantConfig() {
+  let saved = {};
+  try {
+    if (fs.existsSync(ASSISTANT_CONFIG_FILE)) {
+      const parsed = JSON.parse(fs.readFileSync(ASSISTANT_CONFIG_FILE, 'utf-8'));
+      if (parsed && typeof parsed === 'object') saved = parsed;
+    }
+  } catch (err) {
+    console.warn('Could not load assistant config:', err.message);
+  }
+  return { ...DEFAULT_ASSISTANT_CONFIG, ...saved };
+}
+
+// --- Agent tab (coding-agent) config -------------------------------------
+// lastProjectPath: re-opened (best-effort) on next launch so the user drops
+//   back into Project mode instead of Global mode.
+// selectedModel: provider/model key used to pin the agent's model in the
+//   top-bar dropdown (falls back to normal known-OK routing if unset).
+// globalMcpServers: [{ name, transport: 'stdio'|'http', command, args, env, url }]
+const DEFAULT_AGENT_CONFIG = {
+  lastProjectPath: null,
+  selectedModel: null,
+  globalMcpServers: [],
+  // --- NEW: streaming support --- on by default; toggled from the Agent
+  // config UI. When false, runAgentTurn falls back to the existing
+  // turn-level processChatCompletion + AGENT_STREAM_CHUNK path.
+  streamResponses: true,
+  // --- NEW: diff preview / undo --- off by default: writes go through the
+  // diff-preview accept/reject flow. When true, executeWriteFile uses the
+  // lighter-weight approval-only flow instead.
+  alwaysApproveWrites: false
+};
+
+function saveAgentConfig(config) {
+  try {
+    fs.writeFileSync(AGENT_CONFIG_FILE, JSON.stringify(config, null, 2));
+  } catch (err) {
+    console.warn('Could not save agent config:', err.message);
+  }
+}
+
+function loadAgentConfig() {
+  let saved = {};
+  try {
+    if (fs.existsSync(AGENT_CONFIG_FILE)) {
+      const parsed = JSON.parse(fs.readFileSync(AGENT_CONFIG_FILE, 'utf-8'));
+      if (parsed && typeof parsed === 'object') saved = parsed;
+    }
+  } catch (err) {
+    console.warn('Could not load agent config:', err.message);
+  }
+  return { ...DEFAULT_AGENT_CONFIG, ...saved };
+}
+
+// Global skills list, e.g. [{ id, name, description, prompt, enabled }].
+function saveAgentSkills(skills) {
+  try {
+    fs.writeFileSync(AGENT_SKILLS_FILE, JSON.stringify(skills, null, 2));
+  } catch (err) {
+    console.warn('Could not save agent skills:', err.message);
+  }
+}
+
+function loadAgentSkills() {
+  try {
+    if (fs.existsSync(AGENT_SKILLS_FILE)) {
+      const parsed = JSON.parse(fs.readFileSync(AGENT_SKILLS_FILE, 'utf-8'));
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch (err) {
+    console.warn('Could not load agent skills:', err.message);
+  }
+  return [];
+}
+
 // Persist/load the proxy configuration (entries: provider, baseURL, apiKeyEnv, model, enabled)
 function saveConfig(config) {
   try {
@@ -293,4 +413,4 @@ function loadUsage() {
   return {};
 }
 
-module.exports = { saveResults, loadResults, saveUsage, loadUsage, saveSettings, loadSettings, saveConfig, loadConfig, saveConfigBoth, syncConfigFromCsv, pruneConfigEntries, loadProviderConfig, CONFIG_CSV, PROVIDER_CONFIG_CSV, getFilePath, parseCsv, envPrefixFor, DEFAULT_PATHS };
+module.exports = { saveResults, loadResults, saveUsage, loadUsage, saveSettings, loadSettings, saveConfig, loadConfig, saveConfigBoth, syncConfigFromCsv, pruneConfigEntries, loadProviderConfig, CONFIG_CSV, PROVIDER_CONFIG_CSV, getFilePath, parseCsv, envPrefixFor, DEFAULT_PATHS, saveAssistantConfig, loadAssistantConfig, DEFAULT_ASSISTANT_CONFIG, saveAgentConfig, loadAgentConfig, DEFAULT_AGENT_CONFIG, saveAgentSkills, loadAgentSkills };

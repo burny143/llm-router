@@ -6,7 +6,17 @@
 // literal 'OK (' string, so a wording change in one can't silently break
 // coloring in the other.
 const LOG_MARKERS = {
-  SUCCESS: 'OK ('
+  SUCCESS: 'OK (',
+  // Tagged prefixes used by proxy-server.js so renderer.js can split the single
+  // console -> DEV_LOG stream into the Request Logs / Response Logs sub-tabs
+  // without adding a second IPC channel. Each tagged line is followed by a
+  // JSON payload (see logRequestLine/logResponseLine in proxy-server.js).
+  REQUEST: '[REQ]',
+  RESPONSE: '[RES]',
+  // Emitted by large-context-dispatcher.js for chunk/lane progress so the
+  // existing Developer Logs console feed shows dispatcher activity without
+  // needing a dedicated IPC channel.
+  DISPATCH: '[LCD]'
 };
 
 const IPC_CHANNELS = {
@@ -52,6 +62,64 @@ const IPC_CHANNELS = {
   CLEAR_WEB_PROVIDER_SESSION: 'clear-web-provider-session',
   SET_PROVIDER_COOKIE: 'set-provider-cookie',
   GET_WEB_PROVIDER_PRESETS: 'get-web-provider-presets',
+
+  // Assistant Config tab (system prompt override / tool calling / proxy features)
+  GET_ASSISTANT_CONFIG: 'get-assistant-config',
+  SAVE_ASSISTANT_CONFIG: 'save-assistant-config',
+  PREVIEW_TOOL_FORMAT: 'preview-tool-format',
+
+  // --- Agent tab (coding agent: Global mode / Project mode) ---
+  // Project folder lifecycle
+  SELECT_PROJECT_FOLDER: 'select-project-folder',
+  CLEAR_PROJECT_FOLDER: 'clear-project-folder',
+  GET_AGENT_MODE: 'get-agent-mode',
+
+  // Project-aware tools, also invocable directly from the file-tree/sidebar UI
+  // (they share the same guarded implementations the agent's tool_calls use)
+  GET_PROJECT_FILES: 'get-project-files',
+  READ_PROJECT_FILE: 'read-project-file',
+  WRITE_PROJECT_FILE: 'write-project-file',
+  RUN_COMMAND: 'run-command',
+  SEARCH_IN_PROJECT: 'search-in-project',
+  UPLOAD_FILE: 'upload-file',
+
+  // Agent conversation lifecycle
+  START_AGENT_SESSION: 'start-agent-session',
+  STOP_AGENT_SESSION: 'stop-agent-session',
+  AGENT_SEND_MESSAGE: 'agent-send-message',
+  AGENT_APPROVAL_RESPONSE: 'agent-approval-response',
+
+  // Agent config / skills / MCP servers (global, persisted in agent-config.json / skills.json)
+  GET_AGENT_CONFIG: 'get-agent-config',
+  SAVE_AGENT_CONFIG: 'save-agent-config',
+  GET_SKILLS: 'get-skills',
+  SAVE_SKILLS: 'save-skills',
+  GET_MCP_STATUS: 'get-mcp-status',
+
+  // main -> renderer streaming/event channels (renderer subscribes via preload's onX helpers)
+  AGENT_STREAM_CHUNK: 'agent:stream-chunk',
+  // --- NEW: streaming support --- token-level streaming events (used when
+  // agent config `streamResponses` is true; AGENT_STREAM_CHUNK above remains
+  // as the turn-level fallback when streaming is off).
+  AGENT_STREAM_START: 'agent:stream-start',
+  AGENT_STREAM_TOKEN: 'agent:stream-token',
+  AGENT_STREAM_END: 'agent:stream-end',
+  AGENT_TOOL_START: 'agent:tool-start',
+  AGENT_TOOL_RESULT: 'agent:tool-result',
+  AGENT_APPROVAL_REQUEST: 'agent:approval-request',
+  AGENT_DONE: 'agent:done',
+  AGENT_ERROR: 'agent:error',
+  AGENT_MODE_CHANGED: 'agent:mode-changed',
+
+  // --- NEW: diff preview / undo ---
+  // main -> renderer: show the diff modal for a pending write_file call
+  AGENT_DIFF_PREVIEW: 'agent:diff-preview',
+  // renderer -> main: user's accept/reject decision for that diff
+  AGENT_DIFF_RESPONSE: 'agent:diff-response',
+  // renderer -> main: revert the most recent write_file
+  AGENT_UNDO_LAST_WRITE: 'agent:undo-last-write',
+  // main -> renderer: whether the Undo button should be enabled
+  AGENT_UNDO_STATE: 'agent:undo-state',
 };
 
 module.exports = { IPC_CHANNELS, LOG_MARKERS };

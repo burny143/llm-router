@@ -7,14 +7,181 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div class="tabs">
-    <button class="tab-btn active" data-tab="proxy">Proxy Control</button>
+  <div class="app-layout">
+  <nav class="tabs sidebar">
+    <button class="tab-btn active" data-tab="agent">Agent</button>
+    <button class="tab-btn" data-tab="proxy">Proxy Control</button>
     <button class="tab-btn" data-tab="config">Admin / Configuration</button>
     <button class="tab-btn" data-tab="health">Health Check</button>
     <button class="tab-btn" data-tab="usage">Token Usage</button>
+    <button class="tab-btn" data-tab="assistant">Assistant Config</button>
+  </nav>
+  <div class="main-content">
+
+  <div id="agent-tab" class="tab-content active">
+    <div class="agent-layout">
+
+      <div class="agent-topbar">
+        <div class="agent-project-indicator">
+          <span id="agentModeLight" class="agent-status-light global" title="Agent mode"></span>
+          <span id="agentModeLabel">Global Agent</span>
+          <button id="agentSelectFolderBtn" class="agent-btn-small">Select Folder</button>
+          <button id="agentClearFolderBtn" class="agent-btn-small agent-clear-btn" style="display:none;" title="Return to Global mode">✕</button>
+        </div>
+        <div class="agent-model-select">
+          <label for="agentModelDropdown">Model:</label>
+          <select id="agentModelDropdown">
+            <option value="">Auto (known-OK routing)</option>
+          </select>
+        </div>
+        <div class="agent-settings-toggles">
+          <label class="agent-toggle-label" title="Stream the assistant's reply token-by-token instead of waiting for the full response">
+            <input type="checkbox" id="agentStreamToggle" checked> Stream responses
+          </label>
+          <label class="agent-toggle-label" title="Skip the diff preview and auto-approve file writes (still shows a plain approval prompt)">
+            <input type="checkbox" id="agentAlwaysApproveToggle"> Always approve writes
+          </label>
+        </div>
+      </div>
+
+      <div class="agent-body">
+        <div class="agent-sidebar">
+          <div class="agent-sidebar-section">
+            <div class="agent-sidebar-header">
+              <span>Project</span>
+              <button id="agentRefreshFilesBtn" class="agent-btn-small">Refresh</button>
+            </div>
+            <!-- --- NEW: keyboard shortcuts --- Ctrl+Shift+F focuses this -->
+            <input id="agentFileSearchInput" class="agent-file-search" type="text" placeholder="Filter files… (Ctrl+Shift+F)">
+            <div id="agentFileTree" class="agent-file-tree">
+              <div class="agent-empty-hint">No project selected — using Global mode. Select a folder to give the agent file/shell access.</div>
+            </div>
+          </div>
+
+          <div class="agent-sidebar-section">
+            <button id="agentUploadFileBtn" class="agent-btn-full">Upload File</button>
+            <div id="agentUploadChips" class="agent-chip-row"></div>
+          </div>
+
+          <div class="agent-sidebar-section">
+            <div class="agent-sidebar-header">
+              <span>Skills</span>
+              <button id="agentAddSkillBtn" class="agent-btn-small">+ Add</button>
+            </div>
+            <div id="agentSkillsList" class="agent-list"></div>
+          </div>
+
+          <div class="agent-sidebar-section">
+            <div class="agent-sidebar-header">
+              <span>MCP Servers</span>
+              <button id="agentAddMcpBtn" class="agent-btn-small">+ Add Server</button>
+            </div>
+            <div id="agentMcpList" class="agent-list"></div>
+          </div>
+        </div>
+
+        <div class="agent-chat">
+          <div id="agentMessages" class="agent-messages"></div>
+          <div class="agent-input-row">
+            <textarea id="agentInput" class="agent-input" placeholder="Ask the agent…" rows="3"></textarea>
+            <button id="agentSendBtn" class="agent-send-btn">Send</button>
+            <button id="agentStopBtn" class="agent-send-btn agent-stop-btn" style="display:none;">Stop</button>
+          </div>
+          <!-- --- NEW: slash commands / undo --- chat toolbar -->
+          <div class="agent-chat-toolbar">
+            <button id="agentPaletteBtn" class="agent-btn-small" title="Command palette (Ctrl+K)">⌘ Commands</button>
+            <button id="agentUndoBtn" class="agent-btn-small" title="Undo last file write (Ctrl+Z)" disabled>↶ Undo Last Change</button>
+            <span class="agent-toolbar-hint">/ for commands · Ctrl+K palette · Ctrl+L clear · Ctrl+Z undo</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Approval modal: shown when write_file / run_command needs a yes/no from the user -->
+    <div id="agentApprovalModal" class="agent-modal-overlay" style="display:none;">
+      <div class="agent-modal">
+        <h3 id="agentApprovalTitle">Approval needed</h3>
+        <pre id="agentApprovalDetails" class="agent-modal-details"></pre>
+        <div class="agent-modal-actions">
+          <button id="agentApproveBtn" class="agent-btn-approve">Approve</button>
+          <button id="agentDenyBtn" class="agent-btn-deny">Deny</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- --- NEW: diff preview --- shown before write_file executes (unless
+         "Always approve writes" is on, in which case the plain approval
+         modal above is used instead) -->
+    <div id="agentDiffModal" class="agent-modal-overlay" style="display:none;">
+      <div class="agent-modal agent-diff-modal">
+        <h3 id="agentDiffTitle">Review file change</h3>
+        <div id="agentDiffPath" class="agent-diff-path"></div>
+        <div id="agentDiffBody" class="agent-diff-body"></div>
+        <div class="agent-modal-actions">
+          <button id="agentDiffAcceptBtn" class="agent-btn-approve">Accept</button>
+          <button id="agentDiffRejectBtn" class="agent-btn-deny">Reject</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- File preview modal: shown when a file row in the tree is clicked -->
+    <div id="agentFilePreviewModal" class="agent-modal-overlay" style="display:none;">
+      <div class="agent-modal agent-diff-modal">
+        <h3 id="agentFilePreviewTitle">File</h3>
+        <pre id="agentFilePreviewBody" class="agent-diff-body agent-file-preview-body"></pre>
+        <div class="agent-modal-actions">
+          <button id="agentFilePreviewCloseBtn" class="agent-btn-deny">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- --- NEW: slash commands --- command palette overlay (Ctrl+K) -->
+    <div id="agentPaletteModal" class="agent-modal-overlay" style="display:none;">
+      <div class="agent-modal agent-palette-modal">
+        <input id="agentPaletteInput" class="agent-palette-input" type="text" placeholder="Type a command…" autocomplete="off">
+        <div id="agentPaletteList" class="agent-palette-list"></div>
+        <div class="agent-palette-help">
+          <strong>Shortcuts:</strong> Ctrl+Enter send · Ctrl+L clear chat · Ctrl+Shift+F focus file search · Ctrl+K palette · Ctrl+Z undo last change
+        </div>
+      </div>
+    </div>
+
+    <!-- Add Skill modal -->
+    <div id="agentSkillModal" class="agent-modal-overlay" style="display:none;">
+      <div class="agent-modal">
+        <h3 id="agentSkillModalTitle">Add Skill</h3>
+        <label>Name<input id="agentSkillName" type="text"></label>
+        <label>Description<input id="agentSkillDescription" type="text"></label>
+        <label>Prompt / instructions<textarea id="agentSkillPrompt" rows="4"></textarea></label>
+        <div class="agent-modal-actions">
+          <button id="agentSkillSaveBtn" class="agent-btn-approve">Save</button>
+          <button id="agentSkillCancelBtn" class="agent-btn-deny">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Add MCP Server modal -->
+    <div id="agentMcpModal" class="agent-modal-overlay" style="display:none;">
+      <div class="agent-modal">
+        <h3>Add MCP Server</h3>
+        <label>Name<input id="agentMcpName" type="text"></label>
+        <label>Transport
+          <select id="agentMcpTransport">
+            <option value="stdio">stdio (command)</option>
+            <option value="http">http (url)</option>
+          </select>
+        </label>
+        <label id="agentMcpCommandRow">Command<input id="agentMcpCommand" type="text" placeholder="npx some-mcp-server"></label>
+        <label id="agentMcpUrlRow" style="display:none;">URL<input id="agentMcpUrl" type="text" placeholder="https://…"></label>
+        <div class="agent-modal-actions">
+          <button id="agentMcpSaveBtn" class="agent-btn-approve">Save</button>
+          <button id="agentMcpCancelBtn" class="agent-btn-deny">Cancel</button>
+        </div>
+      </div>
+    </div>
   </div>
 
-  <div id="proxy-tab" class="tab-content active">
+  <div id="proxy-tab" class="tab-content">
     <div class="control-panel">
       <label>Port: <input type="number" id="portInput" value="8000" style="width: 60px;"></label>
       <button id="connectBtn" class="btn-primary">Connect</button>
@@ -26,7 +193,15 @@
       </label>
     </div>
     <div id="serverAddress" class="status stopped">Server stopped</div>
-    
+
+    <h3 class="section-header">Connected Applications</h3>
+    <div class="connected-apps-panel">
+      <div id="connectedAppsCount" class="proxy-stats">Connected applications: 0</div>
+      <div id="connectedAppsList" class="connected-apps-list">
+        <div class="connected-apps-empty">No applications connected.</div>
+      </div>
+    </div>
+
     <h3>Quick Chat</h3>
     <div id="chatMessages"></div>
     <div class="chat-input-area">
@@ -36,6 +211,23 @@
 
     <h3 class="section-header">Developer Logs <button id="clearLogsBtn" class="section-toggle">Clear Logs</button></h3>
     <div id="devLogs" class="dev-logs"></div>
+
+    <h3 class="section-header">Request / Response Logs</h3>
+    <div class="sub-tabs">
+      <button class="tab-btn sub-tab-btn active" data-subtab="request-logs">Request Logs</button>
+      <button class="tab-btn sub-tab-btn" data-subtab="response-logs">Response Logs</button>
+    </div>
+    <div class="log-controls">
+      <input type="text" id="reqResLogFilterInput" placeholder="Filter/search logs (provider, model, status...)" style="width: 260px;">
+      <button id="clearReqResLogsBtn">Clear</button>
+      <label><input type="checkbox" id="reqResLiveTailToggle" checked> Live tail</label>
+    </div>
+    <div id="request-logs-subtab" class="tab-content sub-tab-content active">
+      <div id="requestLogsList" class="dev-logs req-res-logs"></div>
+    </div>
+    <div id="response-logs-subtab" class="tab-content sub-tab-content">
+      <div id="responseLogsList" class="dev-logs req-res-logs"></div>
+    </div>
   </div>
 
   <div id="config-tab" class="tab-content">
@@ -138,11 +330,91 @@
     <table id="usageTable">
       <thead>
         <tr>
-          <th>#</th><th>Provider</th><th>Model</th><th>Requests</th><th>Prompt Tokens</th><th>Completion Tokens</th><th>Total Tokens</th>
+          <th>#</th><th>Provider</th><th>Model</th><th>Requests</th><th>Prompt Tokens</th><th>Completion Tokens</th><th>Total Tokens</th><th>Estimated</th><th>Est. Cost</th>
         </tr>
       </thead>
       <tbody></tbody>
     </table>
+  </div>
+
+  <div id="assistant-tab" class="tab-content">
+    <h3>Assistant Config</h3>
+    <button id="saveAssistantConfigBtn" class="btn-primary" style="float: right;">Save Assistant Config</button>
+    <p style="color:#555;">Settings here persist to <code>data/assistant-config.json</code> and apply to new requests immediately after saving — no restart needed.</p>
+
+    <h4>System Prompt Override</h4>
+    <p style="color:#555; font-size:12px;">When non-empty, this is injected as a system message ahead of every request's own messages, before the tool-calling translator runs.</p>
+    <textarea id="systemPromptOverrideInput" style="width:100%; height:90px;" placeholder="Leave blank to disable."></textarea>
+
+    <h4>Tool Calling</h4>
+    <label><input type="checkbox" id="toolCallEmulationToggle" checked> Emulation enabled (forced system prompt + text&#8594;tool_calls translation)</label>
+    <div style="margin-top:8px;">
+      <button id="previewToolFormatBtn">Preview Output Format</button>
+      <pre id="toolFormatPreview" class="assistant-config-preview" style="display:none;"></pre>
+    </div>
+
+    <h4>Proxy Features</h4>
+    <table class="assistant-config-table">
+      <tr>
+        <td>Routing mode</td>
+        <td>
+          <select id="routingModeSelect">
+            <option value="auto">Fastest known-good (auto)</option>
+            <option value="configOrder">Config order</option>
+          </select>
+        </td>
+      </tr>
+      <tr>
+        <td>Retry count</td>
+        <td><input type="number" id="retryCountInput" min="0" max="10" style="width:60px;"> extra attempt(s) per candidate</td>
+      </tr>
+      <tr>
+        <td>Timeout</td>
+        <td><input type="number" id="timeoutMsInput" min="1000" step="1000" style="width:90px;"> ms (direct API-key providers only)</td>
+      </tr>
+      <tr>
+        <td>Logging verbosity</td>
+        <td>
+          <select id="loggingVerbositySelect">
+            <option value="verbose">Verbose</option>
+            <option value="normal">Normal</option>
+            <option value="quiet">Quiet (suppress Request/Response Logs)</option>
+          </select>
+        </td>
+      </tr>
+      <tr>
+        <td>Large Context Dispatcher</td>
+        <td>
+          <label><input type="checkbox" id="largeContextModeToggle"> Enabled — auto-splits oversized prompts across known-OK models</label>
+          <div style="margin-top:6px; display:flex; gap:16px; flex-wrap:wrap; align-items:center;">
+            <span>Threshold: <input type="number" id="largeContextThresholdInput" min="1000" step="1000" style="width:90px;"> tokens</span>
+            <span>Chunk size: <input type="number" id="largeContextChunkTokensInput" min="1000" step="1000" style="width:90px;"> tokens</span>
+            <span>Lane concurrency — API key: <input type="number" id="largeContextConcurrencyDefaultInput" min="1" max="20" style="width:50px;"></span>
+            <span>Cookie/session: <input type="number" id="largeContextConcurrencyCookieInput" min="1" max="5" style="width:50px;"></span>
+          </div>
+          <p style="color:#555; font-size:12px; margin:6px 0 0;">When a request's estimated prompt tokens exceed the threshold, it's split into chunks (respecting file boundaries), summarized in parallel — one lane per known-OK model, Cookie/session providers capped at their concurrency since only one session exists — then assembled into a final answer by the best available model. No tool-calling in this path.</p>
+        </td>
+      </tr>
+      <tr>
+        <td>Fallback order</td>
+        <td><input type="text" disabled placeholder="Pending backend support" style="width:100%; background:#f5f5f5;"></td>
+      </tr>
+      <tr>
+        <td>Rate limits</td>
+        <td><input type="text" disabled placeholder="Pending backend support" style="width:100%; background:#f5f5f5;"></td>
+      </tr>
+      <tr>
+        <td>Request rewriting rules</td>
+        <td><textarea disabled placeholder="Pending backend support" style="width:100%; height:50px; background:#f5f5f5;"></textarea></td>
+      </tr>
+      <tr>
+        <td>Response rewriting rules</td>
+        <td><textarea disabled placeholder="Pending backend support" style="width:100%; height:50px; background:#f5f5f5;"></textarea></td>
+      </tr>
+    </table>
+  </div>
+
+  </div>
   </div>
 
   <div id="configFooter" class="config-footer">
@@ -150,6 +422,7 @@
     <span id="configFileLabel">No config file yet.</span>
   </div>
 
+  <script src="agent-tab.js"></script>
   <script src="renderer.js"></script>
 </body>
 </html>

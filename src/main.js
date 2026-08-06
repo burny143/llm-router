@@ -5,9 +5,10 @@ const fs = require('fs');
 const { exec, spawn } = require('child_process');
 const axios = require('axios');
 const https = require('https');
-const { startProxy, stopProxy, isProxyRunning, setHealthResults, extractContent, getTokenUsage, getProxyStats, getKnownOk, setPriorityOverride, injectUserText } = require('./proxy-server');
-const { saveResults, loadResults, saveSettings, loadSettings, saveConfigBoth, syncConfigFromCsv, pruneConfigEntries, loadProviderConfig, CONFIG_CSV, PROVIDER_CONFIG_CSV, getFilePath, envPrefixFor, parseCsv } = require('./state-store');
+const { startProxy, stopProxy, isProxyRunning, setHealthResults, extractContent, getTokenUsage, getProxyStats, getKnownOk, setPriorityOverride, injectUserText, reloadAssistantConfig, previewToolFormat } = require('./proxy-server');
+const { saveResults, loadResults, saveSettings, loadSettings, saveConfigBoth, syncConfigFromCsv, pruneConfigEntries, loadProviderConfig, CONFIG_CSV, PROVIDER_CONFIG_CSV, getFilePath, envPrefixFor, parseCsv, loadAssistantConfig, saveAssistantConfig } = require('./state-store');
 const { IPC_CHANNELS } = require('./shared-constants');
+const { initAgentController } = require('./agent-controller');
 require('dotenv').config({ path: getFilePath('env') });
 
 const chromeAgent = new https.Agent({
@@ -633,6 +634,29 @@ ipcMain.handle(IPC_CHANNELS.GET_PROXY_STATS, () => {
   return getProxyStats();
 });
 
+ipcMain.handle(IPC_CHANNELS.GET_ASSISTANT_CONFIG, () => {
+  return loadAssistantConfig();
+});
+
+ipcMain.handle(IPC_CHANNELS.SAVE_ASSISTANT_CONFIG, (event, config) => {
+  try {
+    saveAssistantConfig(config);
+    reloadAssistantConfig(); // pick the new settings up in the running proxy immediately
+    console.log('Assistant config saved.');
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle(IPC_CHANNELS.PREVIEW_TOOL_FORMAT, () => {
+  try {
+    return { success: true, preview: previewToolFormat() };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
 ipcMain.handle(IPC_CHANNELS.HEALTH_CHECK, async (event, entries) => {
   console.log(`Health check: pinging ${entries.length} enabled model(s)...`);
   const checkOne = async (entry) => {
@@ -803,6 +827,11 @@ app.whenReady().then(async () => {
   loadLatestModels();
   autoConnectModelFile();
   createWindow();
+  try {
+    initAgentController({ ipcMain, dialog, sendToRenderer, getMainWindow: () => mainWindow });
+  } catch (err) {
+    console.error('initAgentController failed to initialize:', err);
+  }
   await autoConnectConfigFile();
 });
 
