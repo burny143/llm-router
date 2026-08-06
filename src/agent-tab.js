@@ -15,13 +15,16 @@
   let sending = false;
   let currentAssistantBubble = null; // element being appended to for the in-flight turn
   let pendingApprovalId = null;
+
   // --- NEW: diff preview ---
   let pendingDiffId = null;
+
   // --- NEW: slash commands ---
   let paletteActiveIndex = 0;
 
   // --- DOM refs --------------------------------------------------------------
   const el = (id) => document.getElementById(id);
+
   const modeLight = el('agentModeLight');
   const modeLabel = el('agentModeLabel');
   const selectFolderBtn = el('agentSelectFolderBtn');
@@ -39,7 +42,6 @@
   const inputEl = el('agentInput');
   const sendBtn = el('agentSendBtn');
   const stopBtn = el('agentStopBtn');
-
   const approvalModal = el('agentApprovalModal');
   const approvalTitle = el('agentApprovalTitle');
   const approvalDetails = el('agentApprovalDetails');
@@ -146,9 +148,10 @@
       currentAssistantBubble._streamCursor.remove();
       delete currentAssistantBubble._streamCursor;
     }
+
     // fullText is authoritative (covers cases where the backend's final
     // content differs slightly from the concatenated tokens); reconcile.
-    if (currentAssistantBubble && typeof fullText === 'string' && fullText) {
+    if (currentAssistantBubble && typeof fullText === 'string') {
       currentAssistantBubble.textContent = fullText;
     }
   }
@@ -157,6 +160,7 @@
     const card = document.createElement('div');
     card.className = 'agent-tool-card';
     card.dataset.toolId = id;
+
     card.innerHTML =
       '<div class="agent-tool-card-header">' +
         '<span class="agent-tool-card-title"><span class="agent-tool-caret">▾</span>🔧 ' + escapeHtml(name || 'tool') + '</span>' +
@@ -166,10 +170,13 @@
         '<pre class="agent-tool-args">' + escapeHtml(JSON.stringify(args || {}, null, 2)) + '</pre>' +
         '<pre class="agent-tool-result" style="display:none;"></pre>' +
       '</div>';
+
     card.querySelector('.agent-tool-card-header').addEventListener('click', () => {
       card.classList.toggle('agent-tool-collapsed');
     });
+
     messagesEl.appendChild(card);
+
     // A tool result following this closes the current assistant bubble (a
     // new one starts if the model replies again after the tool result).
     currentAssistantBubble = null;
@@ -179,11 +186,14 @@
   function updateToolCard(id, result) {
     const card = messagesEl.querySelector('.agent-tool-card[data-tool-id="' + id + '"]');
     if (!card) return;
+
     const status = card.querySelector('.agent-tool-status');
     const resultEl = card.querySelector('.agent-tool-result');
     const ok = result && (result.ok === undefined || result.ok);
+
     status.textContent = ok ? 'done' : 'failed';
     status.className = 'agent-tool-status ' + (ok ? 'ok' : 'fail');
+
     resultEl.style.display = 'block';
     resultEl.textContent = typeof result === 'string' ? result : (result.message || JSON.stringify(result));
     scrollMessagesToBottom();
@@ -200,17 +210,27 @@
 
   function escapeHtml(s) {
     return String(s)
-      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function parseCommandString(command) {
+    const parts = String(command || '').trim().match(/(?:[^\s"]+|"[^"]*")/g) || [];
+    return parts.map(p => p.replace(/^"|"$/g, ''));
   }
 
   // --- Mode / top bar ----------------------------------------------------------
   function applyMode(newMode, newProjectRoot) {
     mode = newMode;
     projectRoot = newProjectRoot || null;
+
     modeLight.className = 'agent-status-light ' + mode;
+
     if (mode === 'project') {
-      modeLabel.textContent = (projectRoot || '').split(/[\\/]/).pop() || projectRoot;
+      modeLabel.textContent = (projectRoot || '').split(/[\/\\]/).pop() || projectRoot;
       modeLabel.title = projectRoot;
       clearFolderBtn.style.display = 'inline-block';
       refreshFilesBtn.style.display = 'inline-block';
@@ -219,8 +239,10 @@
       modeLabel.textContent = 'Global Agent';
       modeLabel.title = '';
       clearFolderBtn.style.display = 'none';
+      refreshFilesBtn.style.display = 'none';
       fileTreeEl.innerHTML = '<div class="agent-empty-hint">No project selected — using Global mode. Select a folder to give the agent file/shell access.</div>';
     }
+
     renderSkills();
   }
 
@@ -230,6 +252,7 @@
     js: '📄', ts: '📄', jsx: '📄', tsx: '📄', json: '🧾', md: '📝', css: '🎨',
     html: '🌐', py: '🐍', png: '🖼️', jpg: '🖼️', jpeg: '🖼️', gif: '🖼️', svg: '🖼️'
   };
+
   function iconForFile(name) {
     const ext = name.includes('.') ? name.split('.').pop().toLowerCase() : '';
     return FILE_ICONS[ext] || '📄';
@@ -239,16 +262,20 @@
   // flat list of "a/b/c.js"-style relative paths.
   function buildFileTree(paths) {
     const root = { subdirs: {}, files: [] };
+
     paths.forEach((relPath) => {
-      const parts = relPath.split(/[\\/]/);
+      const parts = relPath.split(/[\/\\]/);
       let node = root;
+
       for (let i = 0; i < parts.length - 1; i++) {
         const dir = parts[i];
         if (!node.subdirs[dir]) node.subdirs[dir] = { subdirs: {}, files: [] };
         node = node.subdirs[dir];
       }
+
       node.files.push({ name: parts[parts.length - 1], relPath });
     });
+
     return root;
   }
 
@@ -256,16 +283,20 @@
     Object.keys(node.subdirs).sort().forEach((dirName) => {
       const dirRow = document.createElement('div');
       dirRow.className = 'agent-dir-row';
+
       const caret = document.createElement('span');
       caret.className = 'agent-dir-caret';
       caret.textContent = '▾';
+
       const label = document.createElement('span');
       label.textContent = '📁 ' + dirName;
+
       dirRow.appendChild(caret);
       dirRow.appendChild(label);
 
       const childrenEl = document.createElement('div');
       childrenEl.className = 'agent-dir-children';
+
       renderFileTreeNode(node.subdirs[dirName], childrenEl, depth + 1);
 
       dirRow.addEventListener('click', () => {
@@ -281,13 +312,17 @@
       const row = document.createElement('div');
       row.className = 'agent-file-row';
       row.title = f.relPath;
+
       const icon = document.createElement('span');
       icon.className = 'agent-file-row-icon';
       icon.textContent = iconForFile(f.name);
+
       const label = document.createElement('span');
       label.textContent = f.name;
+
       row.appendChild(icon);
       row.appendChild(label);
+
       row.addEventListener('click', () => openFilePreview(f.relPath));
       container.appendChild(row);
     });
@@ -297,6 +332,7 @@
     filePreviewTitle.textContent = relPath;
     filePreviewBody.textContent = 'Loading…';
     filePreviewModal.style.display = 'flex';
+
     try {
       const content = await api.readProjectFile(relPath);
       filePreviewBody.textContent = content;
@@ -304,25 +340,33 @@
       filePreviewBody.textContent = 'Could not read file: ' + err.message;
     }
   }
+
   filePreviewCloseBtn.addEventListener('click', () => { filePreviewModal.style.display = 'none'; });
   filePreviewModal.addEventListener('click', (e) => { if (e.target === filePreviewModal) filePreviewModal.style.display = 'none'; });
 
   async function refreshProjectFiles() {
     if (mode !== 'project') return;
+
     fileTreeEl.innerHTML = '<div class="agent-empty-hint">Loading…</div>';
+
     try {
       const files = await api.getProjectFiles();
+
       if (!files.length) {
         fileTreeEl.innerHTML = '<div class="agent-empty-hint">(empty project)</div>';
         return;
       }
+
       const summary = document.createElement('div');
       summary.className = 'agent-file-summary';
       summary.textContent = files.length + ' file(s)' + (files.length > 500 ? ' (showing first 500)' : '');
+
       const list = document.createElement('div');
       list.className = 'agent-file-list';
+
       const tree = buildFileTree(files.slice(0, 500));
       renderFileTreeNode(tree, list, 0);
+
       fileTreeEl.innerHTML = '';
       fileTreeEl.appendChild(summary);
       fileTreeEl.appendChild(list);
@@ -335,6 +379,7 @@
     try {
       const chosen = await api.selectProjectFolder();
       if (!chosen) return; // user cancelled
+
       // agent:mode-changed event (below) also fires and will call applyMode;
       // this covers the case where events aren't wired yet at click-time.
       applyMode('project', chosen);
@@ -362,10 +407,13 @@
   // so picking a model here actually pins routing for every request, agent or not) ---
   async function populateModelDropdown() {
     let known = [];
-    try { known = await api.getKnownOk(); } catch (_) { known = []; }
+    try { known = await api.getKnownOk(); } catch () { known = []; }
+
     let saved = {};
-    try { saved = await api.getAgentConfig(); } catch (_) { saved = {}; }
+    try { saved = await api.getAgentConfig(); } catch () { saved = {}; }
+
     modelDropdown.innerHTML = '<option value="">Auto (known-OK routing)</option>';
+
     known.forEach((k) => {
       const key = k.provider + '::' + k.model;
       const opt = document.createElement('option');
@@ -373,6 +421,7 @@
       opt.textContent = k.provider + ' / ' + k.model;
       modelDropdown.appendChild(opt);
     });
+
     if (saved.selectedModel) modelDropdown.value = saved.selectedModel;
   }
 
@@ -390,13 +439,16 @@
   async function loadSettingsToggles() {
     let saved = {};
     try { saved = await api.getAgentConfig(); } catch (_) { saved = {}; }
+
     streamToggle.checked = saved.streamResponses !== false; // default true
     alwaysApproveToggle.checked = !!saved.alwaysApproveWrites; // default false
   }
+
   streamToggle.addEventListener('change', async () => {
     try { await api.saveAgentConfig({ streamResponses: streamToggle.checked }); }
     catch (err) { addSystemNote('Could not save setting: ' + err.message, true); }
   });
+
   alwaysApproveToggle.addEventListener('change', async () => {
     try { await api.saveAgentConfig({ alwaysApproveWrites: alwaysApproveToggle.checked }); }
     catch (err) { addSystemNote('Could not save setting: ' + err.message, true); }
@@ -405,15 +457,18 @@
   // --- Upload files --------------------------------------------------------------
   function renderUploadChips() {
     uploadChipsEl.innerHTML = '';
+
     uploadedFiles.forEach((f, i) => {
       const chip = document.createElement('span');
       chip.className = 'agent-chip';
       chip.textContent = f.filename + ' ✕';
       chip.title = f.binary ? 'Could not read as text' : '';
+
       chip.addEventListener('click', () => {
         uploadedFiles.splice(i, 1);
         renderUploadChips();
       });
+
       uploadChipsEl.appendChild(chip);
     });
   }
@@ -440,6 +495,7 @@
   function renderSkillRow(s, isProject) {
     const row = document.createElement('div');
     row.className = 'agent-list-row';
+
     const label = document.createElement('span');
     label.textContent = s.name;
     label.title = s.description || '';
@@ -447,6 +503,7 @@
 
     const actions = document.createElement('span');
     actions.className = 'agent-skill-row-actions';
+
     if (isProject) {
       const lock = document.createElement('span');
       lock.textContent = '🔒';
@@ -457,11 +514,13 @@
       toggle.type = 'checkbox';
       toggle.checked = s.enabled !== false;
       toggle.title = 'Enabled';
+
       toggle.addEventListener('change', async () => {
         const updated = globalSkills.map((g) => g.id === s.id ? { ...g, enabled: toggle.checked } : g);
         globalSkills = updated;
         try { await api.saveSkills(globalSkills); } catch (err) { addSystemNote('Could not save skills: ' + err.message, true); }
       });
+
       actions.appendChild(toggle);
 
       const editBtn = document.createElement('button');
@@ -475,18 +534,22 @@
       deleteBtn.className = 'agent-skill-icon-btn';
       deleteBtn.textContent = '🗑';
       deleteBtn.title = 'Delete skill';
+
       deleteBtn.addEventListener('click', async () => {
         globalSkills = globalSkills.filter((g) => g.id !== s.id);
         try { await api.saveSkills(globalSkills); renderSkills(); } catch (err) { addSystemNote('Could not delete skill: ' + err.message, true); }
       });
+
       actions.appendChild(deleteBtn);
     }
+
     row.appendChild(actions);
     return row;
   }
 
   function renderSkills() {
     skillsListEl.innerHTML = '';
+
     if (!globalSkills.length && !(mode === 'project' && projectSkills.length)) {
       skillsListEl.innerHTML = '<div class="agent-empty-hint">No skills yet.</div>';
       return;
@@ -496,6 +559,7 @@
     globalHeader.className = 'agent-sub-list-header';
     globalHeader.textContent = 'Global';
     skillsListEl.appendChild(globalHeader);
+
     if (!globalSkills.length) {
       skillsListEl.insertAdjacentHTML('beforeend', '<div class="agent-empty-hint">No global skills yet.</div>');
     } else {
@@ -507,6 +571,7 @@
       projectHeader.className = 'agent-sub-list-header';
       projectHeader.textContent = 'Project (' + (projectSkills.length ? projectSkills.length : 'none') + ')';
       skillsListEl.appendChild(projectHeader);
+
       if (projectSkills.length) {
         projectSkills.forEach((s) => skillsListEl.appendChild(renderSkillRow(s, true)));
       }
@@ -519,6 +584,7 @@
       globalSkills = res.global || [];
       projectSkills = res.project || [];
     } catch (_) { globalSkills = []; projectSkills = []; }
+
     renderSkills();
   }
 
@@ -533,19 +599,23 @@
 
   addSkillBtn.addEventListener('click', () => openSkillModal(null));
   skillCancelBtn.addEventListener('click', () => { skillModal.style.display = 'none'; editingSkillId = null; });
+
   skillSaveBtn.addEventListener('click', async () => {
     const name = skillNameInput.value.trim();
     if (!name) return;
+
     const fields = {
       name,
       description: skillDescInput.value.trim(),
       prompt: skillPromptInput.value.trim()
     };
+
     if (editingSkillId) {
       globalSkills = globalSkills.map((g) => g.id === editingSkillId ? { ...g, ...fields } : g);
     } else {
       globalSkills = [...globalSkills, { id: 'skill-' + Date.now(), ...fields, enabled: true }];
     }
+
     try {
       await api.saveSkills(globalSkills);
       renderSkills();
@@ -560,24 +630,33 @@
   async function renderMcp() {
     let servers = [];
     try { servers = await api.getMcpStatus(); } catch (_) { servers = []; }
+
     mcpListEl.innerHTML = '';
+
     if (!servers.length) {
       mcpListEl.innerHTML = '<div class="agent-empty-hint">No MCP servers connected.</div>';
       return;
     }
+
     servers.forEach((s) => {
       const row = document.createElement('div');
       row.className = 'agent-list-row agent-mcp-row';
+
       const label = document.createElement('span');
       label.className = 'agent-mcp-row-label';
+
       const status = s.status || 'connected';
+
       const dot = document.createElement('span');
       dot.className = 'agent-mcp-status-dot ' + (status === 'connected' ? 'connected' : status === 'connecting' ? 'connecting' : 'error');
       dot.title = status === 'connected' ? 'Connected' : status === 'connecting' ? 'Connecting…' : ('Connection failed' + (s.statusMessage ? ': ' + s.statusMessage : ''));
+
       label.appendChild(dot);
+
       const text = document.createElement('span');
       text.textContent = (s.scope === 'project' ? '📁 ' : '') + s.name + ' (' + s.transport + ')';
       text.title = status === 'error' && s.statusMessage ? s.statusMessage : ((s.tools || []).join(', ') || 'no tools listed');
+
       label.appendChild(text);
       row.appendChild(label);
       mcpListEl.appendChild(row);
@@ -593,22 +672,30 @@
     mcpUrlRow.style.display = 'none';
     mcpModal.style.display = 'flex';
   });
+
   mcpTransportSelect.addEventListener('change', () => {
     const isHttp = mcpTransportSelect.value === 'http';
     mcpCommandRow.style.display = isHttp ? 'none' : 'block';
     mcpUrlRow.style.display = isHttp ? 'block' : 'none';
   });
+
   mcpCancelBtn.addEventListener('click', () => { mcpModal.style.display = 'none'; });
+
   mcpSaveBtn.addEventListener('click', async () => {
     const name = mcpNameInput.value.trim();
     if (!name) return;
+
     const transport = mcpTransportSelect.value;
+    const commandParts = parseCommandString(mcpCommandInput.value.trim());
+
     const cfg = transport === 'http'
       ? { name, transport: 'http', url: mcpUrlInput.value.trim() }
-      : { name, transport: 'stdio', command: mcpCommandInput.value.trim().split(' ')[0], args: mcpCommandInput.value.trim().split(' ').slice(1) };
+      : { name, transport: 'stdio', command: commandParts[0] || '', args: commandParts.slice(1) };
+
     try {
       const current = await api.getAgentConfig();
       const globalMcpServers = [...(current.globalMcpServers || []), cfg];
+
       // Close the modal before awaiting the save: saveAgentConfig reconnects
       // every global MCP server, and any unresponsive one adds up to ~15-30s
       // of timeout. Awaiting it first kept the full-viewport modal overlay up
@@ -616,11 +703,17 @@
       // save, close immediately, and poll renderMcp to reflect status as it
       // resolves.
       mcpModal.style.display = 'none';
+
       api.saveAgentConfig({ globalMcpServers }).catch(err => {
         addSystemNote('Could not add MCP server: ' + err.message, true);
       });
-      setTimeout(renderMcp, 500);  // quick first pass
-      setTimeout(renderMcp, 4000); // reflect slower connections/timeouts
+
+      let polls = 0;
+      const pollInterval = setInterval(async () => {
+        polls += 1;
+        await renderMcp();
+        if (polls >= 8) clearInterval(pollInterval);
+      }, 1000);
     } catch (err) {
       addSystemNote('Could not add MCP server: ' + err.message, true);
     }
@@ -635,12 +728,14 @@
       approvalModal.style.display = 'flex';
     });
   }
+
   approveBtn.addEventListener('click', async () => {
     if (!pendingApprovalId) return;
     await api.agentApprovalResponse(pendingApprovalId, true);
     pendingApprovalId = null;
     approvalModal.style.display = 'none';
   });
+
   denyBtn.addEventListener('click', async () => {
     if (!pendingApprovalId) return;
     await api.agentApprovalResponse(pendingApprovalId, false);
@@ -654,11 +749,14 @@
   // over IPC as color-coded monospace lines.
   function renderDiffRows(rows) {
     diffBodyEl.innerHTML = '';
+
     if (!Array.isArray(rows) || !rows.length) {
       diffBodyEl.innerHTML = '<div class="agent-empty-hint">(no changes)</div>';
       return;
     }
+
     const frag = document.createDocumentFragment();
+
     rows.forEach((row) => {
       const line = document.createElement('div');
       const prefix = row.type === 'add' ? '+ ' : row.type === 'del' ? '- ' : '  ';
@@ -666,30 +764,37 @@
       line.textContent = prefix + row.text;
       frag.appendChild(line);
     });
+
     diffBodyEl.appendChild(frag);
   }
 
   if (api.onAgentDiffPreview) {
     api.onAgentDiffPreview((data) => {
       pendingDiffId = data.id;
+
       diffPathEl.innerHTML = escapeHtml(data.path || '') +
         (data.isNewFile ? '<span class="agent-diff-newfile-badge">New file</span>' : '');
+
       diffTitle.textContent = data.isNewFile ? 'Create new file?' : 'Review changes before writing?';
+
       if (data.isNewFile) {
         // Full-content preview for brand-new files (nothing to diff against).
         renderDiffRows(String(data.newContent || '').split('\n').map((text) => ({ type: 'add', text })));
       } else {
         renderDiffRows(data.diff);
       }
+
       diffModal.style.display = 'flex';
     });
   }
+
   diffAcceptBtn.addEventListener('click', async () => {
     if (!pendingDiffId) return;
     await api.agentDiffResponse(pendingDiffId, true);
     pendingDiffId = null;
     diffModal.style.display = 'none';
   });
+
   diffRejectBtn.addEventListener('click', async () => {
     if (!pendingDiffId) return;
     await api.agentDiffResponse(pendingDiffId, false);
@@ -706,28 +811,39 @@
   }
 
   async function sendMessage() {
-    const text = inputEl.value.trim();
+    const originalText = inputEl.value;
+    const text = originalText.trim();
+
     if (!text && !uploadedFiles.length) return;
     if (sending) return;
+
     addUserMessage(text || '(attached files only)');
+
     const filesToSend = uploadedFiles;
     uploadedFiles = [];
     renderUploadChips();
     inputEl.value = '';
+
     setSending(true);
     currentAssistantBubble = null;
+
     try {
       await api.agentSendMessage(text, filesToSend);
     } catch (err) {
+      uploadedFiles = filesToSend.concat(uploadedFiles);
+      renderUploadChips();
+      inputEl.value = originalText;
       addSystemNote('Failed to send: ' + err.message, true);
       setSending(false);
     }
   }
 
   sendBtn.addEventListener('click', sendMessage);
+
   inputEl.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
+
       // --- NEW: slash commands --- expand in place first; the user gets a
       // chance to edit the expanded prompt and press Enter again to send it,
       // matching the spec ("replaced ... which can be further edited before sending").
@@ -735,6 +851,7 @@
       sendMessage();
     }
   });
+
   stopBtn.addEventListener('click', async () => {
     try { await api.stopAgentSession(); } catch (_) { /* best-effort */ }
   });
@@ -744,22 +861,28 @@
     // process is running an older build without the token events below).
     api.onAgentStreamChunk((data) => { if (data && data.text) appendAssistantText(data.text); });
   }
+
   // --- NEW: streaming support ---
   if (api.onAgentStreamStart) {
     api.onAgentStreamStart(() => { startStreamingBubble(); });
   }
+
   if (api.onAgentStreamToken) {
     api.onAgentStreamToken((data) => { if (data && data.token) appendStreamToken(data.token); });
   }
+
   if (api.onAgentStreamEnd) {
     api.onAgentStreamEnd((data) => { endStreamingBubble(data && data.fullText); });
   }
+
   if (api.onAgentToolStart) {
     api.onAgentToolStart((data) => addToolCard(data.id, data.name, data.args));
   }
+
   if (api.onAgentToolResult) {
     api.onAgentToolResult((data) => updateToolCard(data.id, data.result));
   }
+
   if (api.onAgentDone) {
     api.onAgentDone((data) => {
       setSending(false);
@@ -767,6 +890,7 @@
       if (data && data.stoppedReason === 'step-limit-reached') addSystemNote('(agent hit its per-turn tool-call limit — send a follow-up to continue)');
     });
   }
+
   if (api.onAgentError) {
     api.onAgentError((data) => {
       setSending(false);
@@ -778,11 +902,14 @@
   function setUndoEnabled(canUndo) {
     undoBtn.disabled = !canUndo;
   }
+
   if (api.onAgentUndoState) {
     api.onAgentUndoState((data) => setUndoEnabled(!!(data && data.canUndo)));
   }
+
   async function undoLastChange() {
     if (undoBtn.disabled) return;
+
     try {
       const result = await api.agentUndoLastWrite();
       if (result && result.ok) {
@@ -794,6 +921,7 @@
       addSystemNote('Undo failed: ' + err.message, true);
     }
   }
+
   undoBtn.addEventListener('click', undoLastChange);
 
   // --- NEW: slash commands -----------------------------------------------------------
@@ -807,16 +935,18 @@
     { cmd: '/search', desc: 'Search the project for a query and summarize results', expand: (arg) => `Search the project for "${arg || ''}" and summarize what you find (use the search_code tool).` },
     { cmd: '/test', desc: 'Write unit tests for the following code', expand: (arg) => 'Write unit tests for the following code:' + (arg ? ' ' + arg : '') },
     { cmd: '/edit', desc: 'Read a file and suggest improvements (diff before applying)', expand: (arg) => `Read the file ${arg || '<file>'} and suggest improvements. Show the diff before applying any change.` },
-    { cmd: '/newfile', desc: 'Create a new file with a description', expand: (arg) => `Create a new file at ${arg || '<path>'} with the following description: ` },
+    { cmd: '/newfile', desc: 'Create a new file with a description', expand: (arg) => `Create a new file at ${arg || '<path>'} with the following description:` },
     { cmd: '/commit', desc: 'Generate a commit message summarizing current changes', expand: () => 'Generate a Git commit message summarizing the current changes in this project.' }
   ];
 
   function parseSlashCommand(text) {
     const trimmed = text.trim();
     if (!trimmed.startsWith('/')) return null;
+
     const spaceIdx = trimmed.indexOf(' ');
     const cmd = (spaceIdx === -1 ? trimmed : trimmed.slice(0, spaceIdx)).toLowerCase();
     const arg = spaceIdx === -1 ? '' : trimmed.slice(spaceIdx + 1).trim();
+
     const match = SLASH_COMMANDS.find((c) => c.cmd === cmd);
     return match ? { match, arg } : null;
   }
@@ -825,6 +955,7 @@
   function tryExpandSlashCommand() {
     const parsed = parseSlashCommand(inputEl.value);
     if (!parsed) return false;
+
     inputEl.value = parsed.match.expand(parsed.arg);
     addSystemNote('Command: ' + parsed.match.cmd + (parsed.arg ? ' ' + parsed.arg : ''));
     return true;
@@ -838,41 +969,53 @@
     paletteModal.style.display = 'flex';
     setTimeout(() => paletteInput.focus(), 0);
   }
+
   function closePalette() {
     paletteModal.style.display = 'none';
   }
+
   function filteredCommands() {
     const q = paletteInput.value.trim().toLowerCase();
     if (!q) return SLASH_COMMANDS;
     return SLASH_COMMANDS.filter((c) => c.cmd.includes(q) || c.desc.toLowerCase().includes(q));
   }
+
   function renderPalette() {
     const matches = filteredCommands();
     paletteList.innerHTML = '';
+
     if (!matches.length) {
       paletteList.innerHTML = '<div class="agent-empty-hint">No matching commands.</div>';
       return;
     }
+
     if (paletteActiveIndex >= matches.length) paletteActiveIndex = 0;
+
     matches.forEach((c, i) => {
       const row = document.createElement('div');
       row.className = 'agent-palette-item' + (i === paletteActiveIndex ? ' agent-palette-active' : '');
+
       row.innerHTML =
         '<span class="agent-palette-cmd">' + escapeHtml(c.cmd) + '</span>' +
         '<span class="agent-palette-desc">' + escapeHtml(c.desc) + '</span>';
+
       row.addEventListener('click', () => selectPaletteCommand(c));
       paletteList.appendChild(row);
     });
   }
+
   function selectPaletteCommand(c) {
     inputEl.value = c.cmd + ' ';
     closePalette();
     inputEl.focus();
     inputEl.setSelectionRange(inputEl.value.length, inputEl.value.length);
   }
+
   paletteInput.addEventListener('input', () => { paletteActiveIndex = 0; renderPalette(); });
+
   paletteInput.addEventListener('keydown', (e) => {
     const matches = filteredCommands();
+
     if (e.key === 'ArrowDown') {
       e.preventDefault();
       paletteActiveIndex = Math.min(paletteActiveIndex + 1, matches.length - 1);
@@ -889,6 +1032,7 @@
       closePalette();
     }
   });
+
   paletteBtn.addEventListener('click', () => openPalette());
   paletteModal.addEventListener('click', (e) => { if (e.target === paletteModal) closePalette(); });
 
@@ -901,7 +1045,9 @@
   document.addEventListener('keydown', (e) => {
     const ctrlOrCmd = e.ctrlKey || e.metaKey;
     if (!ctrlOrCmd) return;
+
     const key = e.key.toLowerCase();
+
     if (key === 'k') {
       e.preventDefault();
       if (paletteModal.style.display === 'flex') closePalette();
@@ -928,21 +1074,26 @@
     fileSearchInput.addEventListener('input', () => {
       const q = fileSearchInput.value.trim().toLowerCase();
       const rows = fileTreeEl.querySelectorAll('.agent-file-row');
+
       rows.forEach((row) => {
         const match = !q || row.textContent.toLowerCase().includes(q);
         row.classList.toggle('agent-file-row-hidden', !match);
+
         // A match nested inside a collapsed directory would otherwise stay
         // invisible — expand every ancestor .agent-dir-children so search
         // results are actually visible regardless of prior collapse state.
         if (match && q) {
           let ancestor = row.parentElement;
+
           while (ancestor && ancestor !== fileTreeEl) {
             if (ancestor.classList.contains('agent-dir-children')) {
               ancestor.classList.remove('agent-dir-children-collapsed');
+
               const dirRow = ancestor.previousElementSibling;
               const caret = dirRow && dirRow.querySelector('.agent-dir-caret');
               if (caret) caret.classList.remove('agent-dir-collapsed');
             }
+
             ancestor = ancestor.parentElement;
           }
         }
@@ -956,12 +1107,14 @@
       const modeInfo = await api.getAgentMode();
       applyMode(modeInfo.mode, modeInfo.projectRoot);
       setUndoEnabled(!!modeInfo.canUndo); // --- NEW: undo ---
-    } catch (_) { applyMode('global', null); }
+    } catch () { applyMode('global', null); }
+
     await loadSkills();
     await renderMcp();
     await populateModelDropdown();
     await loadSettingsToggles();
-    try { await api.startAgentSession(); } catch (_) { /* best-effort */ }
+
+    try { await api.startAgentSession(); } catch () { /* best-effort */ }
   }
 
   init();
