@@ -137,4 +137,71 @@ const IPC_CHANNELS = {
   AGENT_UNDO_STATE: 'agent:undo-state',
 };
 
-module.exports = { IPC_CHANNELS, LOG_MARKERS, DEFAULT_COOKIE_USER_AGENT };
+// --- NEW: auth-type + default web provider identifiers ---
+// Used by setup-web-provider.js / proxy-server.js / fetch-models.js so the
+// bearer-vs-cookie auth choice and provider names are single-sourced.
+const AUTH_TYPE_BEARER = 'bearer';
+const AUTH_TYPE_COOKIE = 'cookie';
+
+const DEFAULT_QWEN_NAME = 'Qwen';
+const DEFAULT_QWEN_URL = 'https://chat.qwen.ai';
+const DEFAULT_KIMI_NAME = 'Kimi';
+const DEFAULT_KIMI_URL = 'https://kimi.moonshot.cn';
+
+// --- NEW: agent workspace directories (project-scoped) ---
+// agent-controller.js resolves these relative to the selected project root so
+// Global mode uses <projectRoot>/.agent/ while Project mode keeps agent state
+// inside the user's repo without leaking outside it.
+const AGENT_PROJECT_DIR = '.agent';
+const AGENT_SCRATCHPAD_DIR = 'agent-scratchpad';
+// Persisted key for the Kimi refresh token in the app's config store; the
+// Kimi web client and setup-web-provider flows reference this instead of
+// hand-copied string literals.
+const KIMI_REFRESH_TOKEN_KEY = 'kimi_refresh_token';
+// Finish reasons used across the proxy/tool-calling path; tokenizer code and
+// tool-calling-translator.js compare against these instead of raw literals.
+const FINISH_REASON_TOOL_CALLS = 'tool_calls';
+const FINISH_REASON_STOP = 'stop';
+
+// --- NEW: central timeout registry (ms) ---
+// Every hardcoded setTimeout/setInterval delay in the codebase belongs here so
+// tuning one number (e.g. reducing the client idle timeout) doesn't require
+// hunting through per-file literals.
+const TIMEOUTS = {
+  // Periodic health/ping cadence for provider liveness checks.
+  PING_MS: 8000,
+  // Agent run_command execution cap.
+  COMMAND_MS: 30000,
+  // MCP tool request cap.
+  MCP_REQUEST_MS: 15000,
+  // Proxy client idle disconnect cap.
+  CLIENT_IDLE_MS: 90000,
+  // Kimi web-client streaming idle cap.
+  KIMI_STREAM_MS: 120000,
+  // Browser HTTP client request cap (fetch-models / model list refresh).
+  BROWSER_FETCH_MS: 60000,
+  // Chat UI non-streamed request cap.
+  CHAT_UI_MS: 60000,
+  // Health-check interval used by main's health ping.
+  HEALTH_CHECK_MS: 15000,
+  // Renderer's proxy-stats poll cadence (kept in ms; UI-only).
+  POLL_STATS_MS: 3000
+};
+
+module.exports = {
+  IPC_CHANNELS,
+  LOG_MARKERS,
+  DEFAULT_COOKIE_USER_AGENT,
+  AUTH_TYPE_BEARER,
+  AUTH_TYPE_COOKIE,
+  DEFAULT_QWEN_NAME,
+  DEFAULT_QWEN_URL,
+  DEFAULT_KIMI_NAME,
+  DEFAULT_KIMI_URL,
+  AGENT_PROJECT_DIR,
+  AGENT_SCRATCHPAD_DIR,
+  KIMI_REFRESH_TOKEN_KEY,
+  FINISH_REASON_TOOL_CALLS,
+  FINISH_REASON_STOP,
+  TIMEOUTS
+};

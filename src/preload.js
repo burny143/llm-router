@@ -1,6 +1,19 @@
 // preload.js
 const { contextBridge, ipcRenderer } = require('electron');
-const { IPC_CHANNELS, LOG_MARKERS } = require('./shared-constants');
+const {
+  IPC_CHANNELS,
+  LOG_MARKERS,
+  DEFAULT_COOKIE_USER_AGENT,
+  AUTH_TYPE_BEARER,
+  AUTH_TYPE_COOKIE,
+  DEFAULT_QWEN_NAME,
+  DEFAULT_QWEN_URL,
+  DEFAULT_KIMI_NAME,
+  DEFAULT_KIMI_URL,
+  FINISH_REASON_TOOL_CALLS,
+  FINISH_REASON_STOP,
+  TIMEOUTS
+} = require('./shared-constants');
 
 contextBridge.exposeInMainWorld('api', {
   startProxy: (port, entries) => ipcRenderer.invoke(IPC_CHANNELS.START_PROXY, port, entries),
@@ -125,6 +138,20 @@ contextBridge.exposeInMainWorld('api', {
   logSuccessMarker: LOG_MARKERS.SUCCESS,
   logRequestMarker: LOG_MARKERS.REQUEST,
   logResponseMarker: LOG_MARKERS.RESPONSE,
+  // Renderer-facing shared constants (timeouts / provider URLs / finish reasons)
+  // so browser scripts don't need to duplicate literal numbers or strings.
+  constants: {
+    DEFAULT_COOKIE_USER_AGENT,
+    AUTH_TYPE_BEARER,
+    AUTH_TYPE_COOKIE,
+    DEFAULT_QWEN_NAME,
+    DEFAULT_QWEN_URL,
+    DEFAULT_KIMI_NAME,
+    DEFAULT_KIMI_URL,
+    FINISH_REASON_TOOL_CALLS,
+    FINISH_REASON_STOP,
+    TIMEOUTS
+  },
   onDevLog: (callback) => {
     const handler = (_event, data) => callback(data);
     ipcRenderer.on(IPC_CHANNELS.DEV_LOG, handler);

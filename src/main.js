@@ -7,7 +7,7 @@ const axios = require('axios');
 const https = require('https');
 const { startProxy, stopProxy, isProxyRunning, setHealthResults, extractContent, getTokenUsage, getProxyStats, getKnownOk, setPriorityOverride, getRoutingLog, getPriorityState, setPriorityStateListener, injectUserTextWithFallback, reloadAssistantConfig, previewToolFormat } = require('./proxy-server');
 const { saveResults, loadResults, saveSettings, loadSettings, saveConfigBoth, syncConfigFromCsv, pruneConfigEntries, loadProviderConfig, CONFIG_CSV, PROVIDER_CONFIG_CSV, getFilePath, envPrefixFor, parseCsv, loadAssistantConfig, saveAssistantConfig } = require('./state-store');
-const { IPC_CHANNELS, DEFAULT_COOKIE_USER_AGENT } = require('./shared-constants');
+const { IPC_CHANNELS, DEFAULT_COOKIE_USER_AGENT, DEFAULT_QWEN_NAME, DEFAULT_QWEN_URL, DEFAULT_KIMI_NAME, DEFAULT_KIMI_URL, TIMEOUTS } = require('./shared-constants');
 const { initAgentController } = require('./agent-controller');
 require('dotenv').config({ path: getFilePath('env') });
 
@@ -15,7 +15,9 @@ const chromeAgent = new https.Agent({
   ciphers: 'TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384',
   ecdhCurve: 'X25519:prime256v1:secp384r1',
   minVersion: 'TLSv1.2',
-  rejectUnauthorized: false
+  // Insecure TLS is opt-in only (PROXY_INSECURE_TLS=1); the secure default
+  // rejects self-signed/expired certs instead of silently trusting them.
+  rejectUnauthorized: process.env.PROXY_INSECURE_TLS === '1' ? false : true
 });
 
 let webRules = {};
@@ -46,22 +48,22 @@ let pendingConfigReady = null;
 // Provider" modal (name, login URL) and seeds ProviderConfig.csv + rules with a
 // sensible default baseURL/samplePayload when a cookie is pasted manually.
 const WEB_PROVIDER_PRESETS = {
-  Qwen: {
-    loginUrl: 'https://chat.qwen.ai/',
-    baseURL: 'https://chat.qwen.ai/api/v2/chat/completions',
-    origin: 'https://chat.qwen.ai',
-    referer: 'https://chat.qwen.ai/',
+  [DEFAULT_QWEN_NAME]: {
+    loginUrl: `${DEFAULT_QWEN_URL}/`,
+    baseURL: `${DEFAULT_QWEN_URL}/api/v2/chat/completions`,
+    origin: DEFAULT_QWEN_URL,
+    referer: `${DEFAULT_QWEN_URL}/`,
     samplePayload: { model: 'openai', question: 'hi', stream: true }
   },
-  Kimi: {
+  [DEFAULT_KIMI_NAME]: {
     loginUrl: 'https://www.kimi.com/',
     // NOTE: Kimi's web API is a token-exchange protocol (refresh_token -> convId
     // -> completion/stream) served from kimi.moonshot.cn, NOT an OpenAI-style
     // endpoint. baseURL below is display metadata only; when an authToken is
     // present the proxy routes requests through kimi-web-client.js instead.
-    baseURL: 'https://kimi.moonshot.cn/api/chat',
-    origin: 'https://kimi.moonshot.cn',
-    referer: 'https://kimi.moonshot.cn/',
+    baseURL: `${DEFAULT_KIMI_URL}/api/chat`,
+    origin: DEFAULT_KIMI_URL,
+    referer: `${DEFAULT_KIMI_URL}/`,
     samplePayload: {
       copilot_ctx: null,
       is_think: true,
@@ -747,7 +749,7 @@ ipcMain.handle(IPC_CHANNELS.HEALTH_CHECK, async (event, entries) => {
       } else {
         resp = await axios.post(entry.baseURL, payload, { 
           headers, 
-          timeout: 15000,
+          timeout: TIMEOUTS.HEALTH_CHECK_MS,
           httpsAgent: authType === 'Cookie' ? chromeAgent : undefined
         });
       }

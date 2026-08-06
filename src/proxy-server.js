@@ -7,7 +7,7 @@ const { getFilePath, envPrefixFor } = require('./state-store');
 require('dotenv').config({ path: getFilePath('env') });
 const { saveResults, loadUsage, saveUsage, loadAssistantConfig } = require('./state-store');
 const { translateRequest, translateResponse, parseToolCallsFromText } = require('./tool-calling-translator');
-const { LOG_MARKERS, DEFAULT_COOKIE_USER_AGENT } = require('./shared-constants');
+const { LOG_MARKERS, DEFAULT_COOKIE_USER_AGENT, FINISH_REASON_TOOL_CALLS, FINISH_REASON_STOP, TIMEOUTS } = require('./shared-constants');
 const largeContextDispatcher = require('./large-context-dispatcher');
 
 // --- WEB PROVIDER RULES (for Cookie auth & payload translation) ---
@@ -117,7 +117,7 @@ function isCancelledError(err) {
 // protocol, so this is the best identity signal an OpenAI-compatible client
 // gives us for free. Purely in-memory; resets when the proxy restarts.
 const connectedClients = new Map();
-const CLIENT_IDLE_MS = 90000; // no activity for this long (and no in-flight request) => "disconnected"
+const CLIENT_IDLE_MS = TIMEOUTS.CLIENT_IDLE_MS; // no activity for this long (and no in-flight request) => "disconnected"
 
 function clientKeyFromHeaders(headers) {
   const appName = headers['x-app-name'];
@@ -289,7 +289,7 @@ function learnSuccess(entry, elapsed) {
 // demoted. Reuses probeOne so auth/payload handling for every provider
 // type (Bearer, Cookie, Kimi refresh-token) stays identical to a real
 // request; the only difference is the minimal message and short timeout.
-const PING_TIMEOUT_MS = 8000;
+const PING_TIMEOUT_MS = TIMEOUTS.PING_MS;
 
 async function pingEntry(entry) {
   const controller = new AbortController();
@@ -309,6 +309,10 @@ async function pingEntry(entry) {
 // directly wherever a candidate just failed and routing is about to fall
 // back to the next one.
 async function verifyAndDemote(entry) {
+  // Grace period before pinging: a request may have failed on a transient blip
+  // (dropped connection, slow cold start); pinging it immediately would
+  // compound the latency and demote something that would have recovered.
+  await new Promise(r => setTimeout(r, 2000));
   const responded = await pingEntry(entry);
   if (responded) {
     pushRoutingEvent('ping-ok', `${entry.provider}/${entry.model} failed a request but responded to a follow-up ping — keeping it known-OK.`);
@@ -586,7 +590,7 @@ function normalizeResponse(data) {
         {
           index: 0,
           message: { role: 'assistant', content: content || '' },
-          finish_reason: content ? 'stop' : 'length'
+          finish_reason: content ? FINISH_REASON_STOP : 'length'
         }
       ]
     };
@@ -608,7 +612,7 @@ function sendSseResponse(res, data, entry) {
   const finishReason = data.choices?.[0]?.finish_reason;
   const toolCalls = data.choices?.[0]?.message?.tool_calls;
 
-  if (finishReason === 'tool_calls' && Array.isArray(toolCalls) && toolCalls.length > 0) {
+  if (finishReason === FINISH_REASON_TOOL_CALLS && Array.isArray(toolCalls) && toolCalls.length > 0) {
     res.status(200);
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
@@ -636,7 +640,7 @@ function sendSseResponse(res, data, entry) {
         function: { name: tc.function.name, arguments: tc.function.arguments },
       })),
     }, null);
-    writeChunk({}, 'tool_calls');
+    writeChunk({}, FINISH_REASON_TOOL_CALLS);
 
     if (data.usage && typeof data.usage === 'object' && Object.keys(data.usage).length > 0) {
       writeChunk({}, null, { usage: data.usage });
@@ -681,7 +685,7 @@ function sendSseResponse(res, data, entry) {
           function: { name: tc.function.name, arguments: tc.function.arguments },
         })),
       }, null);
-      writeChunk({}, 'tool_calls');
+      writeChunk({}, FINISH_REASON_TOOL_CALLS);
 
       if (data.usage && typeof data.usage === 'object' && Object.keys(data.usage).length > 0) {
         writeChunk({}, null, { usage: data.usage });
@@ -720,7 +724,7 @@ function sendSseResponse(res, data, entry) {
     writeChunk({ content: safeContent.slice(i, i + CHUNK_SIZE) }, null);
   }
 
-  writeChunk({}, 'stop');
+  writeChunk({}, FINISH_REASON_STOP);
 
   if (data.usage && typeof data.usage === 'object' && Object.keys(data.usage).length > 0) {
     writeChunk({}, null, { usage: data.usage });
@@ -824,6 +828,13 @@ function orderEntries() {
 async function probeOne(entry, { messages, rest }, signal) {
   const startTime = Date.now();
   const apiKey = process.env[entry.apiKeyEnv];
+  // Dynamic per-request timeout: a fixed cap punishes long prompts (large
+  // context dispatcher chunks) whose tokenization + first-token latency can
+  // legitimately exceed it. Scale 1.5s per 1000 estimated tokens on top of
+  // the assistant-config base timeout.
+  const baseTimeout = assistantConfig.timeoutMs > 0 ? assistantConfig.timeoutMs : 30000;
+  const tokenEstimate = estimateTokensFromText(JSON.stringify(messages || []));
+  const dynamicTimeout = baseTimeout + Math.ceil(tokenEstimate / 1000) * 1500;
 
   // Kimi-style providers authenticate via `authToken` (refresh_token) in the
   // rules file — the cookie env var is not required for them.
@@ -928,7 +939,7 @@ async function probeOne(entry, { messages, rest }, signal) {
       } else {
         response = await axios.post(entry.baseURL, payload, {
           headers,
-          timeout: (assistantConfig.timeoutMs > 0 ? assistantConfig.timeoutMs : 30000),
+          timeout: dynamicTimeout,
           signal
         });
       }

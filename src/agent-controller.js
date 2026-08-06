@@ -22,7 +22,7 @@ const path = require('path');
 const os = require('os');
 const crypto = require('crypto');
 const { spawn, exec } = require('child_process');
-const { IPC_CHANNELS } = require('./shared-constants');
+const { IPC_CHANNELS, TIMEOUTS, AGENT_PROJECT_DIR, AGENT_SCRATCHPAD_DIR } = require('./shared-constants');
 const {
   loadAgentConfig,
   saveAgentConfig,
@@ -62,16 +62,16 @@ const pendingDiffPreviews = new Map(); // id -> resolve(accepted: boolean)
 // start of a new agent session (matches the "one-step revert" spec).
 let lastWrite = null; // { path, existed, previousContent, sessionMessagesIndex }
 
-const AGENT_TMP_DIR = path.join(os.tmpdir(), 'agent-scratchpad');
+const AGENT_TMP_DIR = path.join(os.tmpdir(), AGENT_SCRATCHPAD_DIR);
 try { fs.mkdirSync(AGENT_TMP_DIR, { recursive: true }); } catch (_) { /* best-effort */ }
 
-const DEFAULT_IGNORE = ['node_modules', '.git', '.agent', 'dist', 'build', '.next', '.venv', '__pycache__'];
+const DEFAULT_IGNORE = ['node_modules', '.git', AGENT_PROJECT_DIR, 'dist', 'build', '.next', '.venv', '__pycache__'];
 const MAX_FILE_LIST = 5000;
 const MAX_READ_BYTES = 300 * 1024;
 const MAX_SEARCH_FILE_BYTES = 1024 * 1024;
 const MAX_SEARCH_MATCHES = 200;
-const COMMAND_TIMEOUT_MS = 30000;
-const MCP_REQUEST_TIMEOUT_MS = 15000;
+const COMMAND_TIMEOUT_MS = TIMEOUTS.COMMAND_MS;
+const MCP_REQUEST_TIMEOUT_MS = TIMEOUTS.MCP_REQUEST_MS;
 const MAX_AGENT_STEPS = 25; // guards against a runaway tool-call chain
 // --- NEW: agent-loop resilience (keep-alive) ---
 // Previously a single failed model call (transient network blip, one bad
@@ -346,6 +346,12 @@ function requestDiffPreview(sendToRenderer, details) {
 }
 
 // --- Project file tools ------------------------------------------------------
+// Natural (numeric-aware) sort so "file2" sorts before "file10" and the model
+// sees a stable, human-friendly listing instead of a raw lexicographic one.
+function naturalCompare(a, b) {
+  return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+}
+
 function walkProjectFiles(rootAbs, ignore) {
   const out = [];
   const stack = [rootAbs];
@@ -362,7 +368,7 @@ function walkProjectFiles(rootAbs, ignore) {
       if (out.length >= MAX_FILE_LIST) break;
     }
   }
-  return out.sort();
+  return out.sort(naturalCompare);
 }
 
 async function toolListDirectory(args) {
@@ -849,7 +855,7 @@ async function callMcpTool(namespacedName, args) {
 // --- Skills / project config loading ---------------------------------------
 function loadProjectSkills() {
   try {
-    const p = path.join(projectRoot, '.agent', 'skills.json');
+    const p = path.join(projectRoot, AGENT_PROJECT_DIR, 'skills.json');
     if (fs.existsSync(p)) {
       const arr = JSON.parse(fs.readFileSync(p, 'utf-8'));
       return Array.isArray(arr) ? arr.map((s) => ({ ...s, scope: 'project' })) : [];
@@ -860,7 +866,7 @@ function loadProjectSkills() {
 
 function loadProjectMcpConfig() {
   try {
-    const p = path.join(projectRoot, '.agent', 'mcp.json');
+    const p = path.join(projectRoot, AGENT_PROJECT_DIR, 'mcp.json');
     if (fs.existsSync(p)) {
       const parsed = JSON.parse(fs.readFileSync(p, 'utf-8'));
       if (Array.isArray(parsed)) return parsed;
@@ -1074,6 +1080,14 @@ function initAgentController({ ipcMain, dialog, sendToRenderer, getMainWindow })
 
   ipcMain.handle(IPC_CHANNELS.STOP_AGENT_SESSION, () => {
     abortRequested = true;
+    // Resolve every pending approval/diff as "denied" so a tool call blocked
+    // on user input can't hang the turn forever after a stop; the run loop
+    // sees abortRequested and exits cleanly.
+    const deny = (resolve) => { try { resolve(false); } catch (_) { /* already settled */ } };
+    pendingApprovals.forEach(deny);
+    pendingDiffPreviews.forEach(deny);
+    pendingApprovals.clear();
+    pendingDiffPreviews.clear();
     return true;
   });
 

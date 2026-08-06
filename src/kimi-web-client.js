@@ -19,8 +19,9 @@
 // of the proxy (normalizeResponse / sendSseResponse) can consume it unchanged.
 
 const axios = require('axios');
+const { DEFAULT_KIMI_URL, FINISH_REASON_STOP, TIMEOUTS } = require('./shared-constants');
 
-const KIMI_API_BASE = 'https://kimi.moonshot.cn';
+const KIMI_API_BASE = DEFAULT_KIMI_URL;
 const ACCESS_TOKEN_EXPIRES = 300; // access_token TTL in seconds
 const MAX_ATTEMPT_COUNT = 2;
 const RETRY_DELAY = 3000;
@@ -51,7 +52,7 @@ class KimiAuthError extends Error {
 
 // --- token cache (keyed by refresh_token) ---
 const accessTokenMap = new Map();
-const accessTokenRequestQueueMap = {};
+const accessTokenRequestQueueMap = new Map();
 
 function unixTimestamp() {
   return Math.floor(Date.now() / 1000);
@@ -103,13 +104,13 @@ function checkResult(result, refreshToken) {
  * refresh_token share one refresh (dedup via request queue).
  */
 async function requestToken(refreshToken) {
-  if (accessTokenRequestQueueMap[refreshToken]) {
+  if (accessTokenRequestQueueMap.has(refreshToken)) {
     // Another caller is already refreshing; wait for its outcome.
     return new Promise((resolve, reject) =>
-      accessTokenRequestQueueMap[refreshToken].push({ resolve, reject })
+      accessTokenRequestQueueMap.get(refreshToken).push({ resolve, reject })
     );
   }
-  accessTokenRequestQueueMap[refreshToken] = [];
+  accessTokenRequestQueueMap.set(refreshToken, []);
 
   const result = await (async () => {
     const resp = await axios.get(`${KIMI_API_BASE}/api/auth/token/refresh`, {
@@ -130,7 +131,7 @@ async function requestToken(refreshToken) {
         'Sec-Fetch-Site': 'same-origin',
         'User-Agent': FAKE_HEADERS['User-Agent']
       },
-      timeout: 15000,
+      timeout: TIMEOUTS.MCP_REQUEST_MS,
       validateStatus: () => true
     });
     const { access_token, refresh_token } = checkResult(resp, refreshToken);
@@ -143,16 +144,16 @@ async function requestToken(refreshToken) {
     };
   })()
     .then(ok => {
-      const waiters = accessTokenRequestQueueMap[refreshToken];
-      delete accessTokenRequestQueueMap[refreshToken];
+      const waiters = accessTokenRequestQueueMap.get(refreshToken);
+      accessTokenRequestQueueMap.delete(refreshToken);
       if (waiters) waiters.forEach(w => w.resolve(ok));
       return ok;
     })
     .catch(err => {
       // Reject queued waiters so they observe the real failure (auth errors
       // must propagate, not get cached as a value).
-      const waiters = accessTokenRequestQueueMap[refreshToken];
-      delete accessTokenRequestQueueMap[refreshToken];
+      const waiters = accessTokenRequestQueueMap.get(refreshToken);
+      accessTokenRequestQueueMap.delete(refreshToken);
       if (waiters) waiters.forEach(w => w.reject(err));
       return err; // leader falls through to the instanceof check below
     });
@@ -179,7 +180,7 @@ async function getUserInfo(accessToken, refreshToken) {
       Cookie: generateCookie(),
       ...FAKE_HEADERS
     },
-    timeout: 15000,
+    timeout: TIMEOUTS.MCP_REQUEST_MS,
     validateStatus: () => true
   });
   return checkResult(resp, refreshToken);
@@ -195,7 +196,7 @@ async function createConversation(name, refreshToken) {
       Cookie: generateCookie(),
       ...FAKE_HEADERS
     },
-    timeout: 15000,
+    timeout: TIMEOUTS.MCP_REQUEST_MS,
     validateStatus: () => true
   });
   const { id: convId } = checkResult(resp, refreshToken);
@@ -212,7 +213,7 @@ async function removeConversation(convId, refreshToken) {
       Cookie: generateCookie(),
       ...FAKE_HEADERS
     },
-    timeout: 15000,
+    timeout: TIMEOUTS.MCP_REQUEST_MS,
     validateStatus: () => true
   });
   checkResult(resp, refreshToken);
@@ -315,8 +316,8 @@ function receiveStream(model, convId, stream) {
       id: convId,
       model,
       object: 'chat.completion',
-      choices: [{ index: 0, message: { role: 'assistant', content: '' }, finish_reason: 'stop' }],
-      usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+      choices: [{ index: 0, message: { role: 'assistant', content: '' }, finish_reason: FINISH_REASON_STOP }],
+      usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0, estimated: true },
       created: unixTimestamp()
     };
     let refContent = '';
@@ -368,7 +369,7 @@ async function doCompletion(model, messages, refreshToken, useSearch, opts) {
       refs: [],
       use_search: useSearch
     }, {
-      timeout: 120000,
+      timeout: TIMEOUTS.KIMI_STREAM_MS,
       signal: opts.signal,
       headers: {
         Authorization: `Bearer ${accessToken}`,

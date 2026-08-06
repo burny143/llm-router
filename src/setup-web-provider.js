@@ -2,6 +2,7 @@ const { chromium } = require('playwright');
 const fs = require('fs');
 const path = require('path');
 const { getFilePath, parseCsv, envPrefixFor } = require('./state-store');
+const { DEFAULT_QWEN_URL, TIMEOUTS } = require('./shared-constants');
 require('dotenv').config({ path: getFilePath('env') });
 
 async function tryFill(page, selectors, value, label) {
@@ -315,7 +316,7 @@ async function setupWebProvider(providerName, startUrl) {
 
   await new Promise((resolve) => {
     const interval = setInterval(() => { if (capturedData || browserClosedEarly) { clearInterval(interval); resolve(); } }, 1000);
-    setTimeout(() => { clearInterval(interval); resolve(); }, 120000);
+    setTimeout(() => { clearInterval(interval); resolve(); }, TIMEOUTS.KIMI_STREAM_MS);
   });
 
   if (!capturedData) {
@@ -405,7 +406,7 @@ async function setupWebProvider(providerName, startUrl) {
 
 if (require.main === module) {
   const provider = process.argv[2] || 'Qwen';
-  const url = process.argv[3] || 'https://chat.qwen.ai';
+  const url = process.argv[3] || DEFAULT_QWEN_URL;
   setupWebProvider(provider, url).then(() => process.exit(0)).catch(err => { console.error(err); process.exit(1); });
 }
 module.exports = { setupWebProvider };

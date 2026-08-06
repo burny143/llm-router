@@ -235,8 +235,8 @@ const DEFAULT_ASSISTANT_CONFIG = {
   // --- Large Context Dispatcher (backend-wired: large-context-dispatcher.js) ---
   largeContextMode: false,         // master toggle — when off, oversized prompts flow through the normal path
   largeContextThreshold: 100000,   // estimated prompt tokens above which the dispatcher intercepts the request
-  largeContextChunkTokens: 20000,  // target tokens per chunk sent to a single lane for summarization
-  largeContextConcurrency: { default: 5, cookie: 1 }, // per-lane concurrency by authType
+  largeContextChunkTokens: 20000,  // target tokens per chunk sent for sequential summarization
+  largeContextInterChunkDelayMs: 500, // pacing (ms) between sequential chunk requests — protects Cookie/session providers
   largeContextTimeoutMs: 60000,    // per-chunk (and final assembly) request timeout
 
   fallbackOrder: [],               // NOT backend-wired — UI placeholder ("Pending backend support")

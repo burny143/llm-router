@@ -1,6 +1,7 @@
 // renderer.js
 // renderer.js — complete file
 const { startProxy, stopProxy, isProxyRunning, healthCheck, getDefaultConfig, getEnvVars, getConnectedModelList, getConnectedConfig, getProviderConfig, saveConfig, openConfigFileDialog, parseConfigCsvFile, parseConfigExcelFile, onDevLog, runFetchModels, onConfigReady, setPriorityOverride, getKnownOk, getRoutingLog, getPriorityState, onPriorityStateChanged } = window.api;
+const APP_CONSTANTS = window.api.constants || {};
 
 let priorityOverrideKey = null;
 let priorityLocked = false;
@@ -481,7 +482,7 @@ async function pollProxyStats() {
   } catch (err) { /* proxy not running yet, or IPC not ready — ignore */ }
 }
 pollProxyStats();
-setInterval(pollProxyStats, 3000);
+setInterval(pollProxyStats, (APP_CONSTANTS.TIMEOUTS && APP_CONSTANTS.TIMEOUTS.POLL_STATS_MS) || 3000);
 
 const chatMessages = document.getElementById('chatMessages');
 const chatInput = document.getElementById('chatInput');
@@ -499,7 +500,7 @@ sendBtn.addEventListener('click', async () => {
 
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 60000);
+    const timeout = setTimeout(() => controller.abort(), (APP_CONSTANTS.TIMEOUTS && APP_CONSTANTS.TIMEOUTS.CHAT_UI_MS) || 60000);
     let resp;
     try {
       resp = await fetch(`http://localhost:${portInput.value}/v1/chat/completions`, {
@@ -580,6 +581,17 @@ function matchesFilter(entry, filterText) {
   return JSON.stringify(entry).toLowerCase().includes(filterText.toLowerCase());
 }
 
+// Shared HTML-escape helper (single chain, used everywhere renderer injects
+// untrusted text into innerHTML — avoids a chain of ad-hoc .replace calls).
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function renderLogList(container, entries, kind) {
   if (!container) return;
   const filterText = reqResLogFilterInput ? reqResLogFilterInput.value.trim() : '';
@@ -594,8 +606,8 @@ function renderLogList(container, entries, kind) {
       ? `[${e.time}] ${e.provider}/${e.model} → ${e.method} ${e.url} (${e.payloadSize}b, ~${e.tokenEstimate} tok)`
       : `[${e.time}] ${e.provider}/${e.model} ← ${e.status ?? 'ERR'} (${e.latency}ms)${e.error ? ' — ' + e.error : ''}`;
     return `<details class="req-res-log-entry ${isError ? 'status-error' : 'status-ok'}">
-      <summary>${summary.replace(/</g, '&lt;')}</summary>
-      <pre>${JSON.stringify(e, null, 2).replace(/</g, '&lt;')}</pre>
+      <summary>${escapeHtml(summary)}</summary>
+      <pre>${escapeHtml(JSON.stringify(e, null, 2))}</pre>
     </details>`;
   }).join('');
 }
@@ -635,10 +647,10 @@ onDevLog(({ text }) => {
 function addMessage(role, content, meta) {
   const div = document.createElement('div');
   const time = new Date().toLocaleTimeString();
-  // Escape HTML to prevent injection
-  const safeContent = String(content).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  // Escape HTML to prevent injection (shared helper, single replace chain).
+  const safeContent = escapeHtml(content);
   if (role === 'assistant' && meta) {
-    div.innerHTML = `<strong>[${time}] ${role}:</strong> ${safeContent}<div class="chat-meta"><span class="meta-provider">${meta.provider}</span> / ${meta.model} · ${meta.elapsed}ms</div>`;
+    div.innerHTML = `<strong>[${time}] ${role}:</strong> ${safeContent}<div class="chat-meta"><span class="meta-provider">${escapeHtml(meta.provider)}</span> / ${escapeHtml(meta.model)} · ${escapeHtml(meta.elapsed)}ms</div>`;
   } else {
     div.innerHTML = `<strong>[${time}] ${role}:</strong> ${safeContent}`;
   }
@@ -856,8 +868,7 @@ const loggingVerbositySelect = document.getElementById('loggingVerbositySelect')
 const largeContextModeToggle = document.getElementById('largeContextModeToggle');
 const largeContextThresholdInput = document.getElementById('largeContextThresholdInput');
 const largeContextChunkTokensInput = document.getElementById('largeContextChunkTokensInput');
-const largeContextConcurrencyDefaultInput = document.getElementById('largeContextConcurrencyDefaultInput');
-const largeContextConcurrencyCookieInput = document.getElementById('largeContextConcurrencyCookieInput');
+const largeContextInterChunkDelayInput = document.getElementById('largeContextInterChunkDelayInput');
 const saveAssistantConfigBtn = document.getElementById('saveAssistantConfigBtn');
 
 let assistantConfigLoaded = false;
@@ -874,9 +885,7 @@ async function loadAssistantConfigForm() {
     if (largeContextModeToggle) largeContextModeToggle.checked = !!config.largeContextMode;
     if (largeContextThresholdInput) largeContextThresholdInput.value = config.largeContextThreshold ?? 100000;
     if (largeContextChunkTokensInput) largeContextChunkTokensInput.value = config.largeContextChunkTokens ?? 20000;
-    const concurrency = config.largeContextConcurrency || { default: 5, cookie: 1 };
-    if (largeContextConcurrencyDefaultInput) largeContextConcurrencyDefaultInput.value = concurrency.default ?? 5;
-    if (largeContextConcurrencyCookieInput) largeContextConcurrencyCookieInput.value = concurrency.cookie ?? 1;
+    if (largeContextInterChunkDelayInput) largeContextInterChunkDelayInput.value = config.largeContextInterChunkDelayMs ?? 500;
     assistantConfigLoaded = true;
   } catch (err) {
     console.warn('Could not load assistant config:', err.message);
@@ -894,10 +903,7 @@ saveAssistantConfigBtn?.addEventListener('click', async () => {
     largeContextMode: largeContextModeToggle ? largeContextModeToggle.checked : false,
     largeContextThreshold: largeContextThresholdInput ? Math.max(1000, parseInt(largeContextThresholdInput.value, 10) || 100000) : 100000,
     largeContextChunkTokens: largeContextChunkTokensInput ? Math.max(1000, parseInt(largeContextChunkTokensInput.value, 10) || 20000) : 20000,
-    largeContextConcurrency: {
-      default: largeContextConcurrencyDefaultInput ? Math.max(1, parseInt(largeContextConcurrencyDefaultInput.value, 10) || 5) : 5,
-      cookie: largeContextConcurrencyCookieInput ? Math.max(1, parseInt(largeContextConcurrencyCookieInput.value, 10) || 1) : 1
-    }
+    largeContextInterChunkDelayMs: largeContextInterChunkDelayInput ? Math.max(0, parseInt(largeContextInterChunkDelayInput.value, 10) || 500) : 500
   };
   try {
     const result = await window.api.saveAssistantConfig(config);
@@ -972,10 +978,10 @@ function showWebProviderForm() {
 addWebProviderBtn?.addEventListener('click', () => {
   // Always rebuild the cached refs: a previous setup run may have left the modal
   // in a stale state (form swapped out, buttons hidden).
-  webProviderNameInput.value = 'Qwen';
-  webProviderUrlInput.value = 'https://chat.qwen.ai/';
+  webProviderNameInput.value = APP_CONSTANTS.DEFAULT_QWEN_NAME || 'Qwen';
+  webProviderUrlInput.value = (APP_CONSTANTS.DEFAULT_QWEN_URL || 'https://chat.qwen.ai') + '/';
   webProviderCookieInput.value = '';
-  if (webProviderPresetSelect) webProviderPresetSelect.value = 'Qwen';
+  if (webProviderPresetSelect) webProviderPresetSelect.value = APP_CONSTANTS.DEFAULT_QWEN_NAME || 'Qwen';
   webProviderModal.style.display = 'flex';
   showWebProviderForm();
   webProviderModalProceed.style.display = '';

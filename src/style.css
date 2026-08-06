@@ -592,6 +592,10 @@ button.btn-primary:hover {
   align-self: flex-start;
   background: #f1f1f1;
   color: #222;
+  /* Phase 5: guarantee long unbroken tokens (URLs, file paths) wrap instead
+     of overflowing the bubble; word-break alone is not honored by all
+     engines for inline content. */
+  overflow-wrap: anywhere;
 }
 /* --- NEW: streaming support --- blinking cursor shown at the end of an
    assistant bubble while a token-level stream is in flight. */
@@ -650,6 +654,52 @@ button.btn-primary:hover {
   font-family: monospace;
   max-height: 160px;
   overflow-y: auto;
+}
+
+/* Floating task tracker overlay (bottom-left), mirrors active agent tool calls */
+.agent-task-tracker {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  z-index: 900;
+  display: none;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 320px;
+  padding: 8px 10px;
+  background: rgba(20, 20, 24, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(4px);
+  pointer-events: none;
+}
+.agent-task-tracker.has-tasks { display: flex; }
+.agent-task-tracker-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #eee;
+  font-size: 12px;
+  line-height: 1.3;
+}
+.agent-task-tracker-row.done .agent-task-tracker-label { color: #7ec699; text-decoration: line-through; }
+.agent-task-tracker-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.task-spinner {
+  flex: 0 0 auto;
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  border-top-color: #6ab0ff;
+  border-radius: 50%;
+  animation: task-spin 0.7s linear infinite;
+}
+@keyframes task-spin {
+  to { transform: rotate(360deg); }
 }
 
 .agent-input-row {

@@ -393,14 +393,13 @@
       <tr>
         <td>Large Context Dispatcher</td>
         <td>
-          <label><input type="checkbox" id="largeContextModeToggle"> Enabled — auto-splits oversized prompts across known-OK models</label>
+          <label><input type="checkbox" id="largeContextModeToggle"> Enabled — auto-splits oversized prompts for sequential processing</label>
           <div style="margin-top:6px; display:flex; gap:16px; flex-wrap:wrap; align-items:center;">
             <span>Threshold: <input type="number" id="largeContextThresholdInput" min="1000" step="1000" style="width:90px;"> tokens</span>
             <span>Chunk size: <input type="number" id="largeContextChunkTokensInput" min="1000" step="1000" style="width:90px;"> tokens</span>
-            <span>Lane concurrency — API key: <input type="number" id="largeContextConcurrencyDefaultInput" min="1" max="20" style="width:50px;"></span>
-            <span>Cookie/session: <input type="number" id="largeContextConcurrencyCookieInput" min="1" max="5" style="width:50px;"></span>
+            <span>Delay between chunks: <input type="number" id="largeContextInterChunkDelayInput" min="0" step="100" style="width:70px;"> ms</span>
           </div>
-          <p style="color:#555; font-size:12px; margin:6px 0 0;">When a request's estimated prompt tokens exceed the threshold, it's split into chunks (respecting file boundaries), summarized in parallel — one lane per known-OK model, Cookie/session providers capped at their concurrency since only one session exists — then assembled into a final answer by the best available model. No tool-calling in this path.</p>
+          <p style="color:#555; font-size:12px; margin:6px 0 0;">When a request's estimated prompt tokens exceed the threshold, it's split into chunks (respecting file boundaries) and summarized sequentially by a single known-OK model — one chunk at a time with a small delay so Cookie/session providers aren't hammered — then assembled into a final answer. Untrusted file content is fenced off from instructions to prevent prompt injection. No tool-calling in this path.</p>
         </td>
       </tr>
       <tr>

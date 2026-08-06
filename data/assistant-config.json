@@ -6,10 +6,7 @@
   "timeoutMs": 30000,
   "loggingVerbosity": "normal",
   "largeContextMode": false,
-  "largeContextThreshold": 100000,
-  "largeContextChunkTokens": 20000,
-  "largeContextConcurrency": {
-    "default": 5,
-    "cookie": 1
-  }
+  "largeContextThreshold": 20000,
+  "largeContextChunkTokens": 5000,
+  "largeContextInterChunkDelayMs": 500
 }

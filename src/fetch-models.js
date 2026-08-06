@@ -18,6 +18,7 @@ const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
 const { getFilePath, parseCsv } = require('./state-store');
+const { AUTH_TYPE_COOKIE } = require('./shared-constants');
 require('dotenv').config({ path: getFilePath('env') });
 
 // Read ProviderConfig.csv (path from file-registry.json) using the shared
@@ -92,7 +93,7 @@ async function fetchModels(provider, endpoint, apiKeyEnv, authType) {
     // (authType === 'Cookie') authenticate with a session cookie via the
     // browser client, not an API key — sending the cookie string as a Bearer
     // token would always fail, so skip them explicitly instead.
-    if (authType !== 'cookie') {
+    if (authType !== AUTH_TYPE_COOKIE) {
         // Add authorization header if API key is available
         if (apiKeyEnv && process.env[apiKeyEnv]) {
             config.headers = { 'Authorization': `Bearer ${process.env[apiKeyEnv]}` };

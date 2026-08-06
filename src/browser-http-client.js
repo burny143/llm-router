@@ -2,6 +2,7 @@
 const { chromium } = require('playwright');
 const path = require('path');
 const { getFilePath } = require('./state-store');
+const { TIMEOUTS } = require('./shared-constants');
 
 // Same marker set for the initial clean-load check and the response check, so a
 // challenge is detected in both places (the union of the old PAGE_/RESPONSE_
@@ -169,7 +170,7 @@ class BrowserHttpClient {
       } finally {
         clearTimeout(timer);
       }
-    }, { url, payload, headers, method, timeoutMs: 60000 });
+    }, { url, payload, headers, method, timeoutMs: TIMEOUTS.BROWSER_FETCH_MS });
   }
 
    async request(url, payload, headers, cookies, profileKey) {
@@ -184,7 +185,7 @@ class BrowserHttpClient {
      try {
        result = await Promise.race([
          this._fetchInPage(session.page, url, payload, headers),
-         new Promise((_, rej) => setTimeout(() => rej(new Error('browser fetch timed out')), 60000))
+         new Promise((_, rej) => setTimeout(() => rej(new Error('browser fetch timed out')), TIMEOUTS.BROWSER_FETCH_MS))
        ]);
      } catch (e) {
        console.log(`[BrowserHttpClient] in-page fetch ABORTED: ${e.message}`);

@@ -157,18 +157,51 @@
     }
   }
 
+  // Short, human-readable label for a tool call card / task tracker row
+  // (e.g. "📄 readme.md" instead of the full JSON args blob).
+  function getToolSummary(name, args) {
+    const a = args || {};
+    const base = String(name || 'tool');
+    switch (base) {
+      case 'read_file': {
+        const f = String(a.path || '').split(/[\/\\]/).pop();
+        return '📄 ' + (f || base);
+      }
+      case 'write_file':
+      case 'edit_file': {
+        const f = String(a.path || '').split(/[\/\\]/).pop();
+        return '✏️ ' + (f || base);
+      }
+      case 'run_command':
+        return '💻 ' + String(a.command || '').slice(0, 60);
+      case 'search_in_project':
+        return '🔍 ' + String(a.query || a.pattern || '').slice(0, 60);
+      case 'list_files':
+      case 'get_project_files':
+        return '📁 ' + (a.path || '/');
+      default:
+        return '🔧 ' + base;
+    }
+  }
+
   function addToolCard(id, name, args) {
     const card = document.createElement('div');
     card.className = 'agent-tool-card';
     card.dataset.toolId = id;
 
+    const argsStr = JSON.stringify(args || {}, null, 2);
+    // Very large arg payloads (read_file of a big source file, search results,
+    // etc.) clutter the thread — start those collapsed so the header summary
+    // is what shows until the user expands them.
+    if (argsStr.length > 300) card.classList.add('agent-tool-collapsed');
+
     card.innerHTML =
       '<div class="agent-tool-card-header">' +
-        '<span class="agent-tool-card-title"><span class="agent-tool-caret">▾</span>🔧 ' + escapeHtml(name || 'tool') + '</span>' +
+        '<span class="agent-tool-card-title"><span class="agent-tool-caret">▾</span> ' + escapeHtml(getToolSummary(name, args)) + '</span>' +
         '<span class="agent-tool-status">running…</span>' +
       '</div>' +
       '<div class="agent-tool-body">' +
-        '<pre class="agent-tool-args">' + escapeHtml(JSON.stringify(args || {}, null, 2)) + '</pre>' +
+        '<pre class="agent-tool-args">' + escapeHtml(argsStr) + '</pre>' +
         '<pre class="agent-tool-result" style="display:none;"></pre>' +
       '</div>';
 
@@ -177,11 +210,58 @@
     });
 
     messagesEl.appendChild(card);
+    addTaskTrackerItem(id, getToolSummary(name, args));
 
     // A tool result following this closes the current assistant bubble (a
     // new one starts if the model replies again after the tool result).
     currentAssistantBubble = null;
     scrollMessagesToBottom();
+  }
+
+  // --- Task tracker (floating bottom-left overlay) --------------------------
+  // Mirrors active tool calls while the agent is working; rows get a spinner
+  // while running and are removed once the tool result arrives.
+  let taskTrackerEl = null;
+  const taskTrackerRows = new Map(); // toolId -> { row, labelEl }
+
+  function ensureTaskTracker() {
+    if (taskTrackerEl && document.body.contains(taskTrackerEl)) return taskTrackerEl;
+    taskTrackerEl = document.createElement('div');
+    taskTrackerEl.className = 'agent-task-tracker';
+    taskTrackerEl.setAttribute('aria-label', 'Agent tasks');
+    document.body.appendChild(taskTrackerEl);
+    return taskTrackerEl;
+  }
+
+  function addTaskTrackerItem(id, label) {
+    const tracker = ensureTaskTracker();
+    if (!id || taskTrackerRows.has(id)) return;
+    const row = document.createElement('div');
+    row.className = 'agent-task-tracker-row';
+    row.innerHTML =
+      '<span class="task-spinner"></span>' +
+      '<span class="agent-task-tracker-label"></span>';
+    row.querySelector('.agent-task-tracker-label').textContent = label || '…';
+    tracker.appendChild(row);
+    taskTrackerRows.set(id, { row, labelEl: row.querySelector('.agent-task-tracker-label') });
+    tracker.classList.add('has-tasks');
+  }
+
+  function updateTaskTrackerItem(id, done, label) {
+    const entry = taskTrackerRows.get(id);
+    if (!entry) return;
+    if (typeof label === 'string') entry.labelEl.textContent = label;
+    if (done) {
+      entry.row.classList.add('done');
+      entry.row.querySelector('.task-spinner').remove();
+      // Briefly keep the finished row visible, then remove it entirely.
+      setTimeout(() => {
+        entry.row.remove();
+        taskTrackerRows.delete(id);
+        const tracker = taskTrackerEl;
+        if (tracker && tracker.children.length === 0) tracker.classList.remove('has-tasks');
+      }, 1200);
+    }
   }
 
   function updateToolCard(id, result) {
@@ -197,6 +277,7 @@
 
     resultEl.style.display = 'block';
     resultEl.textContent = typeof result === 'string' ? result : (result.message || JSON.stringify(result));
+    updateTaskTrackerItem(id, true);
     scrollMessagesToBottom();
   }
 
