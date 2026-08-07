@@ -11,8 +11,6 @@
 // ---------------------------------------------------------------------------
 // Forced system prompt injected into every proxied request
 // ---------------------------------------------------------------------------
-const { FINISH_REASON_TOOL_CALLS, FINISH_REASON_STOP } = require('./shared-constants');
-
 const FORCED_SYSTEM_PROMPT = [
   'You are a powerful AI assistant running behind a tool-calling proxy.',
   'If you need to use a tool, your ENTIRE reply MUST be ONLY one or more fenced JSON code blocks.',
@@ -38,7 +36,7 @@ const FORCED_SYSTEM_PROMPT = [
 // "}" that is immediately followed by "```" — this correctly spans nested
 // JSON objects in `arguments`, not just the first "}" encountered.
 // ---------------------------------------------------------------------------
-const TOOL_CALL_BLOCK_REGEX = /```(?:json)?\s*\n?(\{[\s\S]+?\})\s*\n?```/gi;
+const TOOL_CALL_BLOCK_REGEX = /```(?:json)?\s*\n?(\{[\s\S]*?\})\s*\n?```/gi;
 
 // ---------------------------------------------------------------------------
 // tools → text instruction
@@ -460,7 +458,7 @@ function buildToolCallResponse(toolCalls, requestId, model) {
         content: null,
         tool_calls: toolCalls,
       },
-      finish_reason: FINISH_REASON_TOOL_CALLS,
+      finish_reason: 'tool_calls',
     }],
     usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
   };
@@ -478,7 +476,7 @@ function buildTextResponse(content, requestId, model) {
     choices: [{
       index: 0,
       message: { role: 'assistant', content },
-      finish_reason: FINISH_REASON_STOP,
+      finish_reason: 'stop',
     }],
     usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
   };
@@ -499,7 +497,7 @@ function translateResponse(data, requestId, model) {
       // Native tool_calls — preserve everything, just ensure finish_reason is set
       const result = { ...data };
       if (result.choices && result.choices[0]) {
-        result.choices[0].finish_reason = result.choices[0].finish_reason || FINISH_REASON_TOOL_CALLS;
+        result.choices[0].finish_reason = result.choices[0].finish_reason || 'tool_calls';
       }
       return result;
     }
@@ -711,9 +709,9 @@ function createStreamingToolCallTranslator(res, requestId, model) {
       }
 
       if (collectedToolCalls.length > 0) {
-        writeChunk({}, FINISH_REASON_TOOL_CALLS);
+        writeChunk({}, 'tool_calls');
       } else {
-        writeChunk({}, FINISH_REASON_STOP);
+        writeChunk({}, 'stop');
       }
 
       // Emit usage chunk

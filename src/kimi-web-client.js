@@ -19,9 +19,8 @@
 // of the proxy (normalizeResponse / sendSseResponse) can consume it unchanged.
 
 const axios = require('axios');
-const { DEFAULT_KIMI_URL, FINISH_REASON_STOP, TIMEOUTS } = require('./shared-constants');
 
-const KIMI_API_BASE = DEFAULT_KIMI_URL;
+const KIMI_API_BASE = 'https://kimi.moonshot.cn';
 const ACCESS_TOKEN_EXPIRES = 300; // access_token TTL in seconds
 const MAX_ATTEMPT_COUNT = 2;
 const RETRY_DELAY = 3000;
@@ -52,7 +51,7 @@ class KimiAuthError extends Error {
 
 // --- token cache (keyed by refresh_token) ---
 const accessTokenMap = new Map();
-const accessTokenRequestQueueMap = new Map();
+const accessTokenRequestQueueMap = {};
 
 function unixTimestamp() {
   return Math.floor(Date.now() / 1000);
@@ -104,13 +103,13 @@ function checkResult(result, refreshToken) {
  * refresh_token share one refresh (dedup via request queue).
  */
 async function requestToken(refreshToken) {
-  if (accessTokenRequestQueueMap.has(refreshToken)) {
+  if (accessTokenRequestQueueMap[refreshToken]) {
     // Another caller is already refreshing; wait for its outcome.
     return new Promise((resolve, reject) =>
-      accessTokenRequestQueueMap.get(refreshToken).push({ resolve, reject })
+      accessTokenRequestQueueMap[refreshToken].push({ resolve, reject })
     );
   }
-  accessTokenRequestQueueMap.set(refreshToken, []);
+  accessTokenRequestQueueMap[refreshToken] = [];
 
   const result = await (async () => {
     const resp = await axios.get(`${KIMI_API_BASE}/api/auth/token/refresh`, {
@@ -131,7 +130,7 @@ async function requestToken(refreshToken) {
         'Sec-Fetch-Site': 'same-origin',
         'User-Agent': FAKE_HEADERS['User-Agent']
       },
-      timeout: TIMEOUTS.MCP_REQUEST_MS,
+      timeout: 15000,
       validateStatus: () => true
     });
     const { access_token, refresh_token } = checkResult(resp, refreshToken);
@@ -144,16 +143,16 @@ async function requestToken(refreshToken) {
     };
   })()
     .then(ok => {
-      const waiters = accessTokenRequestQueueMap.get(refreshToken);
-      accessTokenRequestQueueMap.delete(refreshToken);
+      const waiters = accessTokenRequestQueueMap[refreshToken];
+      delete accessTokenRequestQueueMap[refreshToken];
       if (waiters) waiters.forEach(w => w.resolve(ok));
       return ok;
     })
     .catch(err => {
       // Reject queued waiters so they observe the real failure (auth errors
       // must propagate, not get cached as a value).
-      const waiters = accessTokenRequestQueueMap.get(refreshToken);
-      accessTokenRequestQueueMap.delete(refreshToken);
+      const waiters = accessTokenRequestQueueMap[refreshToken];
+      delete accessTokenRequestQueueMap[refreshToken];
       if (waiters) waiters.forEach(w => w.reject(err));
       return err; // leader falls through to the instanceof check below
     });
@@ -180,7 +179,7 @@ async function getUserInfo(accessToken, refreshToken) {
       Cookie: generateCookie(),
       ...FAKE_HEADERS
     },
-    timeout: TIMEOUTS.MCP_REQUEST_MS,
+    timeout: 15000,
     validateStatus: () => true
   });
   return checkResult(resp, refreshToken);
@@ -196,7 +195,7 @@ async function createConversation(name, refreshToken) {
       Cookie: generateCookie(),
       ...FAKE_HEADERS
     },
-    timeout: TIMEOUTS.MCP_REQUEST_MS,
+    timeout: 15000,
     validateStatus: () => true
   });
   const { id: convId } = checkResult(resp, refreshToken);
@@ -213,7 +212,7 @@ async function removeConversation(convId, refreshToken) {
       Cookie: generateCookie(),
       ...FAKE_HEADERS
     },
-    timeout: TIMEOUTS.MCP_REQUEST_MS,
+    timeout: 15000,
     validateStatus: () => true
   });
   checkResult(resp, refreshToken);
@@ -316,8 +315,7 @@ function receiveStream(model, convId, stream) {
       id: convId,
       model,
       object: 'chat.completion',
-      choices: [{ index: 0, message: { role: 'assistant', content: '' }, finish_reason: FINISH_REASON_STOP }],
-      usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0, estimated: true },
+      choices: [{ index: 0, message: { role: 'assistant', content: '' }, finish_reason: 'stop' }],
       created: unixTimestamp()
     };
     let refContent = '';
@@ -362,14 +360,13 @@ async function doCompletion(model, messages, refreshToken, useSearch, opts) {
   try {
     const { accessToken, userId } = await acquireToken(refreshToken);
     const sendMessages = messagesPrepare(messages);
-
     const resp = await axios.post(`${KIMI_API_BASE}/api/chat/${convId}/completion/stream`, {
       kimiplus_id: /^[0-9a-z]{20}$/.test(model) ? model : undefined,
       messages: sendMessages,
       refs: [],
       use_search: useSearch
     }, {
-      timeout: TIMEOUTS.KIMI_STREAM_MS,
+      timeout: 120000,
       signal: opts.signal,
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -399,6 +396,30 @@ async function doCompletion(model, messages, refreshToken, useSearch, opts) {
     }
 
     const answer = await receiveStream(model, convId, resp.data);
+    // Kimi's SSE stream does not report token usage. Compute an estimate from
+    // the actual request/response text (same ~4 chars/token heuristic the rest
+    // of the proxy uses for providers that don't report real usage) and flag it
+    // `estimated: true` so proxy-server.js's recordUsage carries the flag
+    // through to the Token Usage panel instead of silently dropping token
+    // counts (the old code hardcoded prompt_tokens/completion_tokens = 1/1,
+    // which made Kimi look like it used ~0 tokens per request).
+    const completionText = answer.choices && answer.choices[0] && answer.choices[0].message
+      ? answer.choices[0].message.content || ''
+      : '';
+    const promptText = (sendMessages || []).map(m => {
+      if (typeof m.content === 'string') return m.content;
+      if (Array.isArray(m.content)) return m.content.map(b => (b && b.text) || '').join(' ');
+      return '';
+    }).join(' ');
+    const estimate = (text) => Math.max(1, Math.ceil(String(text).length / 4));
+    const promptTokens = estimate(promptText);
+    const completionTokens = estimate(completionText);
+    answer.usage = {
+      prompt_tokens: promptTokens,
+      completion_tokens: completionTokens,
+      total_tokens: promptTokens + completionTokens,
+      estimated: true
+    };
     return { status: 200, data: answer };
   } finally {
     // Clean up the temp conversation + snippet tracking; failures are harmless.

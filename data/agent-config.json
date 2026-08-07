@@ -1,8 +1,6 @@
 {
-  "lastProjectPath": "C:\\__Projects\\AI Projects\\KAGGLE-AI",
+  "lastProjectPath": "C:\\__Projects\\Kaggle",
   "selectedModel": "Kimi::Kimi-chat",
-  "globalMcpServers": [],
   "streamResponses": true,
-  "alwaysApproveWrites": true,
-  "kimiBoostEnabled": false
+  "alwaysApproveWrites": true
 }

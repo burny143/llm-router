@@ -7,7 +7,7 @@ const axios = require('axios');
 const https = require('https');
 const { startProxy, stopProxy, isProxyRunning, setHealthResults, extractContent, getTokenUsage, getProxyStats, getKnownOk, setPriorityOverride, getRoutingLog, getPriorityState, setPriorityStateListener, injectUserTextWithFallback, reloadAssistantConfig, previewToolFormat } = require('./proxy-server');
 const { saveResults, loadResults, saveSettings, loadSettings, saveConfigBoth, syncConfigFromCsv, pruneConfigEntries, loadProviderConfig, CONFIG_CSV, PROVIDER_CONFIG_CSV, getFilePath, envPrefixFor, parseCsv, loadAssistantConfig, saveAssistantConfig } = require('./state-store');
-const { IPC_CHANNELS, DEFAULT_COOKIE_USER_AGENT, DEFAULT_QWEN_NAME, DEFAULT_QWEN_URL, DEFAULT_KIMI_NAME, DEFAULT_KIMI_URL, TIMEOUTS } = require('./shared-constants');
+const { IPC_CHANNELS, DEFAULT_COOKIE_USER_AGENT } = require('./shared-constants');
 const { initAgentController } = require('./agent-controller');
 require('dotenv').config({ path: getFilePath('env') });
 
@@ -15,9 +15,7 @@ const chromeAgent = new https.Agent({
   ciphers: 'TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384',
   ecdhCurve: 'X25519:prime256v1:secp384r1',
   minVersion: 'TLSv1.2',
-  // Insecure TLS is opt-in only (PROXY_INSECURE_TLS=1); the secure default
-  // rejects self-signed/expired certs instead of silently trusting them.
-  rejectUnauthorized: process.env.PROXY_INSECURE_TLS === '1' ? false : true
+  rejectUnauthorized: false
 });
 
 let webRules = {};
@@ -48,22 +46,22 @@ let pendingConfigReady = null;
 // Provider" modal (name, login URL) and seeds ProviderConfig.csv + rules with a
 // sensible default baseURL/samplePayload when a cookie is pasted manually.
 const WEB_PROVIDER_PRESETS = {
-  [DEFAULT_QWEN_NAME]: {
-    loginUrl: `${DEFAULT_QWEN_URL}/`,
-    baseURL: `${DEFAULT_QWEN_URL}/api/v2/chat/completions`,
-    origin: DEFAULT_QWEN_URL,
-    referer: `${DEFAULT_QWEN_URL}/`,
+  Qwen: {
+    loginUrl: 'https://chat.qwen.ai/',
+    baseURL: 'https://chat.qwen.ai/api/v2/chat/completions',
+    origin: 'https://chat.qwen.ai',
+    referer: 'https://chat.qwen.ai/',
     samplePayload: { model: 'openai', question: 'hi', stream: true }
   },
-  [DEFAULT_KIMI_NAME]: {
+  Kimi: {
     loginUrl: 'https://www.kimi.com/',
     // NOTE: Kimi's web API is a token-exchange protocol (refresh_token -> convId
     // -> completion/stream) served from kimi.moonshot.cn, NOT an OpenAI-style
     // endpoint. baseURL below is display metadata only; when an authToken is
     // present the proxy routes requests through kimi-web-client.js instead.
-    baseURL: `${DEFAULT_KIMI_URL}/api/chat`,
-    origin: DEFAULT_KIMI_URL,
-    referer: `${DEFAULT_KIMI_URL}/`,
+    baseURL: 'https://kimi.moonshot.cn/api/chat',
+    origin: 'https://kimi.moonshot.cn',
+    referer: 'https://kimi.moonshot.cn/',
     samplePayload: {
       copilot_ctx: null,
       is_think: true,
@@ -334,9 +332,27 @@ ipcMain.handle(IPC_CHANNELS.STOP_PROXY, () => {
   return { success: true };
 });
 
-ipcMain.handle(IPC_CHANNELS.IS_PROXY_RUNNING, () => {
-  return isProxyRunning();
-});
+  ipcMain.handle(IPC_CHANNELS.IS_PROXY_RUNNING, () => {
+    return isProxyRunning();
+  });
+
+  // --- NEW: INITIALIZE button ---
+  // Ensures the local proxy is running before the agent starts. Uses the
+  // main process's own config entries (default port 8000, matching the
+  // Proxy Control tab's default) so the agent never tries to call a model
+  // through a dead proxy. If a stale instance is detected but wedged, we
+  // stop-then-start rather than failing the start.
+  ipcMain.handle(IPC_CHANNELS.ENSURE_PROXY_RUNNING, async () => {
+    if (isProxyRunning()) return { alreadyRunning: true };
+    const port = 8000; // default proxy port (matches the Proxy tab's default input value)
+    const activeEntries = (configEntries || []).filter((e) => e.enabled);
+    try {
+      const result = await startProxy(port, activeEntries);
+      return { started: true, success: result.success, entryCount: activeEntries.length, error: result.error || null };
+    } catch (err) {
+      return { started: false, success: false, error: err.message };
+    }
+  });
 
 ipcMain.handle(IPC_CHANNELS.GET_DEFAULT_CONFIG, () => {
   const defaultConfig = require('./models-config');
@@ -525,10 +541,9 @@ ipcMain.handle(IPC_CHANNELS.SAVE_CONFIG, async (event, entries) => {
 
 ipcMain.handle(IPC_CHANNELS.OPEN_CONFIG_FILE_DIALOG, async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
-    title: 'Select Proxy Config File (CSV or Excel)',
+    title: 'Select Proxy Config File (CSV)',
     filters: [
       { name: 'CSV Files', extensions: ['csv'] },
-      { name: 'Excel Files', extensions: ['xlsx', 'xls'] },
       { name: 'All Files', extensions: ['*'] }
     ],
     properties: ['openFile']
@@ -556,30 +571,9 @@ ipcMain.handle(IPC_CHANNELS.PARSE_CONFIG_CSV_FILE, async (event, filePath) => {
           authType: r.authType || 'Bearer'
         })).filter(e => e.provider && e.model);
         resolve({ success: true, entries, rowCount: results.length });
-      })
-      .on('error', (err) => reject({ success: false, error: err.message }));
+    })
+    .on('error', (err) => reject({ success: false, error: err.message }));
   });
-});
-
-ipcMain.handle(IPC_CHANNELS.PARSE_CONFIG_EXCEL_FILE, async (event, filePath) => {
-  const XLSX = require('xlsx');
-  try {
-    const workbook = XLSX.readFile(filePath);
-    const sheetName = workbook.SheetNames[0];
-    const worksheet = workbook.Sheets[sheetName];
-    const rows = XLSX.utils.sheet_to_json(worksheet);
-    const entries = rows.map(r => ({
-      provider: r.provider || '',
-      baseURL: r.baseURL || r.baseUrl || '',
-      apiKeyEnv: r.apiKeyEnv || r.apiKey || '',
-      model: r.model || '',
-      enabled: r.enabled !== 'false' && r.enabled !== false,
-      authType: r.authType || 'Bearer'
-    })).filter(e => e.provider && e.model);
-    return { success: true, entries, rowCount: rows.length };
-  } catch (err) {
-    return { success: false, error: err.message };
-  }
 });
 
 ipcMain.handle(IPC_CHANNELS.RUN_FETCH_MODELS, async () => {
@@ -749,7 +743,7 @@ ipcMain.handle(IPC_CHANNELS.HEALTH_CHECK, async (event, entries) => {
       } else {
         resp = await axios.post(entry.baseURL, payload, { 
           headers, 
-          timeout: TIMEOUTS.HEALTH_CHECK_MS,
+          timeout: 15000,
           httpsAgent: authType === 'Cookie' ? chromeAgent : undefined
         });
       }

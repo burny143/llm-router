@@ -14,7 +14,7 @@
     <button class="tab-btn" data-tab="config">Admin / Configuration</button>
     <button class="tab-btn" data-tab="health">Health Check</button>
     <button class="tab-btn" data-tab="usage">Token Usage</button>
-    <button class="tab-btn" data-tab="assistant">Assistant Config</button>
+    <!-- General Config lives in the config tab's General Config sub-tab below -->
   </nav>
   <div class="main-content">
 
@@ -68,22 +68,14 @@
 
           <div class="agent-sidebar-section">
             <div class="agent-sidebar-header">
-              <span>Skills</span>
-              <button id="agentAddSkillBtn" class="agent-btn-small">+ Add</button>
+              <span>Task Progress</span>
             </div>
-            <div id="agentSkillsList" class="agent-list"></div>
-          </div>
-
-          <div class="agent-sidebar-section">
-            <div class="agent-sidebar-header">
-              <span>MCP Servers</span>
-              <button id="agentAddMcpBtn" class="agent-btn-small">+ Add Server</button>
-            </div>
-            <div id="agentMcpList" class="agent-list"></div>
+            <div id="agentTaskProgress" class="agent-task-progress"></div>
           </div>
         </div>
 
         <div class="agent-chat">
+          <div id="agentChatTabs" class="agent-chat-tabs"></div>
           <div id="agentMessages" class="agent-messages"></div>
           <div class="agent-input-row">
             <textarea id="agentInput" class="agent-input" placeholder="Ask the agent…" rows="3"></textarea>
@@ -147,48 +139,13 @@
           <strong>Shortcuts:</strong> Ctrl+Enter send · Ctrl+L clear chat · Ctrl+Shift+F focus file search · Ctrl+K palette · Ctrl+Z undo last change
         </div>
       </div>
-    </div>
-
-    <!-- Add Skill modal -->
-    <div id="agentSkillModal" class="agent-modal-overlay" style="display:none;">
-      <div class="agent-modal">
-        <h3 id="agentSkillModalTitle">Add Skill</h3>
-        <label>Name<input id="agentSkillName" type="text"></label>
-        <label>Description<input id="agentSkillDescription" type="text"></label>
-        <label>Prompt / instructions<textarea id="agentSkillPrompt" rows="4"></textarea></label>
-        <div class="agent-modal-actions">
-          <button id="agentSkillSaveBtn" class="agent-btn-approve">Save</button>
-          <button id="agentSkillCancelBtn" class="agent-btn-deny">Cancel</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Add MCP Server modal -->
-    <div id="agentMcpModal" class="agent-modal-overlay" style="display:none;">
-      <div class="agent-modal">
-        <h3>Add MCP Server</h3>
-        <label>Name<input id="agentMcpName" type="text"></label>
-        <label>Transport
-          <select id="agentMcpTransport">
-            <option value="stdio">stdio (command)</option>
-            <option value="http">http (url)</option>
-          </select>
-        </label>
-        <label id="agentMcpCommandRow">Command<input id="agentMcpCommand" type="text" placeholder="npx some-mcp-server"></label>
-        <label id="agentMcpUrlRow" style="display:none;">URL<input id="agentMcpUrl" type="text" placeholder="https://…"></label>
-        <div class="agent-modal-actions">
-          <button id="agentMcpSaveBtn" class="agent-btn-approve">Save</button>
-          <button id="agentMcpCancelBtn" class="agent-btn-deny">Cancel</button>
-        </div>
-      </div>
-    </div>
-  </div>
+     </div>
+   </div>
 
   <div id="proxy-tab" class="tab-content">
     <div class="control-panel">
       <label>Port: <input type="number" id="portInput" value="8000" style="width: 60px;"></label>
-      <button id="connectBtn" class="btn-primary">Connect</button>
-      <button id="disconnectBtn" class="btn-danger" disabled>Stop</button>
+      <button id="proxyToggleBtn" class="btn-primary">Connect</button>
       <label>Priority model:
         <select id="priorityModelSelect">
           <option value="">None (auto)</option>
@@ -201,39 +158,45 @@
     <div id="priorityRoutingLog" class="priority-routing-log"></div>
     <div id="serverAddress" class="status stopped">Server stopped</div>
 
-    <h3 class="section-header">Connected Applications</h3>
-    <div class="connected-apps-panel">
-      <div id="connectedAppsCount" class="proxy-stats">Connected applications: 0</div>
-      <div id="connectedAppsList" class="connected-apps-list">
-        <div class="connected-apps-empty">No applications connected.</div>
+    <!-- Collapsible: Connected Applications -->
+    <div class="collapsible-section" data-persist-key="proxy.connectedApps">
+      <div class="collapsible-header">
+        <span>Connected Applications</span>
+        <span class="collapsible-caret">▾</span>
+      </div>
+      <div class="collapsible-body">
+        <div id="connectedAppsCount" class="proxy-stats">Connected applications: 0</div>
+        <div id="connectedAppsList" class="connected-apps-list">
+          <div class="connected-apps-empty">No applications connected.</div>
+        </div>
       </div>
     </div>
 
-    <h3>Quick Chat</h3>
-    <div id="chatMessages"></div>
-    <div class="chat-input-area">
-      <input type="text" id="chatInput" placeholder="Type a message...">
-      <button id="sendBtn">Send</button>
+    <!-- Collapsible: Quick Chat -->
+    <div class="collapsible-section" data-persist-key="proxy.quickChat">
+      <div class="collapsible-header">
+        <span>Quick Chat</span>
+        <span class="collapsible-caret">▾</span>
+      </div>
+      <div class="collapsible-body">
+        <div id="chatMessages"></div>
+        <div class="chat-input-area">
+          <input type="text" id="chatInput" placeholder="Type a message...">
+          <button id="sendBtn">Send</button>
+        </div>
+      </div>
     </div>
 
-    <h3 class="section-header">Developer Logs <button id="clearLogsBtn" class="section-toggle">Clear Logs</button></h3>
-    <div id="devLogs" class="dev-logs"></div>
-
-    <h3 class="section-header">Request / Response Logs</h3>
-    <div class="sub-tabs">
-      <button class="tab-btn sub-tab-btn active" data-subtab="request-logs">Request Logs</button>
-      <button class="tab-btn sub-tab-btn" data-subtab="response-logs">Response Logs</button>
-    </div>
-    <div class="log-controls">
-      <input type="text" id="reqResLogFilterInput" placeholder="Filter/search logs (provider, model, status...)" style="width: 260px;">
-      <button id="clearReqResLogsBtn">Clear</button>
-      <label><input type="checkbox" id="reqResLiveTailToggle" checked> Live tail</label>
-    </div>
-    <div id="request-logs-subtab" class="tab-content sub-tab-content active">
-      <div id="requestLogsList" class="dev-logs req-res-logs"></div>
-    </div>
-    <div id="response-logs-subtab" class="tab-content sub-tab-content">
-      <div id="responseLogsList" class="dev-logs req-res-logs"></div>
+    <!-- Collapsible: Developer Logs (absorbs the former Request/Response logs) -->
+    <div class="collapsible-section" data-persist-key="proxy.devLogs" data-collapsed="false">
+      <div class="collapsible-header">
+        <span>Developer Logs</span>
+        <button id="clearLogsBtn" class="section-toggle">Clear Logs</button>
+        <span class="collapsible-caret">▾</span>
+      </div>
+      <div class="collapsible-body">
+        <div id="devLogs" class="dev-logs"></div>
+      </div>
     </div>
   </div>
 
@@ -277,14 +240,75 @@
 
     <h3>Model Configuration</h3>
     <button id="saveConfigBtn" class="btn-primary" style="float: right;">Apply Configuration</button>
-    <button id="loadConfigFromCsvBtn">Load Config from CSV/Excel</button>
 
     <div class="sub-tabs">
-      <button class="tab-btn sub-tab-btn active" data-subtab="api-models">API Models</button>
+      <button class="tab-btn sub-tab-btn active" data-subtab="general-config">General Config</button>
+      <button class="tab-btn sub-tab-btn" data-subtab="api-models">API Models</button>
       <button class="tab-btn sub-tab-btn" data-subtab="cookie-models">Cookie Models</button>
     </div>
 
-    <div id="api-models-subtab" class="tab-content sub-tab-content active">
+    <div id="general-config-subtab" class="tab-content sub-tab-content active">
+      <p style="color:#555; margin-bottom:6px;">Settings persist to <code>data/assistant-config.json</code> and apply to new requests immediately after saving — no restart needed.</p>
+      <button id="saveAssistantConfigBtn" class="btn-primary" style="float: right; margin-left: 8px;">Save General Config</button>
+
+      <h4>System Prompt Override</h4>
+      <p style="color:#555; font-size:12px;">When non-empty, this is injected as a system message ahead of every request's own messages, before the tool-calling translator runs.</p>
+      <textarea id="systemPromptOverrideInput" style="width:100%; height:90px;" placeholder="Leave blank to disable."></textarea>
+
+      <h4>Tool Calling</h4>
+      <label><input type="checkbox" id="toolCallEmulationToggle" checked> Emulation enabled (forced system prompt + text&#8594;tool_calls translation)</label>
+      <div style="margin-top:8px;">
+        <button id="previewToolFormatBtn">Preview Output Format</button>
+        <pre id="toolFormatPreview" class="assistant-config-preview" style="display:none;"></pre>
+      </div>
+
+      <h4>Proxy Features</h4>
+      <table class="assistant-config-table">
+        <tr>
+          <td>Routing mode</td>
+          <td>
+            <select id="routingModeSelect">
+              <option value="auto">Fastest known-good (auto)</option>
+              <option value="configOrder">Config order</option>
+              <option value="rotate">Rotate (round-robin known-good)</option>
+            </select>
+          </td>
+        </tr>
+        <tr>
+          <td>Retry count</td>
+          <td><input type="number" id="retryCountInput" min="0" max="10" style="width:60px;"> extra attempt(s) per candidate</td>
+        </tr>
+        <tr>
+          <td>Timeout</td>
+          <td><input type="number" id="timeoutMsInput" min="1000" step="1000" style="width:90px;"> ms (direct API-key providers only)</td>
+        </tr>
+        <tr>
+          <td>Logging verbosity</td>
+          <td>
+            <select id="loggingVerbositySelect">
+              <option value="verbose">Verbose</option>
+              <option value="normal">Normal</option>
+              <option value="quiet">Quiet (reduce dev-log volume)</option>
+            </select>
+          </td>
+        </tr>
+        <tr>
+          <td>Large Context Dispatcher</td>
+          <td>
+            <label><input type="checkbox" id="largeContextModeToggle"> Enabled — auto-splits oversized prompts across known-OK models</label>
+            <div style="margin-top:6px; display:flex; gap:16px; flex-wrap:wrap; align-items:center;">
+              <span>Threshold: <input type="number" id="largeContextThresholdInput" min="1000" step="1000" style="width:90px;"> tokens</span>
+              <span>Chunk size: <input type="number" id="largeContextChunkTokensInput" min="1000" step="1000" style="width:90px;"> tokens</span>
+              <span>Lane concurrency — API key: <input type="number" id="largeContextConcurrencyDefaultInput" min="1" max="20" style="width:50px;"></span>
+              <span>Cookie/session: <input type="number" id="largeContextConcurrencyCookieInput" min="1" max="5" style="width:50px;"></span>
+            </div>
+            <p style="color:#555; font-size:12px; margin:6px 0 0;">When a request's estimated prompt tokens exceed the threshold, it's split into chunks (respecting file boundaries), summarized in parallel — one lane per known-OK model, Cookie/session providers capped at their concurrency since only one session exists — then assembled into a final answer by the best available model. No tool-calling in this path.</p>
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    <div id="api-models-subtab" class="tab-content sub-tab-content">
       <button id="addEntryBtn">Add Entry</button>
       <button id="loadDefaultsBtn">Load Defaults</button>
       <button id="fetchModelsBtn">Fetch All Models</button>
@@ -318,6 +342,7 @@
         <tbody></tbody>
       </table>
     </div>
+
   </div>
 
   <div id="health-tab" class="tab-content">
@@ -333,91 +358,18 @@
   <div id="usage-tab" class="tab-content">
     <h3>Token Usage</h3>
     <button id="refreshUsageBtn" class="btn-primary">Refresh</button>
+    <!-- NEW: Price Refresh — no pricing data source is shipped with the app, so
+         this just clears the (always-N/A) cost placeholder rather than
+         fabricating numbers. Wire this to a pricing endpoint when one exists. -->
+    <button id="priceRefreshBtn" class="btn-primary" style="float: right; margin-right: 8px;">Price Refresh</button>
     <div id="usageSummary" style="margin: 10px 0;"></div>
     <table id="usageTable">
       <thead>
         <tr>
-          <th>#</th><th>Provider</th><th>Model</th><th>Requests</th><th>Prompt Tokens</th><th>Completion Tokens</th><th>Total Tokens</th><th>Estimated</th><th>Est. Cost</th>
+          <th>#</th><th>Provider</th><th>Model</th><th>Requests</th><th>Auth</th><th>Prompt Tokens</th><th>Completion Tokens</th><th>Total Tokens</th><th>Estimated</th><th>Est. Cost</th>
         </tr>
       </thead>
       <tbody></tbody>
-    </table>
-  </div>
-
-  <div id="assistant-tab" class="tab-content">
-    <h3>Assistant Config</h3>
-    <button id="saveAssistantConfigBtn" class="btn-primary" style="float: right;">Save Assistant Config</button>
-    <p style="color:#555;">Settings here persist to <code>data/assistant-config.json</code> and apply to new requests immediately after saving — no restart needed.</p>
-
-    <h4>System Prompt Override</h4>
-    <p style="color:#555; font-size:12px;">When non-empty, this is injected as a system message ahead of every request's own messages, before the tool-calling translator runs.</p>
-    <textarea id="systemPromptOverrideInput" style="width:100%; height:90px;" placeholder="Leave blank to disable."></textarea>
-
-    <h4>Tool Calling</h4>
-    <label><input type="checkbox" id="toolCallEmulationToggle" checked> Emulation enabled (forced system prompt + text&#8594;tool_calls translation)</label>
-    <div style="margin-top:8px;">
-      <button id="previewToolFormatBtn">Preview Output Format</button>
-      <pre id="toolFormatPreview" class="assistant-config-preview" style="display:none;"></pre>
-    </div>
-
-    <h4>Proxy Features</h4>
-    <table class="assistant-config-table">
-      <tr>
-        <td>Routing mode</td>
-        <td>
-          <select id="routingModeSelect">
-            <option value="auto">Fastest known-good (auto)</option>
-            <option value="configOrder">Config order</option>
-            <option value="rotate">Rotate (round-robin known-good)</option>
-          </select>
-        </td>
-      </tr>
-      <tr>
-        <td>Retry count</td>
-        <td><input type="number" id="retryCountInput" min="0" max="10" style="width:60px;"> extra attempt(s) per candidate</td>
-      </tr>
-      <tr>
-        <td>Timeout</td>
-        <td><input type="number" id="timeoutMsInput" min="1000" step="1000" style="width:90px;"> ms (direct API-key providers only)</td>
-      </tr>
-      <tr>
-        <td>Logging verbosity</td>
-        <td>
-          <select id="loggingVerbositySelect">
-            <option value="verbose">Verbose</option>
-            <option value="normal">Normal</option>
-            <option value="quiet">Quiet (suppress Request/Response Logs)</option>
-          </select>
-        </td>
-      </tr>
-      <tr>
-        <td>Large Context Dispatcher</td>
-        <td>
-          <label><input type="checkbox" id="largeContextModeToggle"> Enabled — auto-splits oversized prompts for sequential processing</label>
-          <div style="margin-top:6px; display:flex; gap:16px; flex-wrap:wrap; align-items:center;">
-            <span>Threshold: <input type="number" id="largeContextThresholdInput" min="1000" step="1000" style="width:90px;"> tokens</span>
-            <span>Chunk size: <input type="number" id="largeContextChunkTokensInput" min="1000" step="1000" style="width:90px;"> tokens</span>
-            <span>Delay between chunks: <input type="number" id="largeContextInterChunkDelayInput" min="0" step="100" style="width:70px;"> ms</span>
-          </div>
-          <p style="color:#555; font-size:12px; margin:6px 0 0;">When a request's estimated prompt tokens exceed the threshold, it's split into chunks (respecting file boundaries) and summarized sequentially by a single known-OK model — one chunk at a time with a small delay so Cookie/session providers aren't hammered — then assembled into a final answer. Untrusted file content is fenced off from instructions to prevent prompt injection. No tool-calling in this path.</p>
-        </td>
-      </tr>
-      <tr>
-        <td>Fallback order</td>
-        <td><input type="text" disabled placeholder="Pending backend support" style="width:100%; background:#f5f5f5;"></td>
-      </tr>
-      <tr>
-        <td>Rate limits</td>
-        <td><input type="text" disabled placeholder="Pending backend support" style="width:100%; background:#f5f5f5;"></td>
-      </tr>
-      <tr>
-        <td>Request rewriting rules</td>
-        <td><textarea disabled placeholder="Pending backend support" style="width:100%; height:50px; background:#f5f5f5;"></textarea></td>
-      </tr>
-      <tr>
-        <td>Response rewriting rules</td>
-        <td><textarea disabled placeholder="Pending backend support" style="width:100%; height:50px; background:#f5f5f5;"></textarea></td>
-      </tr>
     </table>
   </div>
 

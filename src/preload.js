@@ -1,24 +1,12 @@
 // preload.js
 const { contextBridge, ipcRenderer } = require('electron');
-const {
-  IPC_CHANNELS,
-  LOG_MARKERS,
-  DEFAULT_COOKIE_USER_AGENT,
-  AUTH_TYPE_BEARER,
-  AUTH_TYPE_COOKIE,
-  DEFAULT_QWEN_NAME,
-  DEFAULT_QWEN_URL,
-  DEFAULT_KIMI_NAME,
-  DEFAULT_KIMI_URL,
-  FINISH_REASON_TOOL_CALLS,
-  FINISH_REASON_STOP,
-  TIMEOUTS
-} = require('./shared-constants');
+const { IPC_CHANNELS, LOG_MARKERS } = require('./shared-constants');
 
 contextBridge.exposeInMainWorld('api', {
   startProxy: (port, entries) => ipcRenderer.invoke(IPC_CHANNELS.START_PROXY, port, entries),
   stopProxy: () => ipcRenderer.invoke(IPC_CHANNELS.STOP_PROXY),
   isProxyRunning: () => ipcRenderer.invoke(IPC_CHANNELS.IS_PROXY_RUNNING),
+  ensureProxyRunning: () => ipcRenderer.invoke(IPC_CHANNELS.ENSURE_PROXY_RUNNING),
   healthCheck: (entries) => ipcRenderer.invoke(IPC_CHANNELS.HEALTH_CHECK, entries),
   getDefaultConfig: () => ipcRenderer.invoke(IPC_CHANNELS.GET_DEFAULT_CONFIG),
   getDefaultFileNames: () => ipcRenderer.invoke(IPC_CHANNELS.GET_DEFAULT_FILE_NAMES),
@@ -27,9 +15,8 @@ contextBridge.exposeInMainWorld('api', {
   getConnectedConfig: () => ipcRenderer.invoke(IPC_CHANNELS.GET_CONNECTED_CONFIG),
   getProviderConfig: () => ipcRenderer.invoke(IPC_CHANNELS.GET_PROVIDER_CONFIG),
   saveConfig: (entries) => ipcRenderer.invoke(IPC_CHANNELS.SAVE_CONFIG, entries),
-  openConfigFileDialog: () => ipcRenderer.invoke(IPC_CHANNELS.OPEN_CONFIG_FILE_DIALOG),
-  parseConfigCsvFile: (filePath) => ipcRenderer.invoke(IPC_CHANNELS.PARSE_CONFIG_CSV_FILE, filePath),
-  parseConfigExcelFile: (filePath) => ipcRenderer.invoke(IPC_CHANNELS.PARSE_CONFIG_EXCEL_FILE, filePath),
+   openConfigFileDialog: () => ipcRenderer.invoke(IPC_CHANNELS.OPEN_CONFIG_FILE_DIALOG),
+   parseConfigCsvFile: (filePath) => ipcRenderer.invoke(IPC_CHANNELS.PARSE_CONFIG_CSV_FILE, filePath),
   getTokenUsage: () => ipcRenderer.invoke(IPC_CHANNELS.GET_TOKEN_USAGE),
   getProxyStats: () => ipcRenderer.invoke(IPC_CHANNELS.GET_PROXY_STATS),
   runFetchModels: () => ipcRenderer.invoke(IPC_CHANNELS.RUN_FETCH_MODELS),
@@ -66,9 +53,10 @@ contextBridge.exposeInMainWorld('api', {
   agentApprovalResponse: (id, approved) => ipcRenderer.invoke(IPC_CHANNELS.AGENT_APPROVAL_RESPONSE, { id, approved }),
   getAgentConfig: () => ipcRenderer.invoke(IPC_CHANNELS.GET_AGENT_CONFIG),
   saveAgentConfig: (config) => ipcRenderer.invoke(IPC_CHANNELS.SAVE_AGENT_CONFIG, config),
-  getSkills: () => ipcRenderer.invoke(IPC_CHANNELS.GET_SKILLS),
-  saveSkills: (skills) => ipcRenderer.invoke(IPC_CHANNELS.SAVE_SKILLS, skills),
-  getMcpStatus: () => ipcRenderer.invoke(IPC_CHANNELS.GET_MCP_STATUS),
+  // --- NEW: per-project cached chat sessions ---
+  agentGetChatSessions: () => ipcRenderer.invoke(IPC_CHANNELS.AGENT_GET_CHAT_SESSIONS),
+  agentSwitchChat: (key) => ipcRenderer.invoke(IPC_CHANNELS.AGENT_SWITCH_CHAT, key),
+
   onAgentStreamChunk: (callback) => {
     const handler = (_event, data) => callback(data);
     ipcRenderer.on(IPC_CHANNELS.AGENT_STREAM_CHUNK, handler);
@@ -99,6 +87,17 @@ contextBridge.exposeInMainWorld('api', {
     const handler = (_event, data) => callback(data);
     ipcRenderer.on(IPC_CHANNELS.AGENT_TOOL_RESULT, handler);
     return () => ipcRenderer.removeListener(IPC_CHANNELS.AGENT_TOOL_RESULT, handler);
+  },
+  // --- NEW: task-progress panel ---
+  onAgentToolList: (callback) => {
+    const handler = (_event, data) => callback(data);
+    ipcRenderer.on(IPC_CHANNELS.AGENT_TOOL_LIST, handler);
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.AGENT_TOOL_LIST, handler);
+  },
+  onAgentTokenUsage: (callback) => {
+    const handler = (_event, data) => callback(data);
+    ipcRenderer.on(IPC_CHANNELS.AGENT_TOKEN_USAGE, handler);
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.AGENT_TOKEN_USAGE, handler);
   },
   onAgentApprovalRequest: (callback) => {
     const handler = (_event, data) => callback(data);
@@ -136,22 +135,6 @@ contextBridge.exposeInMainWorld('api', {
   },
 
   logSuccessMarker: LOG_MARKERS.SUCCESS,
-  logRequestMarker: LOG_MARKERS.REQUEST,
-  logResponseMarker: LOG_MARKERS.RESPONSE,
-  // Renderer-facing shared constants (timeouts / provider URLs / finish reasons)
-  // so browser scripts don't need to duplicate literal numbers or strings.
-  constants: {
-    DEFAULT_COOKIE_USER_AGENT,
-    AUTH_TYPE_BEARER,
-    AUTH_TYPE_COOKIE,
-    DEFAULT_QWEN_NAME,
-    DEFAULT_QWEN_URL,
-    DEFAULT_KIMI_NAME,
-    DEFAULT_KIMI_URL,
-    FINISH_REASON_TOOL_CALLS,
-    FINISH_REASON_STOP,
-    TIMEOUTS
-  },
   onDevLog: (callback) => {
     const handler = (_event, data) => callback(data);
     ipcRenderer.on(IPC_CHANNELS.DEV_LOG, handler);

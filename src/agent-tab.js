@@ -10,8 +10,6 @@
   let mode = 'global';
   let projectRoot = null;
   let uploadedFiles = [];   // [{ filename, path, content, binary }]
-  let globalSkills = [];
-  let projectSkills = [];
   let sending = false;
   let currentAssistantBubble = null; // element being appended to for the in-flight turn
   let pendingApprovalId = null;
@@ -35,10 +33,7 @@
   const fileTreeEl = el('agentFileTree');
   const uploadFileBtn = el('agentUploadFileBtn');
   const uploadChipsEl = el('agentUploadChips');
-  const addSkillBtn = el('agentAddSkillBtn');
-  const skillsListEl = el('agentSkillsList');
-  const addMcpBtn = el('agentAddMcpBtn');
-  const mcpListEl = el('agentMcpList');
+
   const messagesEl = el('agentMessages');
   const inputEl = el('agentInput');
   const sendBtn = el('agentSendBtn');
@@ -74,23 +69,9 @@
   const undoBtn = el('agentUndoBtn');
   const fileSearchInput = el('agentFileSearchInput');
 
-  const skillModal = el('agentSkillModal');
-  const skillModalTitle = el('agentSkillModalTitle');
-  const skillNameInput = el('agentSkillName');
-  const skillDescInput = el('agentSkillDescription');
-  const skillPromptInput = el('agentSkillPrompt');
-  const skillSaveBtn = el('agentSkillSaveBtn');
-  const skillCancelBtn = el('agentSkillCancelBtn');
-
-  const mcpModal = el('agentMcpModal');
-  const mcpNameInput = el('agentMcpName');
-  const mcpTransportSelect = el('agentMcpTransport');
-  const mcpCommandRow = el('agentMcpCommandRow');
-  const mcpCommandInput = el('agentMcpCommand');
-  const mcpUrlRow = el('agentMcpUrlRow');
-  const mcpUrlInput = el('agentMcpUrl');
-  const mcpSaveBtn = el('agentMcpSaveBtn');
-  const mcpCancelBtn = el('agentMcpCancelBtn');
+  // --- NEW: task-progress panel ---
+  const taskProgressEl = el('agentTaskProgress');
+  const chatTabsEl = el('agentChatTabs');
 
   // --- Rendering helpers -------------------------------------------------------
   function scrollMessagesToBottom() {
@@ -157,51 +138,18 @@
     }
   }
 
-  // Short, human-readable label for a tool call card / task tracker row
-  // (e.g. "📄 readme.md" instead of the full JSON args blob).
-  function getToolSummary(name, args) {
-    const a = args || {};
-    const base = String(name || 'tool');
-    switch (base) {
-      case 'read_file': {
-        const f = String(a.path || '').split(/[\/\\]/).pop();
-        return '📄 ' + (f || base);
-      }
-      case 'write_file':
-      case 'edit_file': {
-        const f = String(a.path || '').split(/[\/\\]/).pop();
-        return '✏️ ' + (f || base);
-      }
-      case 'run_command':
-        return '💻 ' + String(a.command || '').slice(0, 60);
-      case 'search_in_project':
-        return '🔍 ' + String(a.query || a.pattern || '').slice(0, 60);
-      case 'list_files':
-      case 'get_project_files':
-        return '📁 ' + (a.path || '/');
-      default:
-        return '🔧 ' + base;
-    }
-  }
-
   function addToolCard(id, name, args) {
     const card = document.createElement('div');
     card.className = 'agent-tool-card';
     card.dataset.toolId = id;
 
-    const argsStr = JSON.stringify(args || {}, null, 2);
-    // Very large arg payloads (read_file of a big source file, search results,
-    // etc.) clutter the thread — start those collapsed so the header summary
-    // is what shows until the user expands them.
-    if (argsStr.length > 300) card.classList.add('agent-tool-collapsed');
-
     card.innerHTML =
       '<div class="agent-tool-card-header">' +
-        '<span class="agent-tool-card-title"><span class="agent-tool-caret">▾</span> ' + escapeHtml(getToolSummary(name, args)) + '</span>' +
+        '<span class="agent-tool-card-title"><span class="agent-tool-caret">▾</span>🔧 ' + escapeHtml(name || 'tool') + '</span>' +
         '<span class="agent-tool-status">running…</span>' +
       '</div>' +
       '<div class="agent-tool-body">' +
-        '<pre class="agent-tool-args">' + escapeHtml(argsStr) + '</pre>' +
+        '<pre class="agent-tool-args">' + escapeHtml(JSON.stringify(args || {}, null, 2)) + '</pre>' +
         '<pre class="agent-tool-result" style="display:none;"></pre>' +
       '</div>';
 
@@ -210,58 +158,11 @@
     });
 
     messagesEl.appendChild(card);
-    addTaskTrackerItem(id, getToolSummary(name, args));
 
     // A tool result following this closes the current assistant bubble (a
     // new one starts if the model replies again after the tool result).
     currentAssistantBubble = null;
     scrollMessagesToBottom();
-  }
-
-  // --- Task tracker (floating bottom-left overlay) --------------------------
-  // Mirrors active tool calls while the agent is working; rows get a spinner
-  // while running and are removed once the tool result arrives.
-  let taskTrackerEl = null;
-  const taskTrackerRows = new Map(); // toolId -> { row, labelEl }
-
-  function ensureTaskTracker() {
-    if (taskTrackerEl && document.body.contains(taskTrackerEl)) return taskTrackerEl;
-    taskTrackerEl = document.createElement('div');
-    taskTrackerEl.className = 'agent-task-tracker';
-    taskTrackerEl.setAttribute('aria-label', 'Agent tasks');
-    document.body.appendChild(taskTrackerEl);
-    return taskTrackerEl;
-  }
-
-  function addTaskTrackerItem(id, label) {
-    const tracker = ensureTaskTracker();
-    if (!id || taskTrackerRows.has(id)) return;
-    const row = document.createElement('div');
-    row.className = 'agent-task-tracker-row';
-    row.innerHTML =
-      '<span class="task-spinner"></span>' +
-      '<span class="agent-task-tracker-label"></span>';
-    row.querySelector('.agent-task-tracker-label').textContent = label || '…';
-    tracker.appendChild(row);
-    taskTrackerRows.set(id, { row, labelEl: row.querySelector('.agent-task-tracker-label') });
-    tracker.classList.add('has-tasks');
-  }
-
-  function updateTaskTrackerItem(id, done, label) {
-    const entry = taskTrackerRows.get(id);
-    if (!entry) return;
-    if (typeof label === 'string') entry.labelEl.textContent = label;
-    if (done) {
-      entry.row.classList.add('done');
-      entry.row.querySelector('.task-spinner').remove();
-      // Briefly keep the finished row visible, then remove it entirely.
-      setTimeout(() => {
-        entry.row.remove();
-        taskTrackerRows.delete(id);
-        const tracker = taskTrackerEl;
-        if (tracker && tracker.children.length === 0) tracker.classList.remove('has-tasks');
-      }, 1200);
-    }
   }
 
   function updateToolCard(id, result) {
@@ -277,7 +178,6 @@
 
     resultEl.style.display = 'block';
     resultEl.textContent = typeof result === 'string' ? result : (result.message || JSON.stringify(result));
-    updateTaskTrackerItem(id, true);
     scrollMessagesToBottom();
   }
 
@@ -299,9 +199,82 @@
       .replace(/'/g, '&#39;');
   }
 
-  function parseCommandString(command) {
-    const parts = String(command || '').trim().match(/(?:[^\s"]+|"[^"]*")/g) || [];
-    return parts.map(p => p.replace(/^"|"$/g, ''));
+  // --- NEW: per-project cached chat sessions ---------------------------------
+  // Replays a session's cached OpenAI-format message history into the chat
+  // pane: user messages -> user bubbles, assistant text -> assistant bubbles,
+  // tool results -> compact system notes (tool_name: ok/failed). Assistant
+  // messages that only carry tool_calls (no content) render nothing of their
+  // own — the following tool-result note stands in for them, matching how a
+  // live turn looks today.
+  function renderMessagesFromHistory(messages) {
+    messagesEl.innerHTML = '';
+    currentAssistantBubble = null;
+
+    const byId = {}; // tool_call_id -> { name }
+    (messages || []).forEach((m) => {
+      if (Array.isArray(m.tool_calls)) {
+        m.tool_calls.forEach((tc) => {
+          byId[tc.id] = { name: (tc.function && tc.function.name) || 'tool' };
+        });
+      }
+    });
+
+    (messages || []).forEach((m) => {
+      if (m.role === 'user') {
+        addUserMessage(typeof m.content === 'string' ? m.content : JSON.stringify(m.content));
+      } else if (m.role === 'assistant') {
+        if (m.content) {
+          startAssistantBubble();
+          appendAssistantText(m.content);
+        }
+        currentAssistantBubble = null;
+      } else if (m.role === 'tool') {
+        const info = byId[m.tool_call_id] || {};
+        let ok = true;
+        try {
+          const parsed = JSON.parse(m.content);
+          if (parsed && typeof parsed === 'object' && 'ok' in parsed) ok = !!parsed.ok;
+        } catch (_) { /* plain string result — assume ok */ }
+        addSystemNote(`${info.name || 'tool'}: ${ok ? 'ok' : 'failed'}`);
+      }
+    });
+
+    if (!messages || messages.length === 0) {
+      addSystemNote('(no messages yet in this chat)');
+    }
+    scrollMessagesToBottom();
+  }
+
+  // Renders the tab strip above the message list: "Global" always present,
+  // plus one tab per project the agent has ever switched into (cached on the
+  // main-process side — nothing is persisted here in the renderer).
+  async function refreshChatTabs() {
+    if (!chatTabsEl || !api.agentGetChatSessions) return;
+    let sessions = [];
+    try { sessions = await api.agentGetChatSessions(); } catch (_) { sessions = []; }
+
+    chatTabsEl.innerHTML = '';
+    const activeKey = mode === 'project' && projectRoot ? projectRoot : 'global';
+
+    sessions.forEach((s) => {
+      const tab = document.createElement('button');
+      tab.type = 'button';
+      tab.className = 'agent-chat-tab' + (s.key === activeKey ? ' active' : '');
+      tab.textContent = s.label + (s.messageCount ? ` (${s.messageCount})` : '');
+      tab.title = s.key === 'global' ? 'Global' : s.key;
+      tab.addEventListener('click', async () => {
+        if (s.key === activeKey) return;
+        try {
+          const result = await api.agentSwitchChat(s.key);
+          applyMode(result.mode, result.projectRoot);
+          renderMessagesFromHistory(result.messages);
+          setUndoEnabled(false);
+        } catch (err) {
+          addSystemNote('Could not switch chat: ' + err.message, true);
+        }
+      });
+      chatTabsEl.appendChild(tab);
+    });
   }
 
   // --- Mode / top bar ----------------------------------------------------------
@@ -325,7 +298,7 @@
       fileTreeEl.innerHTML = '<div class="agent-empty-hint">No project selected — using Global mode. Select a folder to give the agent file/shell access.</div>';
     }
 
-    renderSkills();
+    refreshChatTabs();
   }
 
   // Extensions shown with a slightly different icon; everything else falls
@@ -459,12 +432,14 @@
 
   selectFolderBtn.addEventListener('click', async () => {
     try {
-      const chosen = await api.selectProjectFolder();
-      if (!chosen) return; // user cancelled
+      const result = await api.selectProjectFolder();
+      if (!result || !result.projectRoot) return; // user cancelled
 
       // agent:mode-changed event (below) also fires and will call applyMode;
       // this covers the case where events aren't wired yet at click-time.
-      applyMode('project', chosen);
+      applyMode('project', result.projectRoot);
+      renderMessagesFromHistory(result.messages);
+      setUndoEnabled(false);
     } catch (err) {
       addSystemNote('Could not select folder: ' + err.message, true);
     }
@@ -472,8 +447,10 @@
 
   clearFolderBtn.addEventListener('click', async () => {
     try {
-      await api.clearProjectFolder();
+      const result = await api.clearProjectFolder();
       applyMode('global', null);
+      renderMessagesFromHistory(result && result.messages);
+      setUndoEnabled(false);
     } catch (err) {
       addSystemNote('Could not clear folder: ' + err.message, true);
     }
@@ -610,241 +587,6 @@
       renderUploadChips();
     } catch (err) {
       addSystemNote('Upload failed: ' + err.message, true);
-    }
-  });
-
-  // --- Skills --------------------------------------------------------------------
-  // Global skills are stored in agent-config.json and are fully editable here.
-  // Project skills load read-only from the project's own .agent/skills.json
-  // (see agent-controller.js's SAVE_SKILLS handler) — there's no IPC path to
-  // write them from the UI, so they're shown but not editable, with a tooltip
-  // explaining why rather than offering buttons that would silently no-op.
-  let editingSkillId = null; // null => "add" mode; otherwise the global skill being edited
-
-  function renderSkillRow(s, isProject) {
-    const row = document.createElement('div');
-    row.className = 'agent-list-row';
-
-    const label = document.createElement('span');
-    label.textContent = s.name;
-    label.title = s.description || '';
-    row.appendChild(label);
-
-    const actions = document.createElement('span');
-    actions.className = 'agent-skill-row-actions';
-
-    if (isProject) {
-      const lock = document.createElement('span');
-      lock.textContent = '🔒';
-      lock.title = 'Project skills are read-only here — edit .agent/skills.json in the project folder.';
-      actions.appendChild(lock);
-    } else {
-      const toggle = document.createElement('input');
-      toggle.type = 'checkbox';
-      toggle.checked = s.enabled !== false;
-      toggle.title = 'Enabled';
-
-      toggle.addEventListener('change', async () => {
-        const updated = globalSkills.map((g) => g.id === s.id ? { ...g, enabled: toggle.checked } : g);
-        globalSkills = updated;
-        try { await api.saveSkills(globalSkills); } catch (err) { addSystemNote('Could not save skills: ' + err.message, true); }
-      });
-
-      actions.appendChild(toggle);
-
-      const editBtn = document.createElement('button');
-      editBtn.className = 'agent-skill-icon-btn';
-      editBtn.textContent = '✎';
-      editBtn.title = 'Edit skill';
-      editBtn.addEventListener('click', () => openSkillModal(s));
-      actions.appendChild(editBtn);
-
-      const deleteBtn = document.createElement('button');
-      deleteBtn.className = 'agent-skill-icon-btn';
-      deleteBtn.textContent = '🗑';
-      deleteBtn.title = 'Delete skill';
-
-      deleteBtn.addEventListener('click', async () => {
-        globalSkills = globalSkills.filter((g) => g.id !== s.id);
-        try { await api.saveSkills(globalSkills); renderSkills(); } catch (err) { addSystemNote('Could not delete skill: ' + err.message, true); }
-      });
-
-      actions.appendChild(deleteBtn);
-    }
-
-    row.appendChild(actions);
-    return row;
-  }
-
-  function renderSkills() {
-    skillsListEl.innerHTML = '';
-
-    if (!globalSkills.length && !(mode === 'project' && projectSkills.length)) {
-      skillsListEl.innerHTML = '<div class="agent-empty-hint">No skills yet.</div>';
-      return;
-    }
-
-    const globalHeader = document.createElement('div');
-    globalHeader.className = 'agent-sub-list-header';
-    globalHeader.textContent = 'Global';
-    skillsListEl.appendChild(globalHeader);
-
-    if (!globalSkills.length) {
-      skillsListEl.insertAdjacentHTML('beforeend', '<div class="agent-empty-hint">No global skills yet.</div>');
-    } else {
-      globalSkills.forEach((s) => skillsListEl.appendChild(renderSkillRow(s, false)));
-    }
-
-    if (mode === 'project') {
-      const projectHeader = document.createElement('div');
-      projectHeader.className = 'agent-sub-list-header';
-      projectHeader.textContent = 'Project (' + (projectSkills.length ? projectSkills.length : 'none') + ')';
-      skillsListEl.appendChild(projectHeader);
-
-      if (projectSkills.length) {
-        projectSkills.forEach((s) => skillsListEl.appendChild(renderSkillRow(s, true)));
-      }
-    }
-  }
-
-  async function loadSkills() {
-    try {
-      const res = await api.getSkills();
-      globalSkills = res.global || [];
-      projectSkills = res.project || [];
-    } catch (_) { globalSkills = []; projectSkills = []; }
-
-    renderSkills();
-  }
-
-  function openSkillModal(existing) {
-    editingSkillId = existing ? existing.id : null;
-    skillModalTitle.textContent = existing ? 'Edit Skill' : 'Add Skill';
-    skillNameInput.value = existing ? existing.name : '';
-    skillDescInput.value = existing ? (existing.description || '') : '';
-    skillPromptInput.value = existing ? (existing.prompt || '') : '';
-    skillModal.style.display = 'flex';
-  }
-
-  addSkillBtn.addEventListener('click', () => openSkillModal(null));
-  skillCancelBtn.addEventListener('click', () => { skillModal.style.display = 'none'; editingSkillId = null; });
-
-  skillSaveBtn.addEventListener('click', async () => {
-    const name = skillNameInput.value.trim();
-    if (!name) return;
-
-    const fields = {
-      name,
-      description: skillDescInput.value.trim(),
-      prompt: skillPromptInput.value.trim()
-    };
-
-    if (editingSkillId) {
-      globalSkills = globalSkills.map((g) => g.id === editingSkillId ? { ...g, ...fields } : g);
-    } else {
-      globalSkills = [...globalSkills, { id: 'skill-' + Date.now(), ...fields, enabled: true }];
-    }
-
-    try {
-      await api.saveSkills(globalSkills);
-      renderSkills();
-      skillModal.style.display = 'none';
-      editingSkillId = null;
-    } catch (err) {
-      addSystemNote('Could not save skill: ' + err.message, true);
-    }
-  });
-
-  // --- MCP servers -----------------------------------------------------------------
-  async function renderMcp() {
-    let servers = [];
-    try { servers = await api.getMcpStatus(); } catch (_) { servers = []; }
-
-    mcpListEl.innerHTML = '';
-
-    if (!servers.length) {
-      mcpListEl.innerHTML = '<div class="agent-empty-hint">No MCP servers connected.</div>';
-      return;
-    }
-
-    servers.forEach((s) => {
-      const row = document.createElement('div');
-      row.className = 'agent-list-row agent-mcp-row';
-
-      const label = document.createElement('span');
-      label.className = 'agent-mcp-row-label';
-
-      const status = s.status || 'connected';
-
-      const dot = document.createElement('span');
-      dot.className = 'agent-mcp-status-dot ' + (status === 'connected' ? 'connected' : status === 'connecting' ? 'connecting' : 'error');
-      dot.title = status === 'connected' ? 'Connected' : status === 'connecting' ? 'Connecting…' : ('Connection failed' + (s.statusMessage ? ': ' + s.statusMessage : ''));
-
-      label.appendChild(dot);
-
-      const text = document.createElement('span');
-      text.textContent = (s.scope === 'project' ? '📁 ' : '') + s.name + ' (' + s.transport + ')';
-      text.title = status === 'error' && s.statusMessage ? s.statusMessage : ((s.tools || []).join(', ') || 'no tools listed');
-
-      label.appendChild(text);
-      row.appendChild(label);
-      mcpListEl.appendChild(row);
-    });
-  }
-
-  addMcpBtn.addEventListener('click', () => {
-    mcpNameInput.value = '';
-    mcpCommandInput.value = '';
-    mcpUrlInput.value = '';
-    mcpTransportSelect.value = 'stdio';
-    mcpCommandRow.style.display = 'block';
-    mcpUrlRow.style.display = 'none';
-    mcpModal.style.display = 'flex';
-  });
-
-  mcpTransportSelect.addEventListener('change', () => {
-    const isHttp = mcpTransportSelect.value === 'http';
-    mcpCommandRow.style.display = isHttp ? 'none' : 'block';
-    mcpUrlRow.style.display = isHttp ? 'block' : 'none';
-  });
-
-  mcpCancelBtn.addEventListener('click', () => { mcpModal.style.display = 'none'; });
-
-  mcpSaveBtn.addEventListener('click', async () => {
-    const name = mcpNameInput.value.trim();
-    if (!name) return;
-
-    const transport = mcpTransportSelect.value;
-    const commandParts = parseCommandString(mcpCommandInput.value.trim());
-
-    const cfg = transport === 'http'
-      ? { name, transport: 'http', url: mcpUrlInput.value.trim() }
-      : { name, transport: 'stdio', command: commandParts[0] || '', args: commandParts.slice(1) };
-
-    try {
-      const current = await api.getAgentConfig();
-      const globalMcpServers = [...(current.globalMcpServers || []), cfg];
-
-      // Close the modal before awaiting the save: saveAgentConfig reconnects
-      // every global MCP server, and any unresponsive one adds up to ~15-30s
-      // of timeout. Awaiting it first kept the full-viewport modal overlay up
-      // the whole time, blocking clicks to everything behind it. Fire the
-      // save, close immediately, and poll renderMcp to reflect status as it
-      // resolves.
-      mcpModal.style.display = 'none';
-
-      api.saveAgentConfig({ globalMcpServers }).catch(err => {
-        addSystemNote('Could not add MCP server: ' + err.message, true);
-      });
-
-      let polls = 0;
-      const pollInterval = setInterval(async () => {
-        polls += 1;
-        await renderMcp();
-        if (polls >= 8) clearInterval(pollInterval);
-      }, 1000);
-    } catch (err) {
-      addSystemNote('Could not add MCP server: ' + err.message, true);
     }
   });
 
@@ -1004,19 +746,109 @@
     api.onAgentStreamEnd((data) => { endStreamingBubble(data && data.fullText); });
   }
 
-  if (api.onAgentToolStart) {
-    api.onAgentToolStart((data) => addToolCard(data.id, data.name, data.args));
+  // --- NEW: task-progress panel ----------------------------------------------------------
+  // Mirrors the agent's activity in the sidebar Task Progress list, distinct
+  // from the chat tool cards above. Shows active tools (spinner), per-request
+  // token usage, and an end-of-turn summary line.
+  function resetTaskProgress() {
+    if (!taskProgressEl) return;
+    taskProgressEl.innerHTML = '<div class="agent-task-progress-empty">Idle</div>';
   }
 
+  function addTaskProgressEntry(id, label) {
+    if (!taskProgressEl) return;
+    const empty = taskProgressEl.querySelector('.agent-task-progress-empty');
+    if (empty) empty.remove();
+    const row = document.createElement('div');
+    row.className = 'agent-progress-item';
+    row.dataset.taskId = id;
+    row.innerHTML =
+      '<span class="agent-progress-label">' + escapeHtml(label) + '</span>' +
+      '<span class="agent-progress-spinner">⏳</span>' +
+      '<span class="agent-progress-result" style="display:none;"></span>';
+    taskProgressEl.appendChild(row);
+  }
+
+  function completeTaskProgressEntry(id, resultText) {
+    if (!taskProgressEl) return;
+    const row = taskProgressEl.querySelector('.agent-progress-item[data-task-id="' + id + '"]');
+    if (!row) return;
+    row.querySelector('.agent-progress-spinner').style.display = 'none';
+    const resultEl = row.querySelector('.agent-progress-result');
+    resultEl.style.display = 'inline';
+    resultEl.textContent = resultText === undefined ? '✓' : ('✓ ' + (resultText.ok ? 'ok' : 'failed'));
+  }
+
+  function addTokenUsageEntry(usage) {
+    if (!taskProgressEl) return;
+    const { prompt, completion, total, estimated } = usage || {};
+    if (prompt == null && completion == null) return;
+    const empty = taskProgressEl.querySelector('.agent-task-progress-empty');
+    if (empty) empty.remove();
+    const row = document.createElement('div');
+    row.className = 'agent-progress-item agent-progress-usage';
+    row.textContent = 'tokens: ' + [
+      prompt != null ? 'in ' + prompt : '',
+      completion != null ? 'out ' + completion : '',
+      total != null ? 'total ' + total : ''
+    ].filter(Boolean).join(' · ') + (estimated ? ' (estimated)' : '');
+    taskProgressEl.appendChild(row);
+  }
+
+  function addTurnSummary(text) {
+    if (!taskProgressEl) return;
+    const empty = taskProgressEl.querySelector('.agent-task-progress-empty');
+    if (empty) empty.remove();
+    const row = document.createElement('div');
+    row.className = 'agent-progress-item agent-progress-summary';
+    row.textContent = '✓ ' + (text || 'turn complete');
+    taskProgressEl.appendChild(row);
+  }
+
+  if (api.onAgentToolList) {
+    // Available tool set for the turn (header context) — but the live entries
+    // below are driven by AGENT_TOOL_START / AGENT_TOOL_RESULT so the list
+    // tracks exactly which tool ran and its outcome, not just what was offered.
+    api.onAgentToolList((data) => {
+      resetTaskProgress();
+      const tools = (data && data.tools) || [];
+      if (tools.length) {
+        const avail = document.createElement('div');
+        avail.className = 'agent-progress-available';
+        avail.textContent = tools.length + ' tool(s) available';
+        taskProgressEl && taskProgressEl.appendChild(avail);
+      }
+    });
+  }
+
+  if (api.onAgentTokenUsage) {
+    api.onAgentTokenUsage((data) => addTokenUsageEntry(data.usage));
+  }
+
+  // Live task tracking: each tool call gets a row that flips from "running"
+  // to its result as the agent works. (Also drives the chat-side tool cards.)
+  if (api.onAgentToolStart) {
+    api.onAgentToolStart((data) => {
+      addToolCard(data.id, data.name, data.args);
+      addTaskProgressEntry(data.id, data.name || 'tool');
+    });
+  }
   if (api.onAgentToolResult) {
-    api.onAgentToolResult((data) => updateToolCard(data.id, data.result));
+    api.onAgentToolResult((data) => {
+      updateToolCard(data.id, data.result);
+      completeTaskProgressEntry(data.id, data.result);
+    });
   }
 
   if (api.onAgentDone) {
     api.onAgentDone((data) => {
       setSending(false);
+      addTurnSummary(data && data.stoppedReason === 'step-limit-reached'
+        ? 'agent hit tool-call limit — send a follow-up to continue'
+        : 'turn complete');
       if (data && data.aborted) addSystemNote('(stopped by user)');
       if (data && data.stoppedReason === 'step-limit-reached') addSystemNote('(agent hit its per-turn tool-call limit — send a follow-up to continue)');
+      refreshChatTabs();
     });
   }
 
@@ -1247,12 +1079,15 @@
       setUndoEnabled(!!modeInfo.canUndo); // --- NEW: undo ---
     } catch (_) { applyMode('global', null); }
 
-    await loadSkills();
-    await renderMcp();
     await populateModelDropdown();
     await loadSettingsToggles();
 
-    try { await api.startAgentSession(); } catch (_) { /* best-effort */ }
+    try {
+      const session = await api.startAgentSession();
+      renderMessagesFromHistory(session && session.messages);
+    } catch (_) { /* best-effort */ }
+
+    refreshChatTabs();
   }
 
   init();

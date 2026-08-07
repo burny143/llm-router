@@ -1,6 +1,18 @@
 /**
  * Default model configuration for LLM Proxy Router
  * Each provider group contains: provider name, baseURL, apiKeyEnv, and list of models
+ *
+ * NOTE (audit 2026-08-07): this module is a SEED/FALLBACK catalog only — it is
+ * still required by main.js in exactly two places:
+ *   1. GET_DEFAULT_CONFIG -> renderer's "Load Defaults" button.
+ *   2. buildModelListsForProviders -> model-name fallback when generating the
+ *      initial UltimateConfig.csv for a provider that has no models in
+ *      LatestModels.csv/models.csv yet.
+ * The authoritative source of truth for provider/model data is the CSV pipeline
+ * (ProviderConfig.csv -> fetch-models.js -> LatestModels.csv/models.csv). Keep
+ * the model lists here roughly in sync with the CSVs, but never treat this
+ * module as the single source of truth — it only fills gaps until a real fetch
+ * runs.
  */
 module.exports = [
   {

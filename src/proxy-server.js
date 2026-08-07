@@ -7,7 +7,7 @@ const { getFilePath, envPrefixFor } = require('./state-store');
 require('dotenv').config({ path: getFilePath('env') });
 const { saveResults, loadUsage, saveUsage, loadAssistantConfig } = require('./state-store');
 const { translateRequest, translateResponse, parseToolCallsFromText } = require('./tool-calling-translator');
-const { LOG_MARKERS, DEFAULT_COOKIE_USER_AGENT, FINISH_REASON_TOOL_CALLS, FINISH_REASON_STOP, TIMEOUTS } = require('./shared-constants');
+const { LOG_MARKERS, DEFAULT_COOKIE_USER_AGENT } = require('./shared-constants');
 const largeContextDispatcher = require('./large-context-dispatcher');
 
 // --- WEB PROVIDER RULES (for Cookie auth & payload translation) ---
@@ -117,7 +117,7 @@ function isCancelledError(err) {
 // protocol, so this is the best identity signal an OpenAI-compatible client
 // gives us for free. Purely in-memory; resets when the proxy restarts.
 const connectedClients = new Map();
-const CLIENT_IDLE_MS = TIMEOUTS.CLIENT_IDLE_MS; // no activity for this long (and no in-flight request) => "disconnected"
+const CLIENT_IDLE_MS = 90000; // no activity for this long (and no in-flight request) => "disconnected"
 
 function clientKeyFromHeaders(headers) {
   const appName = headers['x-app-name'];
@@ -224,10 +224,10 @@ function estimateMessagesTokens(messages) {
   return estimateTokensFromText(joined);
 }
 
-// --- REQUEST/RESPONSE LOGS (Task 4) ---
-// Emitted as tagged console lines so they ride the existing forwardLogsToRenderer
-// pipeline in main.js; renderer.js splits them into the Request/Response Logs
-// sub-tabs by matching the LOG_MARKERS.REQUEST / LOG_MARKERS.RESPONSE prefix.
+// --- REQUEST/RESPONSE LOGS (merged into Developer Logs) ---
+// Logs a single human-readable line per request/response that rides the
+// existing forwardLogsToRenderer pipeline straight into the Developer Logs
+// panel — no [REQ]/[RESPONSE] sub-tabs, no JSON parsing on the renderer.
 function safeHeaderList(headers) {
   const SENSITIVE = new Set(['authorization', 'cookie', 'x-traffic-id']);
   return Object.keys(headers || {}).filter(h => !SENSITIVE.has(h.toLowerCase()));
@@ -235,34 +235,20 @@ function safeHeaderList(headers) {
 
 function logRequestLine(entry, payload, headers, messages) {
   if (assistantConfig.loggingVerbosity === 'quiet') return;
-  const line = {
-    time: new Date().toISOString(),
-    method: 'POST',
-    url: entry.baseURL,
-    provider: entry.provider,
-    model: entry.model,
-    payloadSize: JSON.stringify(payload || {}).length,
-    bodyPreview: JSON.stringify(payload || {}).slice(0, 300),
-    tokenEstimate: estimateMessagesTokens(messages),
-    headers: safeHeaderList(headers)
-  };
-  console.log(`${LOG_MARKERS.REQUEST} ${JSON.stringify(line)}`);
+  const payloadSize = JSON.stringify(payload || {}).length;
+  const tokenEstimate = estimateMessagesTokens(messages);
+  console.log(`→ ${entry.provider}/${entry.model} POST ${entry.baseURL} (${payloadSize}b, ~${tokenEstimate} tok)`);
 }
 
 function logResponseLine(entry, status, elapsed, data, errorMessage) {
   if (assistantConfig.loggingVerbosity === 'quiet') return;
-  const line = {
-    time: new Date().toISOString(),
-    endpoint: entry.baseURL,
-    status,
-    latency: elapsed,
-    provider: entry.provider,
-    model: entry.model,
-    bodyPreview: data ? JSON.stringify(data).slice(0, 300) : null,
-    usage: (data && data.usage) || null,
-    error: errorMessage || null
-  };
-  console.log(`${LOG_MARKERS.RESPONSE} ${JSON.stringify(line)}`);
+  const usage = (data && data.usage) || null;
+  const tok = usage ? ` (tokens in ${usage.prompt_tokens || '?'} / out ${usage.completion_tokens || '?'})` : '';
+  if (errorMessage) {
+    console.warn(`← ${entry.provider}/${entry.model} ${errorMessage} (${elapsed}ms)`);
+  } else {
+    console.log(`← ${entry.provider}/${entry.model} ${status ?? 'ERR'} (${elapsed}ms)${tok}`);
+  }
 }
 
 const keyOf = (e) => `${e.provider}::${e.model}`;
@@ -289,7 +275,7 @@ function learnSuccess(entry, elapsed) {
 // demoted. Reuses probeOne so auth/payload handling for every provider
 // type (Bearer, Cookie, Kimi refresh-token) stays identical to a real
 // request; the only difference is the minimal message and short timeout.
-const PING_TIMEOUT_MS = TIMEOUTS.PING_MS;
+const PING_TIMEOUT_MS = 8000;
 
 async function pingEntry(entry) {
   const controller = new AbortController();
@@ -309,10 +295,6 @@ async function pingEntry(entry) {
 // directly wherever a candidate just failed and routing is about to fall
 // back to the next one.
 async function verifyAndDemote(entry) {
-  // Grace period before pinging: a request may have failed on a transient blip
-  // (dropped connection, slow cold start); pinging it immediately would
-  // compound the latency and demote something that would have recovered.
-  await new Promise(r => setTimeout(r, 2000));
   const responded = await pingEntry(entry);
   if (responded) {
     pushRoutingEvent('ping-ok', `${entry.provider}/${entry.model} failed a request but responded to a follow-up ping — keeping it known-OK.`);
@@ -590,7 +572,7 @@ function normalizeResponse(data) {
         {
           index: 0,
           message: { role: 'assistant', content: content || '' },
-          finish_reason: content ? FINISH_REASON_STOP : 'length'
+          finish_reason: content ? 'stop' : 'length'
         }
       ]
     };
@@ -612,7 +594,7 @@ function sendSseResponse(res, data, entry) {
   const finishReason = data.choices?.[0]?.finish_reason;
   const toolCalls = data.choices?.[0]?.message?.tool_calls;
 
-  if (finishReason === FINISH_REASON_TOOL_CALLS && Array.isArray(toolCalls) && toolCalls.length > 0) {
+  if (finishReason === 'tool_calls' && Array.isArray(toolCalls) && toolCalls.length > 0) {
     res.status(200);
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
@@ -640,7 +622,7 @@ function sendSseResponse(res, data, entry) {
         function: { name: tc.function.name, arguments: tc.function.arguments },
       })),
     }, null);
-    writeChunk({}, FINISH_REASON_TOOL_CALLS);
+    writeChunk({}, 'tool_calls');
 
     if (data.usage && typeof data.usage === 'object' && Object.keys(data.usage).length > 0) {
       writeChunk({}, null, { usage: data.usage });
@@ -685,7 +667,7 @@ function sendSseResponse(res, data, entry) {
           function: { name: tc.function.name, arguments: tc.function.arguments },
         })),
       }, null);
-      writeChunk({}, FINISH_REASON_TOOL_CALLS);
+      writeChunk({}, 'tool_calls');
 
       if (data.usage && typeof data.usage === 'object' && Object.keys(data.usage).length > 0) {
         writeChunk({}, null, { usage: data.usage });
@@ -724,7 +706,7 @@ function sendSseResponse(res, data, entry) {
     writeChunk({ content: safeContent.slice(i, i + CHUNK_SIZE) }, null);
   }
 
-  writeChunk({}, FINISH_REASON_STOP);
+  writeChunk({}, 'stop');
 
   if (data.usage && typeof data.usage === 'object' && Object.keys(data.usage).length > 0) {
     writeChunk({}, null, { usage: data.usage });
@@ -828,13 +810,6 @@ function orderEntries() {
 async function probeOne(entry, { messages, rest }, signal) {
   const startTime = Date.now();
   const apiKey = process.env[entry.apiKeyEnv];
-  // Dynamic per-request timeout: a fixed cap punishes long prompts (large
-  // context dispatcher chunks) whose tokenization + first-token latency can
-  // legitimately exceed it. Scale 1.5s per 1000 estimated tokens on top of
-  // the assistant-config base timeout.
-  const baseTimeout = assistantConfig.timeoutMs > 0 ? assistantConfig.timeoutMs : 30000;
-  const tokenEstimate = estimateTokensFromText(JSON.stringify(messages || []));
-  const dynamicTimeout = baseTimeout + Math.ceil(tokenEstimate / 1000) * 1500;
 
   // Kimi-style providers authenticate via `authToken` (refresh_token) in the
   // rules file — the cookie env var is not required for them.
@@ -939,7 +914,7 @@ async function probeOne(entry, { messages, rest }, signal) {
       } else {
         response = await axios.post(entry.baseURL, payload, {
           headers,
-          timeout: dynamicTimeout,
+          timeout: (assistantConfig.timeoutMs > 0 ? assistantConfig.timeoutMs : 30000),
           signal
         });
       }
@@ -1048,7 +1023,11 @@ function recordUsage(entry, rawData, ctx) {
   const key = keyOf(entry);
   const rec = tokenUsage[key] || {
     provider: entry.provider, model: entry.model, requests: 0,
-    promptTokens: 0, completionTokens: 0, totalTokens: 0, estimatedRequests: 0
+    promptTokens: 0, completionTokens: 0, totalTokens: 0, estimatedRequests: 0,
+    // --- NEW: cookie-provider column --- capture authType so the Token Usage
+    // tab can flag Cookie-auth (e.g. Kimi/Qwen) rows distinctly from API-key
+    // rows, and so estimated-vs-real attribution is visible at a glance.
+    authType: (entry.authType || 'Bearer').toLowerCase() === 'cookie' ? 'cookie' : 'bearer'
   };
 
   rec.requests += 1;

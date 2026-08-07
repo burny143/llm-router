@@ -18,8 +18,8 @@ const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
 const { getFilePath, parseCsv } = require('./state-store');
-const { AUTH_TYPE_COOKIE } = require('./shared-constants');
-require('dotenv').config({ path: getFilePath('env') });
+const { FILE_ROLES } = require('./shared-constants');
+require('dotenv').config({ path: getFilePath(FILE_ROLES.ENV) });
 
 // Read ProviderConfig.csv (path from file-registry.json) using the shared
 // quote-aware parser from state-store.js, so a baseURL/modelsEndpoint value
@@ -27,7 +27,7 @@ require('dotenv').config({ path: getFilePath('env') });
 // column alignment the way naive line.split(',') did.
 // Guarded at module scope: a missing/unreadable CSV must fail with a clear
 // message and non-zero exit, not an unhandled exception.
-const providerConfigPath = getFilePath('providerConfig');
+const providerConfigPath = getFilePath(FILE_ROLES.PROVIDER_CONFIG);
 let parsedRows = [];
 if (!fs.existsSync(providerConfigPath)) {
   console.error(`ProviderConfig.csv not found at ${providerConfigPath}. Nothing to fetch — exiting.`);
@@ -68,6 +68,14 @@ if (!hasStripPrefixColumn) {
 // Build provider rows from the parsed CSV objects (parseCsv already strips
 // the header row and handles quoted commas, so no manual header-skipping or
 // column-index math is needed here anymore).
+// Filter: a provider row needs a provider name AND either a real
+// modelsEndpoint OR a Cookie authType. Cookie-auth providers (Qwen/Kimi)
+// legitimately have an empty modelsEndpoint — they're fetched through the
+// browser/session layer, not a public /models endpoint. Dropping them here
+// (the old `.filter(r => r.provider && r.modelsEndpoint)`) silently removed
+// them from the run with zero log output, which is exactly the "vanish with no
+// explanation" behavior fetchModels()'s explicit cookie-skip log was built to
+// prevent. Keeping them in `rows` lets that skip log actually fire.
 const rows = parsedRows.map(r => {
     const provider = r.provider;
     const stripPrefix = hasStripPrefixColumn
@@ -81,7 +89,7 @@ const rows = parsedRows.map(r => {
         authType: (r.authType || 'Bearer').trim().toLowerCase() || 'Bearer',
         stripPrefix
     };
-}).filter(r => r.provider && r.modelsEndpoint);
+}).filter(r => r.provider && (r.modelsEndpoint || r.authType === 'cookie'));
 
 console.log(`Found ${rows.length} providers to fetch models from.`);
 
@@ -93,7 +101,7 @@ async function fetchModels(provider, endpoint, apiKeyEnv, authType) {
     // (authType === 'Cookie') authenticate with a session cookie via the
     // browser client, not an API key — sending the cookie string as a Bearer
     // token would always fail, so skip them explicitly instead.
-    if (authType !== AUTH_TYPE_COOKIE) {
+    if (authType !== 'cookie') {
         // Add authorization header if API key is available
         if (apiKeyEnv && process.env[apiKeyEnv]) {
             config.headers = { 'Authorization': `Bearer ${process.env[apiKeyEnv]}` };
@@ -102,7 +110,6 @@ async function fetchModels(provider, endpoint, apiKeyEnv, authType) {
         console.log(`  -> Skipping ${provider}: authType=Cookie — a browser-based models fetch is not supported yet.`);
         return [];
     }
-
     try {
         console.log(`[FETCHING] ${provider} -> ${endpoint}`);
         const resp = await axios.get(endpoint, config);
@@ -141,8 +148,23 @@ async function fetchModels(provider, endpoint, apiKeyEnv, authType) {
     // or multiple fetch passes overlap.
     const seenKeys = new Set();
 
-    for (const row of rows) {
-        const models = await fetchModels(row.provider, row.modelsEndpoint, row.apiKeyEnv, row.authType);
+    // Fetch every provider concurrently (Promise.allSettled) instead of
+    // serially. Each fetch is already error-isolated inside fetchModels()
+    // (it catches its own axios errors and returns an ['ERROR: ...'] entry),
+    // so a failed provider can never reject the whole batch or poison the
+    // results of the others.
+    const settled = await Promise.allSettled(rows.map(async (row) => {
+        return { row, models: await fetchModels(row.provider, row.modelsEndpoint, row.apiKeyEnv, row.authType) };
+    }));
+
+    for (const outcome of settled) {
+        // fetchModels never throws, but keep the guard for future-proofing.
+        if (outcome.status === 'rejected' || !outcome.value) {
+            const provider = outcome.value ? outcome.value.row.provider : 'unknown';
+            console.log(`  -> ERROR: provider ${provider} fetch rejected unexpectedly: ${outcome.reason ? outcome.reason.message : 'unknown'}`);
+            continue;
+        }
+        const { row, models } = outcome.value;
         // Store each model as a separate entry
         models.forEach(model => {
             // Never prefix-strip an error entry: an axios error message often
@@ -177,8 +199,8 @@ async function fetchModels(provider, endpoint, apiKeyEnv, authType) {
         outputLines.push(`${escapedProvider},${escapedModel}`);
     });
 
-    fs.writeFileSync(getFilePath('latestModels'), outputLines.join('\n'), 'utf-8');
-    console.log(`\nSaved to ${path.basename(getFilePath('latestModels'))} with`, results.length, 'total rows (1 row per model).');
+    fs.writeFileSync(getFilePath(FILE_ROLES.LATEST_MODELS), outputLines.join('\n'), 'utf-8');
+    console.log(`\nSaved to ${path.basename(getFilePath(FILE_ROLES.LATEST_MODELS))} with`, results.length, 'total rows (1 row per model).');
 
     // Also write models.csv with top 5 models per provider (for fallback dropdown)
     const providerModels = {};
@@ -197,8 +219,8 @@ async function fetchModels(provider, endpoint, apiKeyEnv, authType) {
             modelsCsvLines.push(`${escapedProvider},${escapedModel}`);
         });
     }
-    fs.writeFileSync(getFilePath('models'), modelsCsvLines.join('\n'), 'utf-8');
-    console.log(`Saved to ${path.basename(getFilePath('models'))} with`, Object.values(providerModels).reduce((s, arr) => s + arr.length, 0), 'models (top 5 per provider).');
+    fs.writeFileSync(getFilePath(FILE_ROLES.MODELS), modelsCsvLines.join('\n'), 'utf-8');
+    console.log(`Saved to ${path.basename(getFilePath(FILE_ROLES.MODELS))} with`, Object.values(providerModels).reduce((s, arr) => s + arr.length, 0), 'models (top 5 per provider).');
 
     // Summary
     const errorCount = results.filter(r => r.model.startsWith('ERROR')).length;

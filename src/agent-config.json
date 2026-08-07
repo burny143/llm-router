@@ -1,5 +1,6 @@
 {
   "lastProjectPath": null,
   "selectedModel": null,
-  "globalMcpServers": []
+  "streamResponses": true,
+  "alwaysApproveWrites": false
 }

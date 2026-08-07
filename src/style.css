@@ -319,27 +319,34 @@ button.btn-primary:hover {
 .connected-app-status.idle { background: #ffc107; color: #333; }
 .connected-app-status.disconnected { background: #999; }
 
-/* --- Request / Response Logs (Task 4) --- */
-.req-res-logs {
-  height: 220px;
+/* --- Collapsible panels (Proxy tab sections) --- */
+.collapsible-section {
+  margin-bottom: 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  overflow: hidden;
 }
-.req-res-log-entry {
-  border-bottom: 1px solid #333;
-  padding: 4px 0;
-}
-.req-res-log-entry summary {
+.collapsible-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   cursor: pointer;
-  white-space: pre-wrap;
-  word-break: break-all;
+  padding: 8px 10px;
+  background: #f2f2f2;
+  font-weight: 600;
+  user-select: none;
 }
-.req-res-log-entry pre {
-  margin: 4px 0 0 12px;
-  white-space: pre-wrap;
-  word-break: break-all;
-  color: #9cdcfe;
+.collapsible-header span:first-child { flex: 1; }
+.collapsible-caret {
+  transition: transform .15s ease;
+  color: #555;
 }
-.req-res-log-entry.status-error summary { color: #ff6b6b; }
-.req-res-log-entry.status-ok summary { color: #6bcb77; }
+.collapsible-header button.section-toggle { float: none; margin: 0 8px 0 0; }
+.collapsible-body { padding: 8px 10px; }
+.collapsible-body.collapsed { display: none; }
+
+/* --- Proxy Connect/Stop single toggle button --- */
+#proxyToggleBtn { float: none; }
 
 /* --- Assistant Config tab (Task 5) --- */
 .assistant-config-table {
@@ -536,36 +543,36 @@ button.btn-primary:hover {
   margin: 4px 0 2px;
   letter-spacing: 0.03em;
 }
-.agent-skill-row-actions { display: flex; align-items: center; gap: 6px; }
-.agent-skill-icon-btn {
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  font-size: 12px;
-  padding: 0 2px;
-  color: #888;
-}
-.agent-skill-icon-btn:hover { color: #222; }
-/* MCP connection-status dot */
-.agent-mcp-status-dot {
-  display: inline-block;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  margin-right: 5px;
-  flex-shrink: 0;
-}
-.agent-mcp-status-dot.connected { background: #28a745; }
-.agent-mcp-status-dot.connecting { background: #e0a800; animation: agent-stream-blink 1s step-start infinite; }
-.agent-mcp-status-dot.error { background: #c0392b; }
-.agent-mcp-row { align-items: flex-start; }
-.agent-mcp-row-label { display: flex; align-items: center; }
-
 .agent-chat {
   flex: 1 1 auto;
   display: flex;
   flex-direction: column;
   min-width: 0;
+}
+.agent-chat-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 6px 10px;
+  border-bottom: 1px solid #ddd;
+  background: #f7f7f7;
+  flex-wrap: wrap;
+}
+.agent-chat-tab {
+  padding: 5px 10px;
+  font-size: 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: #fff;
+  color: #333;
+  cursor: pointer;
+}
+.agent-chat-tab:hover {
+  background: #eee;
+}
+.agent-chat-tab.active {
+  background: #007bff;
+  border-color: #007bff;
+  color: #fff;
 }
 .agent-messages {
   flex: 1 1 auto;
@@ -592,10 +599,6 @@ button.btn-primary:hover {
   align-self: flex-start;
   background: #f1f1f1;
   color: #222;
-  /* Phase 5: guarantee long unbroken tokens (URLs, file paths) wrap instead
-     of overflowing the bubble; word-break alone is not honored by all
-     engines for inline content. */
-  overflow-wrap: anywhere;
 }
 /* --- NEW: streaming support --- blinking cursor shown at the end of an
    assistant bubble while a token-level stream is in flight. */
@@ -654,52 +657,6 @@ button.btn-primary:hover {
   font-family: monospace;
   max-height: 160px;
   overflow-y: auto;
-}
-
-/* Floating task tracker overlay (bottom-left), mirrors active agent tool calls */
-.agent-task-tracker {
-  position: fixed;
-  left: 16px;
-  bottom: 16px;
-  z-index: 900;
-  display: none;
-  flex-direction: column;
-  gap: 4px;
-  max-width: 320px;
-  padding: 8px 10px;
-  background: rgba(20, 20, 24, 0.82);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 8px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
-  backdrop-filter: blur(4px);
-  pointer-events: none;
-}
-.agent-task-tracker.has-tasks { display: flex; }
-.agent-task-tracker-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: #eee;
-  font-size: 12px;
-  line-height: 1.3;
-}
-.agent-task-tracker-row.done .agent-task-tracker-label { color: #7ec699; text-decoration: line-through; }
-.agent-task-tracker-label {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.task-spinner {
-  flex: 0 0 auto;
-  width: 12px;
-  height: 12px;
-  border: 2px solid rgba(255, 255, 255, 0.25);
-  border-top-color: #6ab0ff;
-  border-radius: 50%;
-  animation: task-spin 0.7s linear infinite;
-}
-@keyframes task-spin {
-  to { transform: rotate(360deg); }
 }
 
 .agent-input-row {
@@ -915,3 +872,25 @@ button.btn-primary:hover {
 .priority-log-demoted { color: #e0a800; }
 .priority-log-lock-fallback { color: #e0a800; }
 .priority-log-pin-set { color: #28a745; }
+
+/* --- Agent tab: Task Progress sidebar panel --- */
+.agent-task-progress {
+  max-height: 320px;
+  overflow-y: auto;
+  font-size: 12px;
+  font-family: monospace;
+  word-break: break-all;
+}
+.agent-task-progress-empty { color: #999; font-style: italic; padding: 4px 0; }
+.agent-progress-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+.agent-progress-label { flex: 1; }
+.agent-progress-spinner { color: #e0a800; }
+.agent-progress-result { color: #6bcb77; }
+.agent-progress-usage { justify-content: space-between; color: #555; }
+.agent-progress-summary { color: #28a745; font-weight: 600; }

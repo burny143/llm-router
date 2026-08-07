@@ -25,12 +25,15 @@ const DEFAULT_PATHS = {
   providerFlags: 'data/provider-flags.json',
   webProviderRules: 'data/web-provider-rules.json',
   assistantConfig: 'data/assistant-config.json',
-  // Agent tab (coding-agent feature): global agent settings + global skills list.
-  // Project-scoped skills/MCP servers live under `<projectRoot>/.agent/` instead,
-  // resolved directly by agent-controller.js (they are not part of this registry
-  // since their location moves with the selected project, not the app install).
+  // Agent tab (coding-agent feature): global agent settings.
+  // Project-scoped state lives under `<projectRoot>/.agent/` instead, resolved
+  // directly by agent-controller.js (it is not part of this registry since its
+  // location moves with the selected project, not the app install).
   agentConfig: 'data/agent-config.json',
-  agentSkills: 'data/skills.json'
+  // Cached per-project (+ global) agent chat history, keyed by project path
+  // ('global' for Global mode). Lets switching projects (or restarting the
+  // app) restore history instead of confusing the agent with a blank slate.
+  agentChats: 'data/agent-chats.json'
 };
 
 let fileRegistry = {};
@@ -76,7 +79,7 @@ const USAGE_FILE = getFilePath('tokenUsage');
 const SETTINGS_FILE = getFilePath('settings');
 const ASSISTANT_CONFIG_FILE = getFilePath('assistantConfig');
 const AGENT_CONFIG_FILE = getFilePath('agentConfig');
-const AGENT_SKILLS_FILE = getFilePath('agentSkills');
+const AGENT_CHATS_FILE = getFilePath('agentChats');
 const CONFIG_FILE = getFilePath('proxyConfig');
 const CONFIG_CSV = getFilePath('ultimateConfig');
 const PROVIDER_CONFIG_CSV = getFilePath('providerConfig');
@@ -171,6 +174,29 @@ function syncConfigFromCsv() {
   }
 }
 
+// Persist/load cached agent chat sessions (data/agent-chats.json). Shape:
+// { [sessionKey]: { messages: [...], updatedAt: number } }. sessionKey is
+// 'global' or an absolute project path. Missing/unreadable file -> {}.
+function saveAgentChats(chats) {
+  try {
+    fs.writeFileSync(AGENT_CHATS_FILE, JSON.stringify(chats, null, 2));
+  } catch (err) {
+    console.warn('Could not save agent chats:', err.message);
+  }
+}
+
+function loadAgentChats() {
+  try {
+    if (fs.existsSync(AGENT_CHATS_FILE)) {
+      const parsed = JSON.parse(fs.readFileSync(AGENT_CHATS_FILE, 'utf-8'));
+      return parsed && typeof parsed === 'object' ? parsed : {};
+    }
+  } catch (err) {
+    console.warn('Could not load agent chats:', err.message);
+  }
+  return {};
+}
+
 // Persist the config to BOTH CSV (editable truth) and JSON (fast reload)
 function saveConfigBoth(entries) {
   try {
@@ -235,8 +261,8 @@ const DEFAULT_ASSISTANT_CONFIG = {
   // --- Large Context Dispatcher (backend-wired: large-context-dispatcher.js) ---
   largeContextMode: false,         // master toggle — when off, oversized prompts flow through the normal path
   largeContextThreshold: 100000,   // estimated prompt tokens above which the dispatcher intercepts the request
-  largeContextChunkTokens: 20000,  // target tokens per chunk sent for sequential summarization
-  largeContextInterChunkDelayMs: 500, // pacing (ms) between sequential chunk requests — protects Cookie/session providers
+  largeContextChunkTokens: 20000,  // target tokens per chunk sent to a single lane for summarization
+  largeContextConcurrency: { default: 5, cookie: 1 }, // per-lane concurrency by authType
   largeContextTimeoutMs: 60000,    // per-chunk (and final assembly) request timeout
 
   fallbackOrder: [],               // NOT backend-wired — UI placeholder ("Pending backend support")
@@ -273,11 +299,9 @@ function loadAssistantConfig() {
 //   back into Project mode instead of Global mode.
 // selectedModel: provider/model key used to pin the agent's model in the
 //   top-bar dropdown (falls back to normal known-OK routing if unset).
-// globalMcpServers: [{ name, transport: 'stdio'|'http', command, args, env, url }]
 const DEFAULT_AGENT_CONFIG = {
   lastProjectPath: null,
   selectedModel: null,
-  globalMcpServers: [],
   // --- NEW: streaming support --- on by default; toggled from the Agent
   // config UI. When false, runAgentTurn falls back to the existing
   // turn-level processChatCompletion + AGENT_STREAM_CHUNK path.
@@ -309,27 +333,6 @@ function loadAgentConfig() {
     console.warn('Could not load agent config:', err.message);
   }
   return { ...DEFAULT_AGENT_CONFIG, ...saved };
-}
-
-// Global skills list, e.g. [{ id, name, description, prompt, enabled }].
-function saveAgentSkills(skills) {
-  try {
-    fs.writeFileSync(AGENT_SKILLS_FILE, JSON.stringify(skills, null, 2));
-  } catch (err) {
-    console.warn('Could not save agent skills:', err.message);
-  }
-}
-
-function loadAgentSkills() {
-  try {
-    if (fs.existsSync(AGENT_SKILLS_FILE)) {
-      const parsed = JSON.parse(fs.readFileSync(AGENT_SKILLS_FILE, 'utf-8'));
-      if (Array.isArray(parsed)) return parsed;
-    }
-  } catch (err) {
-    console.warn('Could not load agent skills:', err.message);
-  }
-  return [];
 }
 
 // Persist/load the proxy configuration (entries: provider, baseURL, apiKeyEnv, model, enabled)
@@ -421,4 +424,4 @@ function loadUsage() {
   return {};
 }
 
-module.exports = { saveResults, loadResults, saveUsage, loadUsage, saveSettings, loadSettings, saveConfig, loadConfig, saveConfigBoth, syncConfigFromCsv, pruneConfigEntries, loadProviderConfig, CONFIG_CSV, PROVIDER_CONFIG_CSV, getFilePath, parseCsv, envPrefixFor, DEFAULT_PATHS, saveAssistantConfig, loadAssistantConfig, DEFAULT_ASSISTANT_CONFIG, saveAgentConfig, loadAgentConfig, DEFAULT_AGENT_CONFIG, saveAgentSkills, loadAgentSkills };
+module.exports = { saveResults, loadResults, saveUsage, loadUsage, saveSettings, loadSettings, saveConfig, loadConfig, saveConfigBoth, syncConfigFromCsv, pruneConfigEntries, loadProviderConfig, CONFIG_CSV, PROVIDER_CONFIG_CSV, getFilePath, parseCsv, envPrefixFor, DEFAULT_PATHS, saveAssistantConfig, loadAssistantConfig, DEFAULT_ASSISTANT_CONFIG, saveAgentConfig, loadAgentConfig, DEFAULT_AGENT_CONFIG, saveAgentChats, loadAgentChats };

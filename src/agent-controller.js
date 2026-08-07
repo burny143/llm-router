@@ -22,12 +22,12 @@ const path = require('path');
 const os = require('os');
 const crypto = require('crypto');
 const { spawn, exec } = require('child_process');
-const { IPC_CHANNELS, TIMEOUTS, AGENT_PROJECT_DIR, AGENT_SCRATCHPAD_DIR } = require('./shared-constants');
+const { IPC_CHANNELS } = require('./shared-constants');
 const {
   loadAgentConfig,
   saveAgentConfig,
-  loadAgentSkills,
-  saveAgentSkills
+  loadAgentChats,
+  saveAgentChats
 } = require('./state-store');
 
 // Deferred require (same pattern large-context-dispatcher.js uses) so a
@@ -40,17 +40,63 @@ function proxy() {
 
 // --- Module state ---------------------------------------------------------
 let projectRoot = null;              // null => Global mode
-let sessionMessages = [];            // OpenAI-format history for the active agent conversation
 let abortRequested = false;
 let running = false;
 
 let globalConfig = loadAgentConfig();
-let globalSkills = loadAgentSkills();       // [{ id, name, description, prompt, enabled }]
-let projectSkills = [];                     // same shape, loaded from <project>/.agent/skills.json
-let globalMcpServers = globalConfig.globalMcpServers || [];
-let projectMcpServers = [];
 
-const mcpClients = new Map();        // key: `${scope}:${name}` -> client record
+// --- Per-project cached chat sessions --------------------------------------
+// Each key is either 'global' or an absolute project path; value is
+// { messages: [] (OpenAI-format history), updatedAt: number }. Cached across
+// project switches (and across app restarts, via loadAgentChats/saveAgentChats)
+// so switching projects doesn't wipe/confuse the agent's history.
+const chatSessions = new Map();
+let activeSessionKey = 'global';
+const MAX_SESSION_MESSAGES = 200;
+
+try {
+  const savedChats = loadAgentChats();
+  if (savedChats && typeof savedChats === 'object') {
+    for (const [key, sess] of Object.entries(savedChats)) {
+      if (sess && Array.isArray(sess.messages)) {
+        chatSessions.set(key, { messages: sess.messages, updatedAt: sess.updatedAt || Date.now() });
+      }
+    }
+  }
+} catch (_) { /* best-effort */ }
+
+function sessionKeyFor(root) { return root || 'global'; }
+
+function getSession(key) {
+  if (!chatSessions.has(key)) chatSessions.set(key, { messages: [], updatedAt: Date.now() });
+  return chatSessions.get(key);
+}
+
+function getActiveMessages() { return getSession(activeSessionKey).messages; }
+
+function setActiveMessages(arr) {
+  const sess = getSession(activeSessionKey);
+  sess.messages = arr;
+  sess.updatedAt = Date.now();
+}
+
+// Trim a session down to the most recent MAX_SESSION_MESSAGES entries without
+// ever starting the kept slice on a lone 'tool' message (which would orphan a
+// tool_call/tool_result pair and confuse the model on the next turn).
+function trimSession(key) {
+  const sess = getSession(key);
+  if (sess.messages.length <= MAX_SESSION_MESSAGES) return;
+  let cut = sess.messages.length - MAX_SESSION_MESSAGES;
+  while (cut < sess.messages.length && sess.messages[cut].role === 'tool') cut++;
+  sess.messages = sess.messages.slice(cut);
+}
+
+function persistChats() {
+  const obj = {};
+  for (const [key, sess] of chatSessions.entries()) obj[key] = sess;
+  saveAgentChats(obj);
+}
+
 const pendingApprovals = new Map();  // id -> resolve(approved: boolean)
 
 // --- NEW: diff preview --- pending diff-preview round-trips, keyed the same
@@ -62,16 +108,15 @@ const pendingDiffPreviews = new Map(); // id -> resolve(accepted: boolean)
 // start of a new agent session (matches the "one-step revert" spec).
 let lastWrite = null; // { path, existed, previousContent, sessionMessagesIndex }
 
-const AGENT_TMP_DIR = path.join(os.tmpdir(), AGENT_SCRATCHPAD_DIR);
+const AGENT_TMP_DIR = path.join(os.tmpdir(), 'agent-scratchpad');
 try { fs.mkdirSync(AGENT_TMP_DIR, { recursive: true }); } catch (_) { /* best-effort */ }
 
-const DEFAULT_IGNORE = ['node_modules', '.git', AGENT_PROJECT_DIR, 'dist', 'build', '.next', '.venv', '__pycache__'];
+const DEFAULT_IGNORE = ['node_modules', '.git', '.agent', 'dist', 'build', '.next', '.venv', '__pycache__'];
 const MAX_FILE_LIST = 5000;
 const MAX_READ_BYTES = 300 * 1024;
 const MAX_SEARCH_FILE_BYTES = 1024 * 1024;
 const MAX_SEARCH_MATCHES = 200;
-const COMMAND_TIMEOUT_MS = TIMEOUTS.COMMAND_MS;
-const MCP_REQUEST_TIMEOUT_MS = TIMEOUTS.MCP_REQUEST_MS;
+const COMMAND_TIMEOUT_MS = 30000;
 const MAX_AGENT_STEPS = 25; // guards against a runaway tool-call chain
 // --- NEW: agent-loop resilience (keep-alive) ---
 // Previously a single failed model call (transient network blip, one bad
@@ -114,16 +159,15 @@ async function runAgentTurn(sendToRenderer, userText, uploadedFiles) {
         .join('\n\n');
       if (ctx) content = `${content}\n\n[Attached files]\n${ctx}`;
     }
-    sessionMessages.push({ role: 'user', content });
+    getActiveMessages().push({ role: 'user', content });
 
     const mode = getMode();
-    const skills = (mode === 'project' ? [...globalSkills, ...projectSkills] : globalSkills)
-      .filter((s) => s.enabled !== false);
-    const skillsBlock = skills.length
-      ? `\n\nActive skills:\n${skills.map((s) => `- ${s.name}: ${s.description || ''}`).join('\n')}`
-      : '';
     const tools = buildToolDefs(mode);
-    const messagesForModel = [{ role: 'system', content: buildSystemPrompt(mode) + skillsBlock }, ...sessionMessages];
+    // --- NEW: task-progress panel --- let the renderer mirror this turn's
+    // available tools in the Task Progress sidebar. Cheap (a handful of names)
+    // and keeps the panel accurate even on tool-call-only turns.
+    sendToRenderer(IPC_CHANNELS.AGENT_TOOL_LIST, { tools: tools.map((t) => t.function.name) });
+    const messagesForModel = [{ role: 'system', content: buildSystemPrompt(mode) }, ...getActiveMessages()];
 
     let stepLimit = MAX_AGENT_STEPS;
     let extensionGranted = false;
@@ -165,6 +209,10 @@ async function runAgentTurn(sendToRenderer, userText, uploadedFiles) {
               // Fallback path when streaming is off: whole message in one chunk.
               sendToRenderer(IPC_CHANNELS.AGENT_STREAM_CHUNK, { text: message.content });
             }
+            // --- NEW: task-progress panel --- emit real usage when the backend
+            // attached it to the response (non-streaming path only; the
+            // streaming simulator doesn't surface usage today).
+            if (response && response.usage) sendToRenderer(IPC_CHANNELS.AGENT_TOKEN_USAGE, { usage: response.usage });
           }
           lastCallError = null;
           break;
@@ -186,7 +234,7 @@ async function runAgentTurn(sendToRenderer, userText, uploadedFiles) {
       if (abortRequested) { sendToRenderer(IPC_CHANNELS.AGENT_DONE, { aborted: true }); return; }
 
       messagesForModel.push(message);
-      sessionMessages.push(message);
+      getActiveMessages().push(message);
 
       const toolCalls = message.tool_calls;
       if (!Array.isArray(toolCalls) || toolCalls.length === 0) {
@@ -211,7 +259,7 @@ async function runAgentTurn(sendToRenderer, userText, uploadedFiles) {
               `Stop repeating it — either try a genuinely different approach, or if the task is actually complete, say so and stop.]`
           };
           messagesForModel.push(nudge);
-          sessionMessages.push(nudge);
+          getActiveMessages().push(nudge);
           recentToolSignatures = [];
         }
       } else {
@@ -234,7 +282,7 @@ async function runAgentTurn(sendToRenderer, userText, uploadedFiles) {
           content: typeof result === 'string' ? result : (result.message || JSON.stringify(result))
         };
         messagesForModel.push(toolMsg);
-        sessionMessages.push(toolMsg);
+        getActiveMessages().push(toolMsg);
       }
 
       // --- NEW: bounded step-limit extension (keep-alive) ---
@@ -259,6 +307,10 @@ async function runAgentTurn(sendToRenderer, userText, uploadedFiles) {
     sendToRenderer(IPC_CHANNELS.AGENT_DONE, {});
   } finally {
     running = false;
+    // Cache this turn's history so switching projects (or restarting the
+    // app) doesn't lose it / confuse the agent with a blank slate.
+    trimSession(activeSessionKey);
+    persistChats();
   }
 }
 
@@ -346,12 +398,6 @@ function requestDiffPreview(sendToRenderer, details) {
 }
 
 // --- Project file tools ------------------------------------------------------
-// Natural (numeric-aware) sort so "file2" sorts before "file10" and the model
-// sees a stable, human-friendly listing instead of a raw lexicographic one.
-function naturalCompare(a, b) {
-  return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
-}
-
 function walkProjectFiles(rootAbs, ignore) {
   const out = [];
   const stack = [rootAbs];
@@ -368,7 +414,7 @@ function walkProjectFiles(rootAbs, ignore) {
       if (out.length >= MAX_FILE_LIST) break;
     }
   }
-  return out.sort(naturalCompare);
+  return out.sort();
 }
 
 async function toolListDirectory(args) {
@@ -431,14 +477,14 @@ async function executeWriteFile(sendToRenderer, args) {
   fs.writeFileSync(abs, newContent);
 
   // --- NEW: undo --- remember enough to revert this single write. Recording
-  // sessionMessages.length here (before this tool's result message is
-  // pushed) lets undoLastWrite() truncate the conversation back to just
-  // before this write's tool_call/result pair.
+  // the active session's message count here (before this tool's result
+  // message is pushed) lets undoLastWrite() truncate the conversation back
+  // to just before this write's tool_call/result pair.
   lastWrite = {
     path: args.path,
     existed,
     previousContent,
-    sessionMessagesIndexBeforeCall: sessionMessages.length
+    sessionMessagesIndexBeforeCall: getActiveMessages().length
   };
   sendToRenderer(IPC_CHANNELS.AGENT_UNDO_STATE, { canUndo: true, summary: `Write to ${args.path}` });
 
@@ -469,10 +515,11 @@ function undoLastWrite() {
     // trimming back to that boundary drops the tool_call/tool_result pair
     // (and anything after) so the model doesn't see a write it no longer
     // believes happened.
-    sessionMessages = sessionMessages.slice(0, sessionMessagesIndexBeforeCall);
+    setActiveMessages(getActiveMessages().slice(0, sessionMessagesIndexBeforeCall));
   }
   const undone = lastWrite;
   lastWrite = null;
+  persistChats();
   return { ok: true, message: `Reverted ${undone.path}${undone.existed ? '' : ' (file removed — it did not exist before this write)'}.` };
 }
 
@@ -524,380 +571,26 @@ async function toolScratchpadWrite(args) {
   return { ok: true, message: `Saved to scratchpad: ${filePath}` };
 }
 
-// --- MCP client (stdio JSON-RPC + minimal HTTP JSON-RPC) -------------------
-// This is a purposefully small MCP client: it speaks JSON-RPC 2.0 well
-// enough for `initialize`, `tools/list`, and `tools/call`, over either a
-// spawned stdio subprocess or a plain HTTP POST endpoint. It does not
-// implement the full Streamable-HTTP (SSE) transport variant of the spec —
-// only request/response JSON-RPC over HTTP — which covers the common case
-// of a simple MCP-over-HTTP server.
-function mcpStdioRequest(client, method, params) {
-  return new Promise((resolve, reject) => {
-    const id = client.nextId++;
-    client.pending.set(id, { resolve, reject });
-    client.child.stdin.write(JSON.stringify({ jsonrpc: '2.0', id, method, params }) + '\n');
-    setTimeout(() => {
-      if (client.pending.has(id)) {
-        client.pending.delete(id);
-        reject(new Error(`MCP "${method}" timed out.`));
-      }
-    }, MCP_REQUEST_TIMEOUT_MS);
-  });
-}
-
-async function mcpHttpRequest(client, method, params) {
-  const axios = require('axios');
-  const id = client.nextId++;
-  const res = await axios.post(
-    client.url,
-    { jsonrpc: '2.0', id, method, params },
-    { headers: { 'Content-Type': 'application/json', ...(client.headers || {}) }, timeout: MCP_REQUEST_TIMEOUT_MS }
-  );
-  if (res.data && res.data.error) throw new Error(res.data.error.message || 'MCP error');
-  return res.data && res.data.result;
-}
-
-// --- NEW: MCP SSE ---
-// Streamable-HTTP transport (per the MCP spec): a persistent GET/SSE
-// connection for server -> client notifications, plus POST for client ->
-// server JSON-RPC requests whose response may come back either directly in
-// the POST body or as an SSE event on the GET stream. Falls back to plain
-// mcpHttpRequest (POST-only) if the server doesn't advertise SSE on GET.
-const MCP_SSE_INITIAL_BACKOFF_MS = 1000;
-const MCP_SSE_MAX_BACKOFF_MS = 30000;
-
-function parseSseChunk(buffer) {
-  // Splits a raw SSE byte stream into { events, rest } — `rest` is the
-  // trailing partial event still awaiting more data.
-  const events = [];
-  const parts = buffer.split('\n\n');
-  const rest = parts.pop() || '';
-  for (const part of parts) {
-    let eventType = 'message';
-    const dataLines = [];
-    for (const line of part.split('\n')) {
-      if (line.startsWith('event:')) eventType = line.slice(6).trim();
-      else if (line.startsWith('data:')) dataLines.push(line.slice(5).trim());
-    }
-    if (dataLines.length) events.push({ event: eventType, data: dataLines.join('\n') });
-  }
-  return { events, rest };
-}
-
-function handleMcpSseMessage(client, raw) {
-  let msg;
-  try { msg = JSON.parse(raw); } catch (_) { return; } // ignore non-JSON-RPC SSE noise
-  if (msg.id != null && client.pending.has(msg.id)) {
-    const { resolve, reject } = client.pending.get(msg.id);
-    client.pending.delete(msg.id);
-    if (msg.error) reject(new Error(msg.error.message || 'MCP error'));
-    else resolve(msg.result);
-  }
-  // Server -> client notifications (no id) — e.g. resource/tool-list updates.
-  // No renderer surface for these yet; logged so they're at least visible.
-  else if (msg.method) {
-    console.log(`[agent] MCP "${client.name}" notification: ${msg.method}`);
-  }
-}
-
-function openMcpSseStream(client) {
-  const http = require('http');
-  const https = require('https');
-  const { URL } = require('url');
-  if (client.closed) return;
-
-  const target = new URL(client.url);
-  const lib = target.protocol === 'https:' ? https : http;
-  const headers = { Accept: 'text/event-stream', ...(client.headers || {}) };
-  if (client.lastEventId) headers['Last-Event-ID'] = client.lastEventId;
-
-  const req = lib.get(target, { headers }, (res) => {
-    if (res.statusCode !== 200 || !String(res.headers['content-type'] || '').includes('text/event-stream')) {
-      // Server doesn't actually support SSE on GET — stop retrying and let
-      // the client fall back to plain request/response POSTs.
-      client.sseSupported = false;
-      res.resume();
-      return;
-    }
-    client.sseSupported = true;
-    client.sseBackoffMs = MCP_SSE_INITIAL_BACKOFF_MS; // connected: reset backoff
-    let buffer = '';
-    res.setEncoding('utf8');
-    res.on('data', (chunk) => {
-      buffer += chunk;
-      const { events, rest } = parseSseChunk(buffer);
-      buffer = rest;
-      for (const ev of events) {
-        if (ev.event === 'id') client.lastEventId = ev.data;
-        handleMcpSseMessage(client, ev.data);
-      }
-    });
-    res.on('end', () => scheduleMcpSseReconnect(client));
-    res.on('error', () => scheduleMcpSseReconnect(client));
-  });
-  req.on('error', () => scheduleMcpSseReconnect(client));
-  client.sseRequest = req;
-}
-
-function scheduleMcpSseReconnect(client) {
-  if (client.closed || client.sseSupported === false) return;
-  const wait = client.sseBackoffMs || MCP_SSE_INITIAL_BACKOFF_MS;
-  client.sseBackoffMs = Math.min(wait * 2, MCP_SSE_MAX_BACKOFF_MS);
-  setTimeout(() => { if (!client.closed) openMcpSseStream(client); }, wait);
-}
-
-async function mcpHttpStreamableRequest(client, method, params) {
-  const axios = require('axios');
-  const id = client.nextId++;
-  const pending = new Promise((resolve, reject) => {
-    client.pending.set(id, { resolve, reject });
-    setTimeout(() => {
-      if (client.pending.has(id)) {
-        client.pending.delete(id);
-        reject(new Error(`MCP "${method}" timed out.`));
-      }
-    }, MCP_REQUEST_TIMEOUT_MS);
-  });
-
-  const res = await axios.post(
-    client.url,
-    { jsonrpc: '2.0', id, method, params },
-    {
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream', ...(client.headers || {}) },
-      timeout: MCP_REQUEST_TIMEOUT_MS,
-      validateStatus: () => true
-    }
-  );
-
-  // Case 1: direct JSON-RPC response in the POST body.
-  const contentType = String(res.headers['content-type'] || '');
-  if (contentType.includes('application/json') && res.data && (res.data.result !== undefined || res.data.error)) {
-    client.pending.delete(id);
-    if (res.data.error) throw new Error(res.data.error.message || 'MCP error');
-    return res.data.result;
-  }
-
-  // Case 2: response arrives asynchronously as an SSE event on the GET
-  // stream (or, less commonly, streamed back on this same POST as SSE).
-  if (contentType.includes('text/event-stream') && typeof res.data === 'string') {
-    const { events } = parseSseChunk(res.data + '\n\n');
-    for (const ev of events) handleMcpSseMessage(client, ev.data);
-  }
-  return pending;
-}
-
-function connectMcpHttpStreamable(url, config) {
-  return new Promise((resolve, reject) => {
-    const client = {
-      name: config.name,
-      scope: config.scope,
-      transport: 'streamable-http',
-      url,
-      headers: config.headers || {},
-      tools: [],
-      nextId: 1,
-      pending: new Map(),
-      sseBackoffMs: MCP_SSE_INITIAL_BACKOFF_MS,
-      sseSupported: undefined, // unknown until the first GET responds
-      lastEventId: null,
-      closed: false
-    };
-    openMcpSseStream(client);
-    mcpHttpStreamableRequest(client, 'initialize', { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'agent-tab', version: '1.0' } })
-      .then(() => mcpHttpStreamableRequest(client, 'tools/list', {}))
-      .then((res) => { client.tools = (res && res.tools) || []; resolve(client); })
-      .catch(reject);
-  });
-}
-
-function connectOneMcpServer(cfg, scope) {
-  return new Promise((resolve, reject) => {
-    const key = `${scope}:${cfg.name}`;
-
-    // --- NEW: MCP SSE --- Streamable-HTTP transport, opted into via
-    // `transport: 'streamable-http'` in the server config (or, for existing
-    // `transport: 'http'` entries, auto-detected below by probing for SSE).
-    if (cfg.transport === 'streamable-http') {
-      connectMcpHttpStreamable(cfg.url, { name: cfg.name, scope, headers: cfg.headers })
-        .then((client) => { client.status = 'connected'; mcpClients.set(key, client); resolve(); })
-        .catch((err) => {
-          mcpClients.set(key, { name: cfg.name, scope, transport: 'streamable-http', tools: [], status: 'error', statusMessage: err.message });
-          reject(err);
-        });
-      return;
-    }
-
-    if (cfg.transport === 'http') {
-      // Auto-detect: try the Streamable-HTTP flow first (it transparently
-      // falls back to plain POST/JSON responses if the server never sends
-      // real SSE — see mcpHttpStreamableRequest — so this is safe even for
-      // servers that only ever speak plain JSON-RPC-over-POST).
-      connectMcpHttpStreamable(cfg.url, { name: cfg.name, scope, headers: cfg.headers })
-        .then((client) => { client.status = 'connected'; mcpClients.set(key, client); resolve(); })
-        .catch(() => {
-          // Last-resort fallback to the original minimal HTTP client, in case
-          // something about the streamable probe itself (not just missing
-          // SSE) tripped the server up.
-          const client = { name: cfg.name, scope, transport: 'http', url: cfg.url, headers: cfg.headers || {}, tools: [], nextId: 1, status: 'connecting' };
-          mcpClients.set(key, client);
-          mcpHttpRequest(client, 'tools/list', {})
-            .then((res) => { client.tools = (res && res.tools) || []; client.status = 'connected'; resolve(); })
-            .catch((err) => {
-              client.status = 'error';
-              client.statusMessage = err.message;
-              reject(err);
-            });
-        });
-      return;
-    }
-
-    // Default: stdio subprocess.
-    let child;
-    try {
-      child = spawn(cfg.command, cfg.args || [], {
-        env: { ...process.env, ...(cfg.env || {}) },
-        cwd: scope === 'project' ? projectRoot : undefined
-      });
-    } catch (err) {
-      mcpClients.set(key, { name: cfg.name, scope, transport: 'stdio', tools: [], status: 'error', statusMessage: err.message });
-      reject(err);
-      return;
-    }
-    const client = { name: cfg.name, scope, transport: 'stdio', child, tools: [], nextId: 1, pending: new Map(), buffer: '', status: 'connecting' };
-    mcpClients.set(key, client);
-
-    child.stdout.on('data', (chunk) => {
-      client.buffer += chunk.toString();
-      let idx;
-      while ((idx = client.buffer.indexOf('\n')) >= 0) {
-        const line = client.buffer.slice(0, idx);
-        client.buffer = client.buffer.slice(idx + 1);
-        if (!line.trim()) continue;
-        let msg;
-        try { msg = JSON.parse(line); } catch (_) { continue; } // ignore non-JSON-RPC stdout noise
-        if (msg.id != null && client.pending.has(msg.id)) {
-          const { resolve: res2, reject: rej2 } = client.pending.get(msg.id);
-          client.pending.delete(msg.id);
-          if (msg.error) rej2(new Error(msg.error.message || 'MCP error'));
-          else res2(msg.result);
-        }
-      }
-    });
-    child.on('error', (err) => {
-      client.status = 'error';
-      client.statusMessage = err.message;
-      reject(err);
-    });
-    child.on('exit', () => {
-      // Keep the record (marked as errored) instead of deleting it outright,
-      // so a server that dies mid-session still shows up in the MCP list
-      // rather than silently vanishing.
-      client.status = 'error';
-      client.statusMessage = client.statusMessage || 'Process exited.';
-    });
-
-    mcpStdioRequest(client, 'initialize', { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'agent-tab', version: '1.0' } })
-      .then(() => mcpStdioRequest(client, 'tools/list', {}))
-      .then((res) => { client.tools = (res && res.tools) || []; client.status = 'connected'; resolve(); })
-      .catch((err) => {
-        client.status = 'error';
-        client.statusMessage = err.message;
-        reject(err);
-      });
-  });
-}
-
-function connectMcpServers(configs, scope) {
-  return Promise.all((configs || []).map((cfg) =>
-    connectOneMcpServer(cfg, scope).catch((err) => {
-      console.warn(`[agent] MCP server "${cfg.name}" (${scope}) failed to connect: ${err.message}`);
-    })
-  ));
-}
-
-function disconnectMcp(scope) {
-  for (const [key, client] of [...mcpClients.entries()]) {
-    if (client.scope !== scope) continue;
-    if (client.transport === 'stdio' && client.child) {
-      try { client.child.kill(); } catch (_) { /* already dead */ }
-    }
-    // --- NEW: MCP SSE --- stop the persistent GET stream and any pending
-    // reconnect backoff so a closed client doesn't keep retrying forever.
-    if (client.transport === 'streamable-http') {
-      client.closed = true;
-      if (client.sseRequest) { try { client.sseRequest.destroy(); } catch (_) { /* already closed */ } }
-    }
-    mcpClients.delete(key);
-  }
-}
-
-async function callMcpTool(namespacedName, args) {
-  // Namespaced as "mcp.<serverName>.<toolName>" — see buildToolDefs().
-  const parts = namespacedName.split('.');
-  const serverName = parts[1];
-  const toolName = parts.slice(2).join('.');
-  const client = [...mcpClients.values()].find((c) => c.name === serverName);
-  if (!client) return { ok: false, message: `MCP server "${serverName}" is not connected.` };
-  try {
-    const result = client.transport === 'streamable-http'
-      ? await mcpHttpStreamableRequest(client, 'tools/call', { name: toolName, arguments: args })
-      : client.transport === 'http'
-      ? await mcpHttpRequest(client, 'tools/call', { name: toolName, arguments: args })
-      : await mcpStdioRequest(client, 'tools/call', { name: toolName, arguments: args });
-    const text = (result && Array.isArray(result.content) && result.content.map((c) => c.text || '').join('\n'))
-      || JSON.stringify(result);
-    return { ok: true, message: text };
-  } catch (err) {
-    return { ok: false, message: err.message };
-  }
-}
-
-// --- Skills / project config loading ---------------------------------------
-function loadProjectSkills() {
-  try {
-    const p = path.join(projectRoot, AGENT_PROJECT_DIR, 'skills.json');
-    if (fs.existsSync(p)) {
-      const arr = JSON.parse(fs.readFileSync(p, 'utf-8'));
-      return Array.isArray(arr) ? arr.map((s) => ({ ...s, scope: 'project' })) : [];
-    }
-  } catch (err) { console.warn('[agent] Could not load project skills:', err.message); }
-  return [];
-}
-
-function loadProjectMcpConfig() {
-  try {
-    const p = path.join(projectRoot, AGENT_PROJECT_DIR, 'mcp.json');
-    if (fs.existsSync(p)) {
-      const parsed = JSON.parse(fs.readFileSync(p, 'utf-8'));
-      if (Array.isArray(parsed)) return parsed;
-      if (Array.isArray(parsed.servers)) return parsed.servers;
-    }
-  } catch (err) { console.warn('[agent] Could not load project MCP config:', err.message); }
-  return [];
-}
-
 // --- Mode transitions --------------------------------------------------------
+// Switching projectRoot switches the ACTIVE chat session (each project keeps
+// its own cached history — see chatSessions above); it never wipes messages.
 async function setProjectRoot(newRoot, sendToRenderer) {
-  disconnectMcp('project');
   projectRoot = newRoot;
-  projectSkills = loadProjectSkills();
-  projectMcpServers = loadProjectMcpConfig();
-  await connectMcpServers(projectMcpServers, 'project');
   globalConfig.lastProjectPath = projectRoot;
   saveAgentConfig(globalConfig);
   lastWrite = null; // --- NEW: undo --- undo slot doesn't survive a project switch
+  activeSessionKey = sessionKeyFor(projectRoot);
+  getSession(activeSessionKey); // ensure it exists (so it shows up immediately as a chat tab)
   sendToRenderer(IPC_CHANNELS.AGENT_MODE_CHANGED, { mode: 'project', projectRoot });
   sendToRenderer(IPC_CHANNELS.AGENT_UNDO_STATE, { canUndo: false });
 }
 
 async function clearProjectFolder(sendToRenderer) {
-  disconnectMcp('project');
   projectRoot = null;
-  projectSkills = [];
-  projectMcpServers = [];
   globalConfig.lastProjectPath = null;
   saveAgentConfig(globalConfig);
   lastWrite = null; // --- NEW: undo ---
+  activeSessionKey = sessionKeyFor(null);
   sendToRenderer(IPC_CHANNELS.AGENT_MODE_CHANGED, { mode: 'global', projectRoot: null });
   sendToRenderer(IPC_CHANNELS.AGENT_UNDO_STATE, { canUndo: false });
 }
@@ -906,7 +599,7 @@ async function selectProjectFolder(dialog, getMainWindow, sendToRenderer) {
   const result = await dialog.showOpenDialog(getMainWindow(), { properties: ['openDirectory'] });
   if (result.canceled || !result.filePaths.length) return null;
   await setProjectRoot(result.filePaths[0], sendToRenderer);
-  return projectRoot;
+  return { projectRoot, messages: getActiveMessages() };
 }
 
 // --- Tool catalogue + dispatch -----------------------------------------------
@@ -933,27 +626,12 @@ function buildToolDefs(mode) {
       { type: 'function', function: { name: 'run_command', description: 'Run a shell command in the project root (30s timeout). Pauses for user approval before executing.', parameters: { type: 'object', properties: { command: { type: 'string' } }, required: ['command'] } } }
     );
   }
-
-  for (const client of mcpClients.values()) {
-    if (client.scope === 'project' && mode !== 'project') continue;
-    for (const t of client.tools || []) {
-      tools.push({
-        type: 'function',
-        function: {
-          name: `mcp.${client.name}.${t.name}`,
-          description: t.description || `Tool "${t.name}" from MCP server "${client.name}".`,
-          parameters: t.inputSchema || { type: 'object', properties: {} }
-        }
-      });
-    }
-  }
   return tools;
 }
 
 async function executeTool(sendToRenderer, name, args) {
   try {
     if (name === 'scratchpad_write') return await toolScratchpadWrite(args);
-    if (name.startsWith('mcp.')) return await callMcpTool(name, args);
     if (getMode() !== 'project') return { ok: false, message: `Tool "${name}" is only available in Project mode.` };
     switch (name) {
       case 'list_directory': return { ok: true, message: await toolListDirectory(args) };
@@ -1014,17 +692,16 @@ function initAgentController({ ipcMain, dialog, sendToRenderer, getMainWindow })
   // Best-effort: reopen the last project folder from a previous run.
   if (globalConfig.lastProjectPath && fs.existsSync(globalConfig.lastProjectPath)) {
     projectRoot = globalConfig.lastProjectPath;
-    projectSkills = loadProjectSkills();
-    projectMcpServers = loadProjectMcpConfig();
-    connectMcpServers(projectMcpServers, 'project').catch(() => {});
   }
-  connectMcpServers(globalMcpServers, 'global').catch(() => {});
+  activeSessionKey = sessionKeyFor(projectRoot);
+  getSession('global');
+  getSession(activeSessionKey);
 
   ipcMain.handle(IPC_CHANNELS.SELECT_PROJECT_FOLDER, () => selectProjectFolder(dialog, getMainWindow, sendToRenderer));
 
   ipcMain.handle(IPC_CHANNELS.CLEAR_PROJECT_FOLDER, async () => {
     await clearProjectFolder(sendToRenderer);
-    return true;
+    return { projectRoot: null, messages: getActiveMessages() };
   });
 
   ipcMain.handle(IPC_CHANNELS.GET_AGENT_MODE, () => ({ mode: getMode(), projectRoot, canUndo: !!lastWrite }));
@@ -1072,22 +749,15 @@ function initAgentController({ ipcMain, dialog, sendToRenderer, getMainWindow })
   });
 
   ipcMain.handle(IPC_CHANNELS.START_AGENT_SESSION, () => {
-    sessionMessages = [];
+    // NOTE: no longer wipes history — each project (+ Global) keeps its own
+    // cached chatSessions entry, so re-opening the app / re-selecting a
+    // project restores prior context instead of starting from a blank slate.
     abortRequested = false;
-    lastWrite = null; // --- NEW: undo --- fresh session, nothing to revert into
-    return { mode: getMode(), projectRoot };
+    return { mode: getMode(), projectRoot, messages: getActiveMessages() };
   });
 
   ipcMain.handle(IPC_CHANNELS.STOP_AGENT_SESSION, () => {
     abortRequested = true;
-    // Resolve every pending approval/diff as "denied" so a tool call blocked
-    // on user input can't hang the turn forever after a stop; the run loop
-    // sees abortRequested and exits cleanly.
-    const deny = (resolve) => { try { resolve(false); } catch (_) { /* already settled */ } };
-    pendingApprovals.forEach(deny);
-    pendingDiffPreviews.forEach(deny);
-    pendingApprovals.clear();
-    pendingDiffPreviews.clear();
     return true;
   });
 
@@ -1126,41 +796,53 @@ function initAgentController({ ipcMain, dialog, sendToRenderer, getMainWindow })
 
   ipcMain.handle(IPC_CHANNELS.GET_AGENT_CONFIG, () => ({ ...globalConfig, mode: getMode(), projectRoot }));
 
+  // --- NEW: per-project cached chat sessions ---
+  ipcMain.handle(IPC_CHANNELS.AGENT_GET_CHAT_SESSIONS, () => {
+    return Array.from(chatSessions.entries())
+      .map(([key, sess]) => ({
+        key,
+        label: key === 'global' ? 'Global' : (path.basename(key) || key),
+        messageCount: sess.messages.length,
+        updatedAt: sess.updatedAt || 0
+      }))
+      // Global always first; the rest most-recently-active first.
+      .sort((a, b) => {
+        if (a.key === 'global') return -1;
+        if (b.key === 'global') return 1;
+        return (b.updatedAt || 0) - (a.updatedAt || 0);
+      });
+  });
+
+  ipcMain.handle(IPC_CHANNELS.AGENT_SWITCH_CHAT, (event, key) => {
+    if (!key || key === 'global') {
+      projectRoot = null;
+    } else if (fs.existsSync(key)) {
+      projectRoot = key;
+      globalConfig.lastProjectPath = key;
+      saveAgentConfig(globalConfig);
+    } else {
+      // The project this chat belonged to no longer exists on disk — fall
+      // back to Global rather than switching into a dead project root.
+      projectRoot = null;
+    }
+    activeSessionKey = sessionKeyFor(projectRoot);
+    getSession(activeSessionKey);
+    lastWrite = null;
+    sendToRenderer(IPC_CHANNELS.AGENT_MODE_CHANGED, { mode: getMode(), projectRoot });
+    sendToRenderer(IPC_CHANNELS.AGENT_UNDO_STATE, { canUndo: false });
+    return { mode: getMode(), projectRoot, messages: getActiveMessages() };
+  });
+
   ipcMain.handle(IPC_CHANNELS.SAVE_AGENT_CONFIG, async (event, config) => {
     globalConfig = { ...globalConfig, ...(config || {}) };
+    // --- NEW: streaming support --- strip out any transient/renamed keys we
+    // don't own (e.g. legacy globalMcpServers) so they can't sneak back in
+    // and confuse the renderer. Always re-derive from DEFAULT_AGENT_CONFIG
+    // shape — no MCP reconnect, there's nothing to reconnect anymore.
+    const { lastProjectPath, selectedModel, streamResponses, alwaysApproveWrites } = globalConfig;
+    globalConfig = { lastProjectPath, selectedModel, streamResponses, alwaysApproveWrites };
     saveAgentConfig(globalConfig);
-    if (Array.isArray(config && config.globalMcpServers)) {
-      disconnectMcp('global');
-      globalMcpServers = config.globalMcpServers;
-      await connectMcpServers(globalMcpServers, 'global');
-    }
     return globalConfig;
-  });
-
-  ipcMain.handle(IPC_CHANNELS.GET_SKILLS, () => ({
-    global: globalSkills,
-    project: getMode() === 'project' ? projectSkills : []
-  }));
-
-  ipcMain.handle(IPC_CHANNELS.SAVE_SKILLS, (event, skills) => {
-    // Only global skills are editable from the UI; project skills are
-    // read-only here — they live in the project's own .agent/skills.json.
-    globalSkills = Array.isArray(skills) ? skills : [];
-    saveAgentSkills(globalSkills);
-    return globalSkills;
-  });
-
-  ipcMain.handle(IPC_CHANNELS.GET_MCP_STATUS, () => {
-    return [...mcpClients.values()]
-      .filter((c) => c.scope === 'global' || (c.scope === 'project' && getMode() === 'project'))
-      .map((c) => ({
-        name: c.name,
-        scope: c.scope,
-        transport: c.transport,
-        tools: (c.tools || []).map((t) => t.name),
-        status: c.status || 'connected', // older records with no status field predate this and were connected
-        statusMessage: c.statusMessage || null
-      }));
   });
 }
 

@@ -15,23 +15,50 @@ const DEFAULT_COOKIE_USER_AGENT =
 
 const LOG_MARKERS = {
   SUCCESS: 'OK (',
-  // Tagged prefixes used by proxy-server.js so renderer.js can split the single
-  // console -> DEV_LOG stream into the Request Logs / Response Logs sub-tabs
-  // without adding a second IPC channel. Each tagged line is followed by a
-  // JSON payload (see logRequestLine/logResponseLine in proxy-server.js).
-  REQUEST: '[REQ]',
-  RESPONSE: '[RES]',
   // Emitted by large-context-dispatcher.js for chunk/lane progress so the
   // existing Developer Logs console feed shows dispatcher activity without
   // needing a dedicated IPC channel.
   DISPATCH: '[LCD]'
 };
 
+// Canonical provider name for Qwen — used by the cookie-capture script so the
+// provider literal never drifts between capture, config-write, and logs.
+const QWEN_PROVIDER_NAME = 'Qwen';
+
+// Data-file role keys passed to state-store.getFilePath(). Centralized here so
+// the fetch-models / browser-http-client / setup-qwen-cookie scripts all agree
+// on the same registry keys (and so a rename is a one-line change, not a
+// search-and-replace across every module that touches data files).
+const FILE_ROLES = {
+  PROVIDER_CONFIG: 'providerConfig',
+  ENV: 'env',
+  WEB_PROVIDER_RULES: 'webProviderRules',
+  LATEST_MODELS: 'latestModels',
+  MODELS: 'models'
+};
+
+// Browser in-page fetch timeouts (browser-http-client.js).
+// BROWSER_FETCH_TIMEOUT_MS is the inner AbortController timeout INSIDE the
+// page.evaluate fetch (kills the fetch itself). BROWSER_FETCH_HANG_GUARD_MS is
+// the outer Promise.race guard in request() that only exists to catch a
+// Playwright-level hang (page.evaluate never resolving). The outer guard MUST
+// be meaningfully longer than the inner timeout, otherwise the two races fire
+// at the same moment and the generic "timed out" error can win over the more
+// specific inner one on perfectly normal requests.
+const BROWSER_FETCH_TIMEOUT_MS = 60000;
+const BROWSER_FETCH_HANG_GUARD_MS = 70000;
+
 const IPC_CHANNELS = {
   // Proxy control
   START_PROXY: 'start-proxy',
   STOP_PROXY: 'stop-proxy',
   IS_PROXY_RUNNING: 'is-proxy-running',
+  // --- NEW: INITIALIZE button ---
+  // renderer->main: ensure the proxy is up before starting the agent (the
+  // agent routes every model call through the local proxy). If already
+  // running returns immediately; if down, starts it with the current config
+  // entries + default port 8000.
+  ENSURE_PROXY_RUNNING: 'ensure-proxy-running',
   GET_PROXY_STATS: 'get-proxy-stats',
 
   // Priority override / known-OK
@@ -59,7 +86,6 @@ const IPC_CHANNELS = {
   SAVE_CONFIG: 'save-config',
   OPEN_CONFIG_FILE_DIALOG: 'open-config-file-dialog',
   PARSE_CONFIG_CSV_FILE: 'parse-config-csv-file',
-  PARSE_CONFIG_EXCEL_FILE: 'parse-config-excel-file',
   CONFIG_READY: 'config-ready',
 
   // Fetch models (LatestModels.csv)
@@ -104,12 +130,18 @@ const IPC_CHANNELS = {
   AGENT_SEND_MESSAGE: 'agent-send-message',
   AGENT_APPROVAL_RESPONSE: 'agent-approval-response',
 
-  // Agent config / skills / MCP servers (global, persisted in agent-config.json / skills.json)
+   // Agent config (global, persisted in agent-config.json)
   GET_AGENT_CONFIG: 'get-agent-config',
   SAVE_AGENT_CONFIG: 'save-agent-config',
-  GET_SKILLS: 'get-skills',
-  SAVE_SKILLS: 'save-skills',
-  GET_MCP_STATUS: 'get-mcp-status',
+
+  // --- NEW: per-project cached chat sessions ---
+  // renderer -> main: list of chat sessions (Global + one per project the
+  // user has visited this run/loaded from the cache file) for the chat-tab
+  // strip in the Agent tab.
+  AGENT_GET_CHAT_SESSIONS: 'agent:get-chat-sessions',
+  // renderer -> main: switch the active chat session by key ('global' or an
+  // absolute project path). Returns { mode, projectRoot, messages }.
+  AGENT_SWITCH_CHAT: 'agent:switch-chat',
 
   // main -> renderer streaming/event channels (renderer subscribes via preload's onX helpers)
   AGENT_STREAM_CHUNK: 'agent:stream-chunk',
@@ -121,6 +153,14 @@ const IPC_CHANNELS = {
   AGENT_STREAM_END: 'agent:stream-end',
   AGENT_TOOL_START: 'agent:tool-start',
   AGENT_TOOL_RESULT: 'agent:tool-result',
+  // --- NEW: task-progress panel ---
+  // Emitted alongside the per-tool events above so the Task Progress sidebar
+  // panel can mirror the agent's activity in a compact list view.
+  //   AGENT_TOOL_LIST:  { tools: string[] }  — current turn's available tool names
+  //   AGENT_TOKEN_USAGE: { prompt, completion, total, estimated } — per-request
+  //                      token counts (cumulative within a turn)
+  AGENT_TOOL_LIST: 'agent:tool-list',
+  AGENT_TOKEN_USAGE: 'agent:token-usage',
   AGENT_APPROVAL_REQUEST: 'agent:approval-request',
   AGENT_DONE: 'agent:done',
   AGENT_ERROR: 'agent:error',
@@ -137,71 +177,4 @@ const IPC_CHANNELS = {
   AGENT_UNDO_STATE: 'agent:undo-state',
 };
 
-// --- NEW: auth-type + default web provider identifiers ---
-// Used by setup-web-provider.js / proxy-server.js / fetch-models.js so the
-// bearer-vs-cookie auth choice and provider names are single-sourced.
-const AUTH_TYPE_BEARER = 'bearer';
-const AUTH_TYPE_COOKIE = 'cookie';
-
-const DEFAULT_QWEN_NAME = 'Qwen';
-const DEFAULT_QWEN_URL = 'https://chat.qwen.ai';
-const DEFAULT_KIMI_NAME = 'Kimi';
-const DEFAULT_KIMI_URL = 'https://kimi.moonshot.cn';
-
-// --- NEW: agent workspace directories (project-scoped) ---
-// agent-controller.js resolves these relative to the selected project root so
-// Global mode uses <projectRoot>/.agent/ while Project mode keeps agent state
-// inside the user's repo without leaking outside it.
-const AGENT_PROJECT_DIR = '.agent';
-const AGENT_SCRATCHPAD_DIR = 'agent-scratchpad';
-// Persisted key for the Kimi refresh token in the app's config store; the
-// Kimi web client and setup-web-provider flows reference this instead of
-// hand-copied string literals.
-const KIMI_REFRESH_TOKEN_KEY = 'kimi_refresh_token';
-// Finish reasons used across the proxy/tool-calling path; tokenizer code and
-// tool-calling-translator.js compare against these instead of raw literals.
-const FINISH_REASON_TOOL_CALLS = 'tool_calls';
-const FINISH_REASON_STOP = 'stop';
-
-// --- NEW: central timeout registry (ms) ---
-// Every hardcoded setTimeout/setInterval delay in the codebase belongs here so
-// tuning one number (e.g. reducing the client idle timeout) doesn't require
-// hunting through per-file literals.
-const TIMEOUTS = {
-  // Periodic health/ping cadence for provider liveness checks.
-  PING_MS: 8000,
-  // Agent run_command execution cap.
-  COMMAND_MS: 30000,
-  // MCP tool request cap.
-  MCP_REQUEST_MS: 15000,
-  // Proxy client idle disconnect cap.
-  CLIENT_IDLE_MS: 90000,
-  // Kimi web-client streaming idle cap.
-  KIMI_STREAM_MS: 120000,
-  // Browser HTTP client request cap (fetch-models / model list refresh).
-  BROWSER_FETCH_MS: 60000,
-  // Chat UI non-streamed request cap.
-  CHAT_UI_MS: 60000,
-  // Health-check interval used by main's health ping.
-  HEALTH_CHECK_MS: 15000,
-  // Renderer's proxy-stats poll cadence (kept in ms; UI-only).
-  POLL_STATS_MS: 3000
-};
-
-module.exports = {
-  IPC_CHANNELS,
-  LOG_MARKERS,
-  DEFAULT_COOKIE_USER_AGENT,
-  AUTH_TYPE_BEARER,
-  AUTH_TYPE_COOKIE,
-  DEFAULT_QWEN_NAME,
-  DEFAULT_QWEN_URL,
-  DEFAULT_KIMI_NAME,
-  DEFAULT_KIMI_URL,
-  AGENT_PROJECT_DIR,
-  AGENT_SCRATCHPAD_DIR,
-  KIMI_REFRESH_TOKEN_KEY,
-  FINISH_REASON_TOOL_CALLS,
-  FINISH_REASON_STOP,
-  TIMEOUTS
-};
+module.exports = { IPC_CHANNELS, LOG_MARKERS, DEFAULT_COOKIE_USER_AGENT, QWEN_PROVIDER_NAME, FILE_ROLES, BROWSER_FETCH_TIMEOUT_MS, BROWSER_FETCH_HANG_GUARD_MS };

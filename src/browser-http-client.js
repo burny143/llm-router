@@ -2,7 +2,12 @@
 const { chromium } = require('playwright');
 const path = require('path');
 const { getFilePath } = require('./state-store');
-const { TIMEOUTS } = require('./shared-constants');
+const {
+  DEFAULT_COOKIE_USER_AGENT,
+  FILE_ROLES,
+  BROWSER_FETCH_TIMEOUT_MS,
+  BROWSER_FETCH_HANG_GUARD_MS
+} = require('./shared-constants');
 
 // Same marker set for the initial clean-load check and the response check, so a
 // challenge is detected in both places (the union of the old PAGE_/RESPONSE_
@@ -50,7 +55,7 @@ class BrowserHttpClient {
   }
 
    async _launchContext(profileKey) {
-    const dataDir = path.dirname(getFilePath('providerConfig'));
+    const dataDir = path.dirname(getFilePath(FILE_ROLES.PROVIDER_CONFIG));
     const profileDir = path.join(dataDir, 'browser-profiles', profileKey || 'proxy-client');
     const base = {
       ignoreDefaultArgs: ['--enable-automation'],
@@ -58,7 +63,11 @@ class BrowserHttpClient {
         '--disable-blink-features=AutomationDetected',
         '--start-minimized',
         '--window-position=-32000,-32000'
-      ]
+      ],
+      // Single shared desktop-Chrome User-Agent for every Cookie-auth provider
+      // request. Imported from shared-constants.js (not a local literal) so it
+      // can't drift out of sync with the cookie-capture script's UA.
+      userAgent: DEFAULT_COOKIE_USER_AGENT
     };
     const attempts = [
       { label: 'system Google Chrome (minimized)', channel: 'chrome', headless: false },
@@ -170,22 +179,24 @@ class BrowserHttpClient {
       } finally {
         clearTimeout(timer);
       }
-    }, { url, payload, headers, method, timeoutMs: TIMEOUTS.BROWSER_FETCH_MS });
+    }, { url, payload, headers, method, timeoutMs: BROWSER_FETCH_TIMEOUT_MS });
   }
 
-   async request(url, payload, headers, cookies, profileKey) {
+   async request(url, payload, headers, cookies, profileKey, method = 'POST') {
     const session = await this._getSession(url, cookies, profileKey);
     // NOTE: cookies were already injected inside _getSession — no second call here.
-    console.log(`[BrowserHttpClient] dispatching in-page fetch to ${url.toString().slice(0, 80)} payload=${JSON.stringify(payload).slice(0, 120)}`);
+    console.log(`[BrowserHttpClient] dispatching in-page ${method} to ${url.toString().slice(0, 80)} payload=${JSON.stringify(payload).slice(0, 120)}`);
 
      // Outer timeout: catches a Playwright-level hang (page.evaluate never resolves).
-     // 60s to match Qwen's thinking-mode latency for real questions (the ping "hi" is
-     // trivially fast, but real messages trigger server-side thinking that can take 15-40s).
+     // BROWSER_FETCH_HANG_GUARD_MS is deliberately LONGER than the inner
+     // AbortController timeout (BROWSER_FETCH_TIMEOUT_MS) so this guard only
+     // fires on a genuine Playwright-level hang, never on ordinary race
+     // ambiguity with the inner fetch timeout.
      let result;
      try {
        result = await Promise.race([
-         this._fetchInPage(session.page, url, payload, headers),
-         new Promise((_, rej) => setTimeout(() => rej(new Error('browser fetch timed out')), TIMEOUTS.BROWSER_FETCH_MS))
+         this._fetchInPage(session.page, url, payload, headers, method),
+         new Promise((_, rej) => setTimeout(() => rej(new Error('browser fetch timed out')), BROWSER_FETCH_HANG_GUARD_MS))
        ]);
      } catch (e) {
        console.log(`[BrowserHttpClient] in-page fetch ABORTED: ${e.message}`);
@@ -199,7 +210,7 @@ class BrowserHttpClient {
      if (containsAny(result.text, WAF_MARKERS)) {
        console.log(`[BrowserHttpClient] WAF/challenge markers detected in response, reloading origin...`);
        await this._loadOriginClean(session.page, originForUrl(url));
-       result = await this._fetchInPage(session.page, url, payload, headers);
+       result = await this._fetchInPage(session.page, url, payload, headers, method);
        if (!result.ok) throw new Error(`Browser fetch failed: ${result.text}`);
        if (containsAny(result.text, WAF_MARKERS)) {
          throw new Error('WAF/CAPTCHA detected in browser response');

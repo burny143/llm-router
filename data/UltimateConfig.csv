@@ -4,64 +4,1389 @@ Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,kilo-a
 Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,kilo-auto/efficient,true,Bearer
 Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,kilo-auto/free,true,Bearer
 Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,stepfun/step-3.7-flash:free,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,poolside/laguna-s-2.1:free,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,tencent/hy3:free,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,anthropic/claude-sonnet-5,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,anthropic/claude-opus-5,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,openai/gpt-5.6-sol,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,stealth/gpt-5.6-sol,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,deepseek/deepseek-v4-pro:discounted,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,z-ai/glm-5.2,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,moonshotai/kimi-k3,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,minimax/minimax-m3,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,qwen/qwen3.7-plus,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,inclusionai/ling-3.0-tiny:free,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,meta/muse-spark-1.2,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,qwen/qwen3.8-max,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,~deepseek/deepseek-v4-flash-latest,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,deepseek/deepseek-v4-flash-0731,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,thinkingmachines/inkling-small,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,qwen/qwen3.7-flash,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,anthropic/claude-opus-5-fast,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,inclusionai/ling-3.0-flash,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,poolside/laguna-s-2.1,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,google/gemini-3.6-flash,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,google/gemini-3.5-flash-lite,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,meituan/longcat-2.0,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,thinkingmachines/inkling,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,openrouter/auto-beta,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,meta/muse-spark-1.1,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,kwaipilot/kat-coder-air-v2.5,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,kwaipilot/kat-coder-pro-v2.5,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,openai/gpt-5.6-luna-pro,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,openai/gpt-5.6-luna,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,openai/gpt-5.6-terra-pro,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,openai/gpt-5.6-terra,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,openai/gpt-5.6-sol-pro,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,x-ai/grok-4.5,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,~x-ai/grok-latest,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,aion-labs/aion-3.0-mini,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,aion-labs/aion-3.0,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,tencent/hy3,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,poolside/laguna-xs-2.1,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,poolside/laguna-xs-2.1:free,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,google/gemini-3.1-flash-lite-image,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,nex-agi/nex-n2-mini,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,sakana/fugu-ultra,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,google/gemini-3.1-flash-image,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,google/gemini-3-pro-image,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,cohere/north-mini-code:free,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,openrouter/fusion,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,moonshotai/kimi-k2.7-code,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,~anthropic/claude-fable-latest,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,anthropic/claude-fable-5,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,nex-agi/nex-n2-pro,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,nvidia/nemotron-3.5-content-safety:free,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,nvidia/nemotron-3-ultra-550b-a55b,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,nvidia/nemotron-3-ultra-550b-a55b:free,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,stepfun/step-3.7-flash,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,anthropic/claude-opus-4.8-fast,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,anthropic/claude-opus-4.8,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,qwen/qwen3.7-max,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,x-ai/grok-build-0.1,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,google/gemini-3.5-flash,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,anthropic/claude-opus-4.7-fast,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,perceptron/perceptron-mk1,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,inclusionai/ring-2.6-1t,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,google/gemini-3.1-flash-lite,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,openai/gpt-chat-latest,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,x-ai/grok-4.3,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,ibm-granite/granite-4.1-8b,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,mistralai/mistral-medium-3-5,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,~anthropic/claude-haiku-latest,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,~openai/gpt-mini-latest,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,~google/gemini-pro-latest,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,~moonshotai/kimi-latest,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,~google/gemini-flash-latest,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,~anthropic/claude-sonnet-latest,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,~openai/gpt-latest,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,qwen/qwen3.5-plus-20260420,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,qwen/qwen3.6-flash,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,qwen/qwen3.6-35b-a3b,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,qwen/qwen3.6-max-preview,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,qwen/qwen3.6-27b,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,openai/gpt-5.5-pro,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,openai/gpt-5.5,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,deepseek/deepseek-v4-pro,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,deepseek/deepseek-v4-flash,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,inclusionai/ling-2.6-1t,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,tencent/hy3-preview,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,xiaomi/mimo-v2.5-pro,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,xiaomi/mimo-v2.5,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,openai/gpt-5.4-image-2,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,inclusionai/ling-2.6-flash,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,~anthropic/claude-opus-latest,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,openrouter/pareto-code,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,moonshotai/kimi-k2.6,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,anthropic/claude-opus-4.7,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,z-ai/glm-5.1,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,google/gemma-4-26b-a4b-it,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,google/gemma-4-31b-it,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,qwen/qwen3.6-plus,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,z-ai/glm-5v-turbo,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,arcee-ai/trinity-large-thinking,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,x-ai/grok-4.20-multi-agent,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,x-ai/grok-4.20,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,google/lyria-3-pro-preview,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,google/lyria-3-clip-preview,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,kwaipilot/kat-coder-pro-v2,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,rekaai/reka-edge,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,minimax/minimax-m2.7,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,openai/gpt-5.4-nano,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,openai/gpt-5.4-mini,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,mistralai/mistral-small-2603,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,z-ai/glm-5-turbo,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,nvidia/nemotron-3-super-120b-a12b,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,nvidia/nemotron-3-super-120b-a12b:free,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,bytedance-seed/seed-2.0-lite,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,qwen/qwen3.5-9b,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,openai/gpt-5.4-pro,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,openai/gpt-5.4,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,inception/mercury-2,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,openai/gpt-5.3-chat,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,google/gemini-3.1-flash-lite-preview,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,bytedance-seed/seed-2.0-mini,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,google/gemini-3.1-flash-image-preview,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,qwen/qwen3.5-35b-a3b,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,qwen/qwen3.5-27b,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,qwen/qwen3.5-122b-a10b,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,qwen/qwen3.5-flash-02-23,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,google/gemini-3.1-pro-preview-customtools,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,openai/gpt-5.3-codex,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,aion-labs/aion-2.0,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,google/gemini-3.1-pro-preview,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,anthropic/claude-sonnet-4.6,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,qwen/qwen3.5-plus-02-15,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,qwen/qwen3.5-397b-a17b,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,minimax/minimax-m2.5,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,z-ai/glm-5,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,qwen/qwen3-max-thinking,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,anthropic/claude-opus-4.6,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,qwen/qwen3-coder-next,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,openrouter/free,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,stepfun/step-3.5-flash,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,moonshotai/kimi-k2.5,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,upstage/solar-pro-3,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,minimax/minimax-m2-her,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,writer/palmyra-x5,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,openai/gpt-audio,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,openai/gpt-audio-mini,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,z-ai/glm-4.7-flash,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,openai/gpt-5.2-codex,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,bytedance-seed/seed-1.6-flash,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,bytedance-seed/seed-1.6,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,minimax/minimax-m2.1,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,z-ai/glm-4.7,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,google/gemini-3-flash-preview,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,nvidia/nemotron-3-nano-30b-a3b,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,openai/gpt-5.2-chat,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,openai/gpt-5.2-pro,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,openai/gpt-5.2,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,relace/relace-search,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,z-ai/glm-4.6v,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,openrouter/bodybuilder,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,openai/gpt-5.1-codex-max,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,amazon/nova-2-lite-v1,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,mistralai/ministral-14b-2512,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,mistralai/ministral-8b-2512,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,mistralai/ministral-3b-2512,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,mistralai/mistral-large-2512,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,deepseek/deepseek-v3.2,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,anthropic/claude-opus-4.5,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,allenai/olmo-3-32b-think,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,google/gemini-3-pro-image-preview,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,deepcogito/cogito-v2.1-671b,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,openai/gpt-5.1,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,openai/gpt-5.1-codex,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,openai/gpt-5.1-codex-mini,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,moonshotai/kimi-k2-thinking,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,amazon/nova-premier-v1,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,perplexity/sonar-pro-search,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,mistralai/voxtral-small-24b-2507,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,openai/gpt-oss-safeguard-20b,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,minimax/minimax-m2,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,qwen/qwen3-vl-32b-instruct,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,ibm-granite/granite-4.0-h-micro,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,openai/gpt-5-image-mini,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,anthropic/claude-haiku-4.5,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,qwen/qwen3-vl-8b-thinking,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,qwen/qwen3-vl-8b-instruct,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,openai/gpt-5-image,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,google/gemini-2.5-flash-image,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,qwen/qwen3-vl-30b-a3b-thinking,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,qwen/qwen3-vl-30b-a3b-instruct,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,openai/gpt-5-pro,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,z-ai/glm-4.6,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,anthropic/claude-sonnet-4.5,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,deepseek/deepseek-v3.2-exp,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,thedrummer/cydonia-24b-v4.1,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,relace/relace-apply-3,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,qwen/qwen3-vl-235b-a22b-thinking,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,qwen/qwen3-vl-235b-a22b-instruct,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,qwen/qwen3-max,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,qwen/qwen3-coder-plus,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,deepseek/deepseek-v3.1-terminus,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,qwen/qwen3-coder-flash,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,qwen/qwen3-next-80b-a3b-thinking,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,qwen/qwen3-next-80b-a3b-instruct,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,qwen/qwen-plus-2025-07-28,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,qwen/qwen-plus-2025-07-28:thinking,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,moonshotai/kimi-k2-0905,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,qwen/qwen3-30b-a3b-thinking-2507,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,nousresearch/hermes-4-70b,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,nousresearch/hermes-4-405b,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,deepseek/deepseek-chat-v3.1,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,mistralai/mistral-medium-3.1,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,z-ai/glm-4.5v,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,ai21/jamba-large-1.7,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,openai/gpt-5,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,openai/gpt-5-mini,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,openai/gpt-5-nano,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,openai/gpt-oss-120b,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,openai/gpt-oss-20b,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,anthropic/claude-opus-4.1,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,mistralai/codestral-2508,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,qwen/qwen3-coder-30b-a3b-instruct,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,qwen/qwen3-30b-a3b-instruct-2507,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,z-ai/glm-4.5,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,z-ai/glm-4.5-air,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,qwen/qwen3-235b-a22b-thinking-2507,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,qwen/qwen3-coder,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,bytedance/ui-tars-1.5-7b,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,google/gemini-2.5-flash-lite,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,qwen/qwen3-235b-a22b-2507,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,moonshotai/kimi-k2,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,cognitivecomputations/dolphin-mistral-24b-venice-edition,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,tencent/hunyuan-a13b-instruct,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,morph/morph-v3-large,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,morph/morph-v3-fast,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,baidu/ernie-4.5-vl-424b-a47b,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,mistralai/mistral-small-3.2-24b-instruct,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,minimax/minimax-m1,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,google/gemini-2.5-flash,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,google/gemini-2.5-pro,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,openai/o3-pro,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,google/gemini-2.5-pro-preview,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,deepseek/deepseek-r1-0528,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,anthropic/claude-opus-4,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,anthropic/claude-sonnet-4,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,google/gemma-3n-e4b-it,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,mistralai/mistral-medium-3,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,google/gemini-2.5-pro-preview-05-06,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,arcee-ai/virtuoso-large,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,meta-llama/llama-guard-4-12b,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,qwen/qwen3-30b-a3b,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,qwen/qwen3-8b,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,qwen/qwen3-14b,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,qwen/qwen3-32b,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,qwen/qwen3-235b-a22b,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,openai/o4-mini-high,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,openai/o3,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,openai/o4-mini,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,openai/gpt-4.1,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,openai/gpt-4.1-mini,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,openai/gpt-4.1-nano,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,meta-llama/llama-4-maverick,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,meta-llama/llama-4-scout,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,deepseek/deepseek-chat-v3-0324,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,openai/o1-pro,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,mistralai/mistral-small-3.1-24b-instruct,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,google/gemma-3-4b-it,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,google/gemma-3-12b-it,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,cohere/command-a,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,rekaai/reka-flash-3,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,google/gemma-3-27b-it,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,thedrummer/skyfall-36b-v2,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,perplexity/sonar-reasoning-pro,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,perplexity/sonar-pro,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,perplexity/sonar-deep-research,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,mistralai/mistral-saba,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,openai/o3-mini-high,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,aion-labs/aion-rp-llama-3.1-8b,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,qwen/qwen2.5-vl-72b-instruct,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,qwen/qwen-plus,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,openai/o3-mini,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,mistralai/mistral-small-24b-instruct-2501,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,perplexity/sonar,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,deepseek/deepseek-r1-distill-llama-70b,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,deepseek/deepseek-r1,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,minimax/minimax-01,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,microsoft/phi-4,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,deepseek/deepseek-chat,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,sao10k/l3.3-euryale-70b,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,openai/o1,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,cohere/command-r7b-12-2024,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,meta-llama/llama-3.3-70b-instruct,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,amazon/nova-lite-v1,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,amazon/nova-micro-v1,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,amazon/nova-pro-v1,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,openai/gpt-4o-2024-11-20,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,mistralai/mistral-large-2407,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,qwen/qwen-2.5-coder-32b-instruct,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,thedrummer/unslopnemo-12b,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,anthracite-org/magnum-v4-72b,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,qwen/qwen-2.5-7b-instruct,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,thedrummer/rocinante-12b,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,meta-llama/llama-3.2-1b-instruct,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,meta-llama/llama-3.2-3b-instruct,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,qwen/qwen-2.5-72b-instruct,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,cohere/command-r-08-2024,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,cohere/command-r-plus-08-2024,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,sao10k/l3.1-euryale-70b,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,nousresearch/hermes-3-llama-3.1-70b,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,nousresearch/hermes-3-llama-3.1-405b,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,sao10k/l3-lunaris-8b,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,openai/gpt-4o-2024-08-06,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,meta-llama/llama-3.1-70b-instruct,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,meta-llama/llama-3.1-8b-instruct,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,mistralai/mistral-nemo,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,openai/gpt-4o-mini,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,openai/gpt-4o-mini-2024-07-18,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,google/gemma-2-27b-it,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,openai/gpt-4o,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,openai/gpt-4o-2024-05-13,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,mistralai/mixtral-8x22b-instruct,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,microsoft/wizardlm-2-8x22b,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,openai/gpt-4-turbo,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,anthropic/claude-3-haiku,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,mistralai/mistral-large,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,openai/gpt-3.5-turbo-0613,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,openai/gpt-4-turbo-preview,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,openrouter/auto,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,openai/gpt-3.5-turbo-instruct,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,openai/gpt-3.5-turbo-16k,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,mancer/weaver,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,undi95/remm-slerp-l2-13b,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,gryphe/mythomax-l2-13b,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,openai/gpt-3.5-turbo,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,openai/gpt-4,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,deepseek/deepseek-v4-flash:discounted,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,stealth/qwen3.6-plus,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,stealth/claude-opus-4.8,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,stealth/claude-opus-4.7,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,stealth/claude-sonnet-4.6,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,stealth/claude-opus-4.6,true,Bearer
+Kilo Gateway,https://api.kilo.ai/v1/chat/completions,KILO_GATEWAY_API_KEY,kilo-auto/small,true,Bearer
 NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,01-ai/yi-large,true,Bearer
 NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,adept/fuyu-8b,true,Bearer
 NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,ai21labs/jamba-1.5-large-instruct,true,Bearer
 NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,aisingapore/sea-lion-7b-instruct,true,Bearer
 NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,baai/bge-m3,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,bigcode/starcoder2-15b,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,databricks/dbrx-instruct,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,deepseek-ai/deepseek-coder-6.7b-instruct,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,deepseek-ai/deepseek-v4-flash,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,deepseek-ai/deepseek-v4-pro,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,google/codegemma-1.1-7b,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,google/codegemma-7b,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,google/deplot,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,google/diffusiongemma-26b-a4b-it,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,google/gemma-2b,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,google/gemma-3-12b-it,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,google/gemma-3-4b-it,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,google/gemma-4-31b-it,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,google/recurrentgemma-2b,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,ibm/granite-3.0-3b-a800m-instruct,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,ibm/granite-3.0-8b-instruct,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,ibm/granite-34b-code-instruct,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,ibm/granite-8b-code-instruct,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,meta/codellama-70b,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,meta/llama-3.1-70b-instruct,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,meta/llama-3.1-8b-instruct,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,meta/llama-3.2-11b-vision-instruct,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,meta/llama-3.2-1b-instruct,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,meta/llama-3.2-3b-instruct,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,meta/llama-3.2-90b-vision-instruct,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,meta/llama-3.3-70b-instruct,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,meta/llama-guard-4-12b,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,meta/llama2-70b,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,microsoft/kosmos-2,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,microsoft/phi-3-vision-128k-instruct,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,microsoft/phi-3.5-moe-instruct,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,minimaxai/minimax-m3,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,mistralai/codestral-22b-instruct-v0.1,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,mistralai/mistral-7b-instruct-v0.3,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,mistralai/mistral-large,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,mistralai/mistral-large-2-instruct,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,mistralai/mistral-medium-3.5-128b,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,mistralai/mistral-nemotron,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,mistralai/mixtral-8x22b-v0.1,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,moonshotai/kimi-k2.6,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,nv-mistralai/mistral-nemo-12b-instruct,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,nvidia/ai-synthetic-video-detector,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,nvidia/cosmos-reason2-8b,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,nvidia/embed-qa-4,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,nvidia/ising-calibration-1.5-31b,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,nvidia/llama-3.1-nemoguard-8b-content-safety,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,nvidia/llama-3.1-nemoguard-8b-topic-control,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,nvidia/llama-3.1-nemotron-51b-instruct,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,nvidia/llama-3.1-nemotron-70b-instruct,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,nvidia/llama-3.1-nemotron-nano-8b-v1,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,nvidia/llama-3.1-nemotron-nano-vl-8b-v1,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,nvidia/llama-3.1-nemotron-safety-guard-8b-v3,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,nvidia/llama-3.1-nemotron-ultra-253b-v1,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,nvidia/llama-3.2-nemoretriever-1b-vlm-embed-v1,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,nvidia/llama-3.2-nv-embedqa-1b-v1,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,nvidia/llama-3.3-nemotron-super-49b-v1,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,nvidia/llama-3.3-nemotron-super-49b-v1.5,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,nvidia/llama-nemotron-embed-1b-v2,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,nvidia/llama-nemotron-embed-vl-1b-v2,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,nvidia/llama3-chatqa-1.5-70b,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,nvidia/mistral-nemo-minitron-8b-8k-instruct,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,nvidia/nemoretriever-parse,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,nvidia/nemotron-3-embed-1b,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,nvidia/nemotron-3-nano-30b-a3b,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,nvidia/nemotron-3-nano-omni-30b-a3b-reasoning,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,nvidia/nemotron-3-super-120b-a12b,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,nvidia/nemotron-3-ultra-550b-a55b,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,nvidia/nemotron-3.5-content-safety,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,nvidia/nemotron-4-340b-instruct,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,nvidia/nemotron-4-340b-reward,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,nvidia/nemotron-mini-4b-instruct,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,nvidia/nemotron-nano-12b-v2-vl,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,nvidia/nemotron-nano-3-30b-a3b,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,nvidia/nemotron-parse,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,nvidia/neva-22b,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,nvidia/nv-embed-v1,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,nvidia/nv-embedcode-7b-v1,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,nvidia/nv-embedqa-e5-v5,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,nvidia/nv-embedqa-mistral-7b-v2,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,nvidia/nvclip,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,nvidia/nvidia-nemotron-nano-9b-v2,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,nvidia/riva-translate-4b-instruct,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,nvidia/riva-translate-4b-instruct-v1.1,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,nvidia/riva-translate-4b-instruct-v2,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,nvidia/vila,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,openai/gpt-oss-120b,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,openai/gpt-oss-20b,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,poolside/laguna-xs-2.1,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,snowflake/arctic-embed-l,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,stepfun-ai/step-3.7-flash,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,thinkingmachines/inkling,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,writer/palmyra-creative-122b,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,writer/palmyra-fin-70b-32k,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,writer/palmyra-med-70b,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,writer/palmyra-med-70b-32k,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,z-ai/glm-5.2,true,Bearer
+NVIDIA NIM,https://integrate.api.nvidia.com/v1/chat/completions,NVIDIA_NIM_API_KEY,zyphra/zamba2-7b-instruct,true,Bearer
 Mistral,https://api.mistral.ai/v1/chat/completions,MISTRAL_API_KEY,mistral-medium-2505,true,Bearer
 Mistral,https://api.mistral.ai/v1/chat/completions,MISTRAL_API_KEY,mistral-medium-2508,true,Bearer
 Mistral,https://api.mistral.ai/v1/chat/completions,MISTRAL_API_KEY,codestral-2508,true,Bearer
 Mistral,https://api.mistral.ai/v1/chat/completions,MISTRAL_API_KEY,codestral-latest,true,Bearer
 Mistral,https://api.mistral.ai/v1/chat/completions,MISTRAL_API_KEY,mistral-code-latest,true,Bearer
+Mistral,https://api.mistral.ai/v1/chat/completions,MISTRAL_API_KEY,mistral-code-fim-latest,true,Bearer
+Mistral,https://api.mistral.ai/v1/chat/completions,MISTRAL_API_KEY,devstral-2512,true,Bearer
+Mistral,https://api.mistral.ai/v1/chat/completions,MISTRAL_API_KEY,devstral-medium-latest,true,Bearer
+Mistral,https://api.mistral.ai/v1/chat/completions,MISTRAL_API_KEY,devstral-latest,true,Bearer
+Mistral,https://api.mistral.ai/v1/chat/completions,MISTRAL_API_KEY,mistral-code-agent-latest,true,Bearer
+Mistral,https://api.mistral.ai/v1/chat/completions,MISTRAL_API_KEY,mistral-small-2603,true,Bearer
+Mistral,https://api.mistral.ai/v1/chat/completions,MISTRAL_API_KEY,mistral-small-latest,true,Bearer
+Mistral,https://api.mistral.ai/v1/chat/completions,MISTRAL_API_KEY,mistral-vibe-cli-fast,true,Bearer
+Mistral,https://api.mistral.ai/v1/chat/completions,MISTRAL_API_KEY,magistral-small-latest,true,Bearer
+Mistral,https://api.mistral.ai/v1/chat/completions,MISTRAL_API_KEY,voxtral-small-2507,true,Bearer
+Mistral,https://api.mistral.ai/v1/chat/completions,MISTRAL_API_KEY,voxtral-small-latest,true,Bearer
+Mistral,https://api.mistral.ai/v1/chat/completions,MISTRAL_API_KEY,labs-leanstral-1-5-1,true,Bearer
+Mistral,https://api.mistral.ai/v1/chat/completions,MISTRAL_API_KEY,labs-leanstral-1-5,true,Bearer
+Mistral,https://api.mistral.ai/v1/chat/completions,MISTRAL_API_KEY,mistral-large-2512,true,Bearer
+Mistral,https://api.mistral.ai/v1/chat/completions,MISTRAL_API_KEY,mistral-large-latest,true,Bearer
+Mistral,https://api.mistral.ai/v1/chat/completions,MISTRAL_API_KEY,ministral-3b-2512,true,Bearer
+Mistral,https://api.mistral.ai/v1/chat/completions,MISTRAL_API_KEY,ministral-3b-latest,true,Bearer
+Mistral,https://api.mistral.ai/v1/chat/completions,MISTRAL_API_KEY,ministral-8b-2512,true,Bearer
+Mistral,https://api.mistral.ai/v1/chat/completions,MISTRAL_API_KEY,ministral-8b-latest,true,Bearer
+Mistral,https://api.mistral.ai/v1/chat/completions,MISTRAL_API_KEY,ministral-14b-2512,true,Bearer
+Mistral,https://api.mistral.ai/v1/chat/completions,MISTRAL_API_KEY,ministral-14b-latest,true,Bearer
+Mistral,https://api.mistral.ai/v1/chat/completions,MISTRAL_API_KEY,mistral-medium-latest,true,Bearer
+Mistral,https://api.mistral.ai/v1/chat/completions,MISTRAL_API_KEY,mistral-medium,true,Bearer
+Mistral,https://api.mistral.ai/v1/chat/completions,MISTRAL_API_KEY,mistral-medium-3-5,true,Bearer
+Mistral,https://api.mistral.ai/v1/chat/completions,MISTRAL_API_KEY,mistral-medium-3.5,true,Bearer
+Mistral,https://api.mistral.ai/v1/chat/completions,MISTRAL_API_KEY,mistral-medium-3,true,Bearer
+Mistral,https://api.mistral.ai/v1/chat/completions,MISTRAL_API_KEY,mistral-medium-2604,true,Bearer
+Mistral,https://api.mistral.ai/v1/chat/completions,MISTRAL_API_KEY,mistral-vibe-cli-latest,true,Bearer
+Mistral,https://api.mistral.ai/v1/chat/completions,MISTRAL_API_KEY,mistral-vibe-cli-with-tools,true,Bearer
+Mistral,https://api.mistral.ai/v1/chat/completions,MISTRAL_API_KEY,mistral-embed-2312,true,Bearer
+Mistral,https://api.mistral.ai/v1/chat/completions,MISTRAL_API_KEY,mistral-embed,true,Bearer
+Mistral,https://api.mistral.ai/v1/chat/completions,MISTRAL_API_KEY,codestral-embed,true,Bearer
+Mistral,https://api.mistral.ai/v1/chat/completions,MISTRAL_API_KEY,codestral-embed-2505,true,Bearer
+Mistral,https://api.mistral.ai/v1/chat/completions,MISTRAL_API_KEY,mistral-moderation-2603,true,Bearer
+Mistral,https://api.mistral.ai/v1/chat/completions,MISTRAL_API_KEY,mistral-ocr-2512,true,Bearer
+Mistral,https://api.mistral.ai/v1/chat/completions,MISTRAL_API_KEY,mistral-ocr-3-0,true,Bearer
+Mistral,https://api.mistral.ai/v1/chat/completions,MISTRAL_API_KEY,mistral-ocr-3,true,Bearer
+Mistral,https://api.mistral.ai/v1/chat/completions,MISTRAL_API_KEY,mistral-ocr-4-0,true,Bearer
+Mistral,https://api.mistral.ai/v1/chat/completions,MISTRAL_API_KEY,mistral-ocr-latest,true,Bearer
+Mistral,https://api.mistral.ai/v1/chat/completions,MISTRAL_API_KEY,mistral-ocr-4,true,Bearer
+Mistral,https://api.mistral.ai/v1/chat/completions,MISTRAL_API_KEY,mistral-ocr-4-1,true,Bearer
+Mistral,https://api.mistral.ai/v1/chat/completions,MISTRAL_API_KEY,voxtral-mini-2602,true,Bearer
+Mistral,https://api.mistral.ai/v1/chat/completions,MISTRAL_API_KEY,voxtral-mini-latest,true,Bearer
+Mistral,https://api.mistral.ai/v1/chat/completions,MISTRAL_API_KEY,voxtral-mini-transcribe-realtime-2602,true,Bearer
+Mistral,https://api.mistral.ai/v1/chat/completions,MISTRAL_API_KEY,voxtral-mini-realtime-2602,true,Bearer
+Mistral,https://api.mistral.ai/v1/chat/completions,MISTRAL_API_KEY,voxtral-mini-realtime-latest,true,Bearer
+Mistral,https://api.mistral.ai/v1/chat/completions,MISTRAL_API_KEY,voxtral-mini-tts-2603,true,Bearer
+Mistral,https://api.mistral.ai/v1/chat/completions,MISTRAL_API_KEY,voxtral-mini-tts-latest,true,Bearer
 Codestral,https://codestral.mistral.ai/v1/chat/completions,CODESTRAL_API_KEY,mistral-medium-2505,true,Bearer
 Codestral,https://codestral.mistral.ai/v1/chat/completions,CODESTRAL_API_KEY,mistral-medium-2508,true,Bearer
 Codestral,https://codestral.mistral.ai/v1/chat/completions,CODESTRAL_API_KEY,codestral-2508,true,Bearer
 Codestral,https://codestral.mistral.ai/v1/chat/completions,CODESTRAL_API_KEY,codestral-latest,true,Bearer
 Codestral,https://codestral.mistral.ai/v1/chat/completions,CODESTRAL_API_KEY,mistral-code-latest,true,Bearer
+Codestral,https://codestral.mistral.ai/v1/chat/completions,CODESTRAL_API_KEY,mistral-code-fim-latest,true,Bearer
+Codestral,https://codestral.mistral.ai/v1/chat/completions,CODESTRAL_API_KEY,devstral-2512,true,Bearer
+Codestral,https://codestral.mistral.ai/v1/chat/completions,CODESTRAL_API_KEY,devstral-medium-latest,true,Bearer
+Codestral,https://codestral.mistral.ai/v1/chat/completions,CODESTRAL_API_KEY,devstral-latest,true,Bearer
+Codestral,https://codestral.mistral.ai/v1/chat/completions,CODESTRAL_API_KEY,mistral-code-agent-latest,true,Bearer
+Codestral,https://codestral.mistral.ai/v1/chat/completions,CODESTRAL_API_KEY,mistral-small-2603,true,Bearer
+Codestral,https://codestral.mistral.ai/v1/chat/completions,CODESTRAL_API_KEY,mistral-small-latest,true,Bearer
+Codestral,https://codestral.mistral.ai/v1/chat/completions,CODESTRAL_API_KEY,mistral-vibe-cli-fast,true,Bearer
+Codestral,https://codestral.mistral.ai/v1/chat/completions,CODESTRAL_API_KEY,magistral-small-latest,true,Bearer
+Codestral,https://codestral.mistral.ai/v1/chat/completions,CODESTRAL_API_KEY,voxtral-small-2507,true,Bearer
+Codestral,https://codestral.mistral.ai/v1/chat/completions,CODESTRAL_API_KEY,voxtral-small-latest,true,Bearer
+Codestral,https://codestral.mistral.ai/v1/chat/completions,CODESTRAL_API_KEY,labs-leanstral-1-5-1,true,Bearer
+Codestral,https://codestral.mistral.ai/v1/chat/completions,CODESTRAL_API_KEY,labs-leanstral-1-5,true,Bearer
+Codestral,https://codestral.mistral.ai/v1/chat/completions,CODESTRAL_API_KEY,mistral-large-2512,true,Bearer
+Codestral,https://codestral.mistral.ai/v1/chat/completions,CODESTRAL_API_KEY,mistral-large-latest,true,Bearer
+Codestral,https://codestral.mistral.ai/v1/chat/completions,CODESTRAL_API_KEY,ministral-3b-2512,true,Bearer
+Codestral,https://codestral.mistral.ai/v1/chat/completions,CODESTRAL_API_KEY,ministral-3b-latest,true,Bearer
+Codestral,https://codestral.mistral.ai/v1/chat/completions,CODESTRAL_API_KEY,ministral-8b-2512,true,Bearer
+Codestral,https://codestral.mistral.ai/v1/chat/completions,CODESTRAL_API_KEY,ministral-8b-latest,true,Bearer
+Codestral,https://codestral.mistral.ai/v1/chat/completions,CODESTRAL_API_KEY,ministral-14b-2512,true,Bearer
+Codestral,https://codestral.mistral.ai/v1/chat/completions,CODESTRAL_API_KEY,ministral-14b-latest,true,Bearer
+Codestral,https://codestral.mistral.ai/v1/chat/completions,CODESTRAL_API_KEY,mistral-medium-latest,true,Bearer
+Codestral,https://codestral.mistral.ai/v1/chat/completions,CODESTRAL_API_KEY,mistral-medium,true,Bearer
+Codestral,https://codestral.mistral.ai/v1/chat/completions,CODESTRAL_API_KEY,mistral-medium-3-5,true,Bearer
+Codestral,https://codestral.mistral.ai/v1/chat/completions,CODESTRAL_API_KEY,mistral-medium-3.5,true,Bearer
+Codestral,https://codestral.mistral.ai/v1/chat/completions,CODESTRAL_API_KEY,mistral-medium-3,true,Bearer
+Codestral,https://codestral.mistral.ai/v1/chat/completions,CODESTRAL_API_KEY,mistral-medium-2604,true,Bearer
+Codestral,https://codestral.mistral.ai/v1/chat/completions,CODESTRAL_API_KEY,mistral-vibe-cli-latest,true,Bearer
+Codestral,https://codestral.mistral.ai/v1/chat/completions,CODESTRAL_API_KEY,mistral-vibe-cli-with-tools,true,Bearer
+Codestral,https://codestral.mistral.ai/v1/chat/completions,CODESTRAL_API_KEY,mistral-embed-2312,true,Bearer
+Codestral,https://codestral.mistral.ai/v1/chat/completions,CODESTRAL_API_KEY,mistral-embed,true,Bearer
+Codestral,https://codestral.mistral.ai/v1/chat/completions,CODESTRAL_API_KEY,codestral-embed,true,Bearer
+Codestral,https://codestral.mistral.ai/v1/chat/completions,CODESTRAL_API_KEY,codestral-embed-2505,true,Bearer
+Codestral,https://codestral.mistral.ai/v1/chat/completions,CODESTRAL_API_KEY,mistral-moderation-2603,true,Bearer
+Codestral,https://codestral.mistral.ai/v1/chat/completions,CODESTRAL_API_KEY,mistral-ocr-2512,true,Bearer
+Codestral,https://codestral.mistral.ai/v1/chat/completions,CODESTRAL_API_KEY,mistral-ocr-3-0,true,Bearer
+Codestral,https://codestral.mistral.ai/v1/chat/completions,CODESTRAL_API_KEY,mistral-ocr-3,true,Bearer
+Codestral,https://codestral.mistral.ai/v1/chat/completions,CODESTRAL_API_KEY,mistral-ocr-4-0,true,Bearer
+Codestral,https://codestral.mistral.ai/v1/chat/completions,CODESTRAL_API_KEY,mistral-ocr-latest,true,Bearer
+Codestral,https://codestral.mistral.ai/v1/chat/completions,CODESTRAL_API_KEY,mistral-ocr-4,true,Bearer
+Codestral,https://codestral.mistral.ai/v1/chat/completions,CODESTRAL_API_KEY,mistral-ocr-4-1,true,Bearer
+Codestral,https://codestral.mistral.ai/v1/chat/completions,CODESTRAL_API_KEY,voxtral-mini-2602,true,Bearer
+Codestral,https://codestral.mistral.ai/v1/chat/completions,CODESTRAL_API_KEY,voxtral-mini-latest,true,Bearer
+Codestral,https://codestral.mistral.ai/v1/chat/completions,CODESTRAL_API_KEY,voxtral-mini-transcribe-realtime-2602,true,Bearer
+Codestral,https://codestral.mistral.ai/v1/chat/completions,CODESTRAL_API_KEY,voxtral-mini-realtime-2602,true,Bearer
+Codestral,https://codestral.mistral.ai/v1/chat/completions,CODESTRAL_API_KEY,voxtral-mini-realtime-latest,true,Bearer
+Codestral,https://codestral.mistral.ai/v1/chat/completions,CODESTRAL_API_KEY,voxtral-mini-tts-2603,true,Bearer
+Codestral,https://codestral.mistral.ai/v1/chat/completions,CODESTRAL_API_KEY,voxtral-mini-tts-latest,true,Bearer
 Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,deepseek-ai/DeepSeek-V4-Flash-0731,true,Bearer
 Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,moonshotai/Kimi-K3,true,Bearer
 Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,thinkingmachines/Inkling-Small,true,Bearer
 Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,zai-org/GLM-5.2,true,Bearer
 Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,deepseek-ai/DeepSeek-V4-Flash,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,meta-llama/Llama-3.1-8B-Instruct,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,Qwen/Qwen2.5-7B-Instruct,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,Qwen/Qwen3.6-27B,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,deepseek-ai/DeepSeek-V3,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,MiniMaxAI/MiniMax-M3,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,prism-ml/Ternary-Bonsai-27B-gguf,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,Qwen/Qwen3.6-35B-A3B,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,thinkingmachines/Inkling,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,google/gemma-4-31B-it,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,deepseek-ai/DeepSeek-V4-Pro,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,openai/gpt-oss-120b,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,openai/gpt-oss-20b,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,Qwen/Qwen3.5-9B,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,google/gemma-4-26B-A4B-it,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,tencent/Hy3,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,Qwen/Qwen3-8B,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,moonshotai/Kimi-K2.7-Code,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,deepseek-ai/DeepSeek-R1,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,XiaomiMiMo/MiMo-V2.5,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,swiss-ai/Apertus-v1.5-70B,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,zai-org/GLM-4.7-Flash,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,XiaomiMiMo/MiMo-V2.5-Pro,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,Qwen/Qwen3-Coder-Next,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,Qwen/Qwen3.5-122B-A10B,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,meta-llama/Llama-3.3-70B-Instruct,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,swiss-ai/Apertus-v1.5-8B,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,Qwen/Qwen3.5-27B,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,Qwen/Qwen3-4B-Instruct-2507,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,MiniMaxAI/MiniMax-M2.7,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,zai-org/GLM-5.2-FP8,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-NVFP4,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,moonshotai/Kimi-K2.6,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,zai-org/GLM-4.6V-Flash,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,Qwen/Qwen3-Coder-30B-A3B-Instruct,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,stepfun-ai/Step-3.7-Flash,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,Qwen/Qwen3.5-397B-A17B,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-BF16,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,deepseek-ai/DeepSeek-R1-Distill-Llama-70B,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,zai-org/GLM-4.5-Air,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,speakleash/Bielik-11B-v3.0-Instruct,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,Qwen/Qwen2.5-Coder-32B-Instruct,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,Qwen/Qwen3-235B-A22B,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,openai/gpt-oss-safeguard-20b,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,prism-ml/Ternary-Bonsai-27B-AWQ-4bit,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,MiniMaxAI/MiniMax-M2.1,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,Qwen/Qwen3.5-35B-A3B,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,google/gemma-3-4b-it,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,Qwen/Qwen2.5-72B-Instruct,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,swiss-ai/Apertus-8B-Instruct-2509,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,google/gemma-3-12b-it,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,microsoft/phi-4,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,Qwen/Qwen3-30B-A3B,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,Qwen/Qwen3-VL-235B-A22B-Instruct,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,baidu/ERNIE-4.5-VL-424B-A47B-Base-PT,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,NousResearch/Hermes-3-Llama-3.1-70B,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,moonshotai/Kimi-K2.5,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,deepcogito/cogito-671b-v2.1,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,meta-llama/Llama-Guard-4-12B,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,swiss-ai/Apertus-70B-Instruct-2509,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,Qwen/Qwen3-14B,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,Qwen/Qwen2.5-Coder-3B-Instruct,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,zai-org/GLM-4.7-FP8,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,moonshotai/Kimi-K2-Instruct,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,utter-project/EuroLLM-22B-Instruct-2512,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,Qwen/Qwen3-Next-80B-A3B-Instruct,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,deepseek-ai/DeepSeek-R1-Distill-Qwen-7B,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,zai-org/GLM-5.1,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,moonshotai/Kimi-K2-Instruct-0905,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,stepfun-ai/Step-3.5-Flash,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,deepseek-ai/DeepSeek-R1-Distill-Qwen-14B,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,deepseek-ai/DeepSeek-V3.2-Exp,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,MiniMaxAI/MiniMax-M2.5,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,Qwen/Qwen3-32B,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,CohereLabs/c4ai-command-r-08-2024,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,Qwen/Qwen3-235B-A22B-Instruct-2507,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,alpindale/WizardLM-2-8x22B,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,deepseek-ai/DeepSeek-V3-0324,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,meta-llama/Llama-4-Scout-17B-16E-Instruct,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,CohereLabs/aya-expanse-32b,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,zai-org/GLM-4.5V,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,Sao10K/L3-8B-Stheno-v3.2,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,deepseek-ai/DeepSeek-R1-0528,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,CohereLabs/c4ai-command-r7b-12-2024,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,Qwen/Qwen3-VL-235B-A22B-Thinking,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,Sao10K/L3-8B-Lunaris-v1,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,Qwen/Qwen3-235B-A22B-Thinking-2507,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,CohereLabs/c4ai-command-r7b-arabic-02-2025,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,Qwen/Qwen3-VL-30B-A3B-Instruct,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,zai-org/GLM-4-32B-0414,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,deepseek-ai/DeepSeek-V3.1,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,CohereLabs/c4ai-command-a-03-2025,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,zai-org/AutoGLM-Phone-9B-Multilingual,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,MiniMaxAI/MiniMax-M1-80k,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,deepseek-ai/DeepSeek-V3.1-Terminus,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,CohereLabs/command-a-reasoning-08-2025,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,CohereLabs/aya-vision-32b,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,Qwen/Qwen3-Coder-480B-A35B-Instruct,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,zai-org/GLM-4.6,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,CohereLabs/command-a-translate-08-2025,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,zai-org/GLM-4.7,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,MiniMaxAI/MiniMax-M2,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,deepseek-ai/DeepSeek-V3.2,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,CohereLabs/tiny-aya-global,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,zai-org/GLM-4.5,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,zai-org/GLM-5,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,google/gemma-3-27b-it,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,CohereLabs/tiny-aya-water,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,zai-org/GLM-4.6-FP8,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,inclusionAI/Ling-2.6-1T,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,google/gemma-3n-E4B-it,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,CohereLabs/tiny-aya-earth,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,zai-org/GLM-5.1-FP8,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,aisingapore/Gemma-SEA-LION-v4-27B-IT,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,pearl-ai/Gemma-4-31B-it-pearl,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,zai-org/GLM-4.5V-FP8,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,CohereLabs/tiny-aya-fire,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,aisingapore/Qwen-SEA-LION-v4-32B-IT,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,zai-org/GLM-4.6V,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,Qwen/Qwen2.5-Coder-7B-Instruct,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,allenai/Olmo-3-7B-Instruct,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,zai-org/GLM-4.6V-FP8,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,deepseek-ai/DeepSeek-R1-Distill-Llama-8B,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,deepcogito/cogito-671b-v2.1-FP8,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,Qwen/Qwen2.5-VL-72B-Instruct,true,Bearer
+Hugging Face,https://api-inference.huggingface.co/v1/chat/completions,HUGGINGFACE_API_KEY,Qwen/Qwen3-4B-Thinking-2507,true,Bearer
 Zen,https://api.z.ai/api/v1/chat/completions,ZEN_API_KEY,code,true,Bearer
 Zen,https://api.z.ai/api/v1/chat/completions,ZEN_API_KEY,msg,true,Bearer
 Zen,https://api.z.ai/api/v1/chat/completions,ZEN_API_KEY,success,true,Bearer
 Cerebras,https://api.cerebras.ai/v1/chat/completions,CEREBRAS_API_KEY,gemma-4-31b,true,Bearer
 Cerebras,https://api.cerebras.ai/v1/chat/completions,CEREBRAS_API_KEY,gpt-oss-120b,true,Bearer
 Cerebras,https://api.cerebras.ai/v1/chat/completions,CEREBRAS_API_KEY,zai-glm-4.7,true,Bearer
-Groq,https://api.groq.com/v1/chat/completions,GROQ_API_KEY,meta-llama/llama-prompt-guard-2-22m,true,Bearer
-Groq,https://api.groq.com/v1/chat/completions,GROQ_API_KEY,whisper-large-v3,true,Bearer
-Groq,https://api.groq.com/v1/chat/completions,GROQ_API_KEY,allam-2-7b,true,Bearer
+Groq,https://api.groq.com/v1/chat/completions,GROQ_API_KEY,llama-3.1-8b-instant,true,Bearer
 Groq,https://api.groq.com/v1/chat/completions,GROQ_API_KEY,openai/gpt-oss-safeguard-20b,true,Bearer
+Groq,https://api.groq.com/v1/chat/completions,GROQ_API_KEY,allam-2-7b,true,Bearer
+Groq,https://api.groq.com/v1/chat/completions,GROQ_API_KEY,llama-3.3-70b-versatile,true,Bearer
+Groq,https://api.groq.com/v1/chat/completions,GROQ_API_KEY,groq/compound-mini,true,Bearer
+Groq,https://api.groq.com/v1/chat/completions,GROQ_API_KEY,qwen/qwen3.6-27b,true,Bearer
+Groq,https://api.groq.com/v1/chat/completions,GROQ_API_KEY,groq/compound,true,Bearer
 Groq,https://api.groq.com/v1/chat/completions,GROQ_API_KEY,meta-llama/llama-prompt-guard-2-86m,true,Bearer
-Cohere,https://api.cohere.com/v1/chat,COHERE_API_KEY,command-r-plus,true,Bearer
-Cohere,https://api.cohere.com/v1/chat,COHERE_API_KEY,command-r,true,Bearer
-Cohere,https://api.cohere.com/v1/chat,COHERE_API_KEY,command,true,Bearer
-Fireworks,https://api.fireworks.ai/inference/v1/chat/completions,FIREWORKS_API_KEY,accounts/fireworks/models/llama-v3p1-405b-instruct,true,Bearer
-Fireworks,https://api.fireworks.ai/inference/v1/chat/completions,FIREWORKS_API_KEY,accounts/fireworks/models/llama-v3p1-70b-instruct,true,Bearer
-Fireworks,https://api.fireworks.ai/inference/v1/chat/completions,FIREWORKS_API_KEY,accounts/fireworks/models/mixtral-8x7b-instruct,true,Bearer
+Groq,https://api.groq.com/v1/chat/completions,GROQ_API_KEY,meta-llama/llama-prompt-guard-2-22m,true,Bearer
+Groq,https://api.groq.com/v1/chat/completions,GROQ_API_KEY,canopylabs/orpheus-arabic-saudi,true,Bearer
+Groq,https://api.groq.com/v1/chat/completions,GROQ_API_KEY,canopylabs/orpheus-v1-english,true,Bearer
+Groq,https://api.groq.com/v1/chat/completions,GROQ_API_KEY,openai/gpt-oss-120b,true,Bearer
+Groq,https://api.groq.com/v1/chat/completions,GROQ_API_KEY,whisper-large-v3,true,Bearer
+Groq,https://api.groq.com/v1/chat/completions,GROQ_API_KEY,openai/gpt-oss-20b,true,Bearer
+Groq,https://api.groq.com/v1/chat/completions,GROQ_API_KEY,whisper-large-v3-turbo,true,Bearer
 Command,https://api.commandcode.ai/provider/v1/chat/completions,COMMAND_API_KEY,claude-sonnet-5,true,Bearer
 Command,https://api.commandcode.ai/provider/v1/chat/completions,COMMAND_API_KEY,claude-sonnet-4-6,true,Bearer
 Command,https://api.commandcode.ai/provider/v1/chat/completions,COMMAND_API_KEY,claude-fable-5,true,Bearer
 Command,https://api.commandcode.ai/provider/v1/chat/completions,COMMAND_API_KEY,claude-opus-5,true,Bearer
 Command,https://api.commandcode.ai/provider/v1/chat/completions,COMMAND_API_KEY,claude-opus-4-8,true,Bearer
+Command,https://api.commandcode.ai/provider/v1/chat/completions,COMMAND_API_KEY,claude-opus-4-7,true,Bearer
+Command,https://api.commandcode.ai/provider/v1/chat/completions,COMMAND_API_KEY,claude-haiku-4-5-20251001,true,Bearer
+Command,https://api.commandcode.ai/provider/v1/chat/completions,COMMAND_API_KEY,gpt-5.6-sol,true,Bearer
+Command,https://api.commandcode.ai/provider/v1/chat/completions,COMMAND_API_KEY,gpt-5.6-terra,true,Bearer
+Command,https://api.commandcode.ai/provider/v1/chat/completions,COMMAND_API_KEY,gpt-5.6-luna,true,Bearer
+Command,https://api.commandcode.ai/provider/v1/chat/completions,COMMAND_API_KEY,gpt-5.5,true,Bearer
+Command,https://api.commandcode.ai/provider/v1/chat/completions,COMMAND_API_KEY,gpt-5.4,true,Bearer
+Command,https://api.commandcode.ai/provider/v1/chat/completions,COMMAND_API_KEY,gpt-5.3-codex,true,Bearer
+Command,https://api.commandcode.ai/provider/v1/chat/completions,COMMAND_API_KEY,gpt-5.4-mini,true,Bearer
+Command,https://api.commandcode.ai/provider/v1/chat/completions,COMMAND_API_KEY,deepseek/deepseek-v4-pro,true,Bearer
+Command,https://api.commandcode.ai/provider/v1/chat/completions,COMMAND_API_KEY,deepseek/deepseek-v4-flash,true,Bearer
+Command,https://api.commandcode.ai/provider/v1/chat/completions,COMMAND_API_KEY,moonshotai/Kimi-K3,true,Bearer
+Command,https://api.commandcode.ai/provider/v1/chat/completions,COMMAND_API_KEY,moonshotai/Kimi-K2.7-Code,true,Bearer
+Command,https://api.commandcode.ai/provider/v1/chat/completions,COMMAND_API_KEY,moonshotai/Kimi-K2.7-Code-Highspeed,true,Bearer
+Command,https://api.commandcode.ai/provider/v1/chat/completions,COMMAND_API_KEY,moonshotai/Kimi-K2.6,true,Bearer
+Command,https://api.commandcode.ai/provider/v1/chat/completions,COMMAND_API_KEY,moonshotai/Kimi-K2.5,true,Bearer
+Command,https://api.commandcode.ai/provider/v1/chat/completions,COMMAND_API_KEY,zai-org/GLM-5.2,true,Bearer
+Command,https://api.commandcode.ai/provider/v1/chat/completions,COMMAND_API_KEY,zai-org/GLM-5.2-Fast,true,Bearer
+Command,https://api.commandcode.ai/provider/v1/chat/completions,COMMAND_API_KEY,zai-org/GLM-5.1,true,Bearer
+Command,https://api.commandcode.ai/provider/v1/chat/completions,COMMAND_API_KEY,zai-org/GLM-5,true,Bearer
+Command,https://api.commandcode.ai/provider/v1/chat/completions,COMMAND_API_KEY,MiniMaxAI/MiniMax-M3,true,Bearer
+Command,https://api.commandcode.ai/provider/v1/chat/completions,COMMAND_API_KEY,MiniMaxAI/MiniMax-M2.7,true,Bearer
+Command,https://api.commandcode.ai/provider/v1/chat/completions,COMMAND_API_KEY,MiniMaxAI/MiniMax-M2.5,true,Bearer
+Command,https://api.commandcode.ai/provider/v1/chat/completions,COMMAND_API_KEY,xiaomi/mimo-v2.5-pro,true,Bearer
+Command,https://api.commandcode.ai/provider/v1/chat/completions,COMMAND_API_KEY,xiaomi/mimo-v2.5,true,Bearer
+Command,https://api.commandcode.ai/provider/v1/chat/completions,COMMAND_API_KEY,Qwen/Qwen3.8-Max,true,Bearer
+Command,https://api.commandcode.ai/provider/v1/chat/completions,COMMAND_API_KEY,Qwen/Qwen3.7-Max,true,Bearer
+Command,https://api.commandcode.ai/provider/v1/chat/completions,COMMAND_API_KEY,Qwen/Qwen3.7-Plus,true,Bearer
+Command,https://api.commandcode.ai/provider/v1/chat/completions,COMMAND_API_KEY,Qwen/Qwen3.7-Flash,true,Bearer
+Command,https://api.commandcode.ai/provider/v1/chat/completions,COMMAND_API_KEY,Qwen/Qwen3.6-Max-Preview,true,Bearer
+Command,https://api.commandcode.ai/provider/v1/chat/completions,COMMAND_API_KEY,Qwen/Qwen3.6-Plus,true,Bearer
+Command,https://api.commandcode.ai/provider/v1/chat/completions,COMMAND_API_KEY,stepfun/Step-3.7-Flash,true,Bearer
+Command,https://api.commandcode.ai/provider/v1/chat/completions,COMMAND_API_KEY,stepfun/Step-3.5-Flash,true,Bearer
+Command,https://api.commandcode.ai/provider/v1/chat/completions,COMMAND_API_KEY,tencent/hy3-paid,true,Bearer
+Command,https://api.commandcode.ai/provider/v1/chat/completions,COMMAND_API_KEY,google/gemini-3.6-flash,true,Bearer
+Command,https://api.commandcode.ai/provider/v1/chat/completions,COMMAND_API_KEY,google/gemini-3.5-flash,true,Bearer
+Command,https://api.commandcode.ai/provider/v1/chat/completions,COMMAND_API_KEY,google/gemini-3.5-flash-lite,true,Bearer
+Command,https://api.commandcode.ai/provider/v1/chat/completions,COMMAND_API_KEY,google/gemini-3.1-flash-lite,true,Bearer
+Command,https://api.commandcode.ai/provider/v1/chat/completions,COMMAND_API_KEY,sakana/fugu-ultra,true,Bearer
+Command,https://api.commandcode.ai/provider/v1/chat/completions,COMMAND_API_KEY,nvidia/nemotron-3-ultra-550b-a55b,true,Bearer
+Command,https://api.commandcode.ai/provider/v1/chat/completions,COMMAND_API_KEY,thinkingmachines/inkling,true,Bearer
+Command,https://api.commandcode.ai/provider/v1/chat/completions,COMMAND_API_KEY,thinkingmachines/inkling-small,true,Bearer
+Command,https://api.commandcode.ai/provider/v1/chat/completions,COMMAND_API_KEY,poolside/laguna-s-2.1-free,true,Bearer
+Command,https://api.commandcode.ai/provider/v1/chat/completions,COMMAND_API_KEY,meta/muse-spark-1.1,true,Bearer
+Command,https://api.commandcode.ai/provider/v1/chat/completions,COMMAND_API_KEY,meta/muse-spark-1.2,true,Bearer
+Command,https://api.commandcode.ai/provider/v1/chat/completions,COMMAND_API_KEY,meta/muse-spark-1.2-contributor,true,Bearer
+Command,https://api.commandcode.ai/provider/v1/chat/completions,COMMAND_API_KEY,xai/grok-4.5,true,Bearer
 Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,alibaba/qwen-3-14b,true,Bearer
 Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,alibaba/qwen-3-235b,true,Bearer
 Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,alibaba/qwen-3-30b,true,Bearer
 Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,alibaba/qwen-3-32b,true,Bearer
 Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,alibaba/qwen-3.6-max-preview,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,alibaba/qwen3-235b-a22b-thinking,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,alibaba/qwen3-coder,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,alibaba/qwen3-coder-30b-a3b,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,alibaba/qwen3-coder-next,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,alibaba/qwen3-coder-plus,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,alibaba/qwen3-embedding-0.6b,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,alibaba/qwen3-embedding-4b,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,alibaba/qwen3-embedding-8b,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,alibaba/qwen3-max,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,alibaba/qwen3-max-preview,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,alibaba/qwen3-max-thinking,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,alibaba/qwen3-next-80b-a3b-instruct,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,alibaba/qwen3-next-80b-a3b-thinking,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,alibaba/qwen3-vl-235b-a22b-instruct,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,alibaba/qwen3-vl-instruct,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,alibaba/qwen3-vl-thinking,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,alibaba/qwen3.5-flash,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,alibaba/qwen3.5-plus,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,alibaba/qwen3.6-27b,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,alibaba/qwen3.6-plus,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,alibaba/qwen3.7-flash,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,alibaba/qwen3.7-max,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,alibaba/qwen3.7-plus,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,alibaba/qwen3.8-max,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,alibaba/wan-v2.5-t2v-preview,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,alibaba/wan-v2.6-i2v,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,alibaba/wan-v2.6-i2v-flash,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,alibaba/wan-v2.6-r2v,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,alibaba/wan-v2.6-r2v-flash,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,alibaba/wan-v2.6-t2v,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,alibaba/wan-v2.7-r2v,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,alibaba/wan-v2.7-t2v,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,amazon/nova-2-lite,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,amazon/nova-lite,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,amazon/nova-micro,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,amazon/nova-pro,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,amazon/titan-embed-text-v2,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,anthropic/claude-3-haiku,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,anthropic/claude-fable-5,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,anthropic/claude-haiku-4.5,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,anthropic/claude-opus-4,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,anthropic/claude-opus-4.5,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,anthropic/claude-opus-4.6,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,anthropic/claude-opus-4.7,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,anthropic/claude-opus-4.8,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,anthropic/claude-opus-4.8-fast,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,anthropic/claude-opus-5,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,anthropic/claude-sonnet-4,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,anthropic/claude-sonnet-4.5,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,anthropic/claude-sonnet-4.6,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,anthropic/claude-sonnet-5,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,arcee-ai/trinity-large-thinking,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,arcee-ai/trinity-mini,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,bfl/flux-2-flex,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,bfl/flux-2-klein-4b,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,bfl/flux-2-klein-9b,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,bfl/flux-2-max,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,bfl/flux-2-pro,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,bfl/flux-3-video,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,bfl/flux-kontext-max,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,bfl/flux-kontext-pro,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,bfl/flux-pro-1.0-fill,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,bfl/flux-pro-1.1,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,bfl/flux-pro-1.1-ultra,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,bytedance/seed-1.6,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,bytedance/seed-1.8,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,bytedance/seedance-2.0,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,bytedance/seedance-2.0-fast,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,bytedance/seedance-v1.0-pro,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,bytedance/seedance-v1.0-pro-fast,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,bytedance/seedance-v1.5-pro,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,bytedance/seedream-4.0,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,bytedance/seedream-4.5,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,bytedance/seedream-5.0-lite,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,bytedance/seedream-5.0-pro,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,cohere/command-a,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,cohere/embed-v4.0,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,cohere/rerank-v3.5,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,cohere/rerank-v4-fast,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,cohere/rerank-v4-pro,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,deepseek/deepseek-r1,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,deepseek/deepseek-v3,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,deepseek/deepseek-v3.1,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,deepseek/deepseek-v3.1-terminus,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,deepseek/deepseek-v3.2,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,deepseek/deepseek-v3.2-thinking,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,deepseek/deepseek-v4-flash,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,deepseek/deepseek-v4-flash-0731,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,deepseek/deepseek-v4-pro,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,google/gemini-2.5-flash,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,google/gemini-2.5-flash-image,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,google/gemini-2.5-flash-lite,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,google/gemini-2.5-pro,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,google/gemini-3-flash,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,google/gemini-3-pro-image,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,google/gemini-3.1-flash-image,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,google/gemini-3.1-flash-image-preview,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,google/gemini-3.1-flash-lite,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,google/gemini-3.1-flash-lite-image,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,google/gemini-3.1-pro-preview,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,google/gemini-3.5-flash,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,google/gemini-3.5-flash-lite,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,google/gemini-3.6-flash,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,google/gemini-embedding-001,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,google/gemini-embedding-2,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,google/gemini-omni-flash-preview,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,google/gemma-4-26b-a4b-it,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,google/gemma-4-31b-it,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,google/imagen-4.0-fast-generate-001,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,google/imagen-4.0-generate-001,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,google/imagen-4.0-ultra-generate-001,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,google/text-embedding-005,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,google/text-multilingual-embedding-002,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,google/veo-3.0-fast-generate-001,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,google/veo-3.0-generate-001,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,google/veo-3.1-fast-generate-001,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,google/veo-3.1-generate-001,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,google/veo-3.1-lite-generate-001,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,inception/mercury-2,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,inception/mercury-coder-small,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,inclusionai/ling-3.0-flash,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,inclusionai/ling-3.0-tiny-free,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,interfaze/interfaze-beta,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,klingai/kling-v2.5-turbo-i2v,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,klingai/kling-v2.5-turbo-t2v,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,klingai/kling-v2.6-i2v,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,klingai/kling-v2.6-motion-control,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,klingai/kling-v2.6-t2v,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,klingai/kling-v3.0-i2v,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,klingai/kling-v3.0-motion-control,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,klingai/kling-v3.0-t2v,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,kwaipilot/kat-coder-air-v2.5,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,kwaipilot/kat-coder-pro-v1,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,kwaipilot/kat-coder-pro-v2,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,kwaipilot/kat-coder-pro-v2.5,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,meta/llama-3.1-70b,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,meta/llama-3.1-8b,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,meta/llama-3.3-70b,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,meta/llama-4-maverick,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,meta/llama-4-scout,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,meta/muse-spark-1.1,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,meta/muse-spark-1.2,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,meta/muse-spark-1.2-contributor,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,minimax/minimax-h3,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,minimax/minimax-m2,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,minimax/minimax-m2.1,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,minimax/minimax-m2.1-lightning,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,minimax/minimax-m2.5,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,minimax/minimax-m2.5-highspeed,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,minimax/minimax-m2.7,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,minimax/minimax-m2.7-highspeed,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,minimax/minimax-m3,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,mistral/codestral,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,mistral/codestral-embed,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,mistral/devstral-2,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,mistral/devstral-small-2,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,mistral/magistral-medium,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,mistral/magistral-small,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,mistral/ministral-14b,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,mistral/ministral-3b,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,mistral/ministral-8b,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,mistral/mistral-embed,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,mistral/mistral-large-3,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,mistral/mistral-medium,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,mistral/mistral-medium-3.5,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,mistral/mistral-nemo,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,mistral/mistral-small,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,mistral/pixtral-12b,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,moonshotai/kimi-k2,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,moonshotai/kimi-k2-thinking,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,moonshotai/kimi-k2.5,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,moonshotai/kimi-k2.6,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,moonshotai/kimi-k2.7-code,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,moonshotai/kimi-k2.7-code-highspeed,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,moonshotai/kimi-k3,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,moonshotai/kimi-k3-fast,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,morph/morph-v3-fast,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,morph/morph-v3-large,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,nvidia/nemotron-3-nano-30b-a3b,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,nvidia/nemotron-3-super-120b-a12b,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,nvidia/nemotron-3-ultra-550b-a55b,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,nvidia/nemotron-nano-12b-v2-vl,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,nvidia/nemotron-nano-9b-v2,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,openai/gpt-3.5-turbo,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,openai/gpt-4-turbo,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,openai/gpt-4.1,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,openai/gpt-4.1-mini,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,openai/gpt-4.1-nano,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,openai/gpt-4o,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,openai/gpt-4o-mini,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,openai/gpt-4o-mini-search-preview,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,openai/gpt-4o-mini-transcribe,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,openai/gpt-4o-transcribe,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,openai/gpt-5,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,openai/gpt-5-codex,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,openai/gpt-5-mini,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,openai/gpt-5-nano,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,openai/gpt-5-pro,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,openai/gpt-5.1-codex,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,openai/gpt-5.1-codex-max,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,openai/gpt-5.1-codex-mini,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,openai/gpt-5.1-instant,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,openai/gpt-5.1-thinking,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,openai/gpt-5.2,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,openai/gpt-5.2-codex,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,openai/gpt-5.2-pro,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,openai/gpt-5.3-chat,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,openai/gpt-5.3-codex,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,openai/gpt-5.4,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,openai/gpt-5.4-mini,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,openai/gpt-5.4-nano,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,openai/gpt-5.4-pro,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,openai/gpt-5.5,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,openai/gpt-5.5-pro,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,openai/gpt-5.6-luna,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,openai/gpt-5.6-sol,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,openai/gpt-5.6-terra,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,openai/gpt-image-1,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,openai/gpt-image-1-mini,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,openai/gpt-image-1.5,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,openai/gpt-image-2,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,openai/gpt-oss-120b,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,openai/gpt-oss-20b,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,openai/gpt-oss-safeguard-20b,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,openai/gpt-realtime-1.5,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,openai/gpt-realtime-2,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,openai/gpt-realtime-2.1,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,openai/gpt-realtime-mini,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,openai/gpt-realtime-whisper,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,openai/o1,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,openai/o3,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,openai/o3-deep-research,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,openai/o3-mini,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,openai/o3-pro,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,openai/o4-mini,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,openai/text-embedding-3-large,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,openai/text-embedding-3-small,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,openai/text-embedding-ada-002,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,openai/tts-1,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,openai/tts-1-hd,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,openai/whisper-1,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,perplexity/pplx-embed-v1-0.6b,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,perplexity/pplx-embed-v1-4b,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,perplexity/sonar,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,perplexity/sonar-pro,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,perplexity/sonar-reasoning-pro,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,poolside/laguna-s-2.1,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,poolside/laguna-s-2.1-free,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,prodia/flux-fast-schnell,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,quiverai/arrow-1.1,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,recraft/recraft-v2,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,recraft/recraft-v3,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,recraft/recraft-v4,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,recraft/recraft-v4-pro,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,recraft/recraft-v4.1,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,recraft/recraft-v4.1-pro,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,recraft/recraft-v4.1-utility,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,recraft/recraft-v4.1-utility-pro,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,sakana/fugu-ultra,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,stepfun/step-3.5-flash,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,stepfun/step-3.7-flash,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,tencent/hy3,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,thinkingmachines/inkling,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,thinkingmachines/inkling-small,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,voyage/rerank-2.5,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,voyage/rerank-2.5-lite,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,voyage/voyage-3-large,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,voyage/voyage-3.5,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,voyage/voyage-3.5-lite,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,voyage/voyage-4,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,voyage/voyage-4-large,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,voyage/voyage-4-lite,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,voyage/voyage-code-2,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,voyage/voyage-code-3,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,voyage/voyage-finance-2,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,voyage/voyage-law-2,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,xai/grok-4.1-fast-non-reasoning,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,xai/grok-4.1-fast-reasoning,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,xai/grok-4.20-multi-agent,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,xai/grok-4.20-multi-agent-beta,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,xai/grok-4.20-non-reasoning,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,xai/grok-4.20-non-reasoning-beta,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,xai/grok-4.20-reasoning,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,xai/grok-4.20-reasoning-beta,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,xai/grok-4.3,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,xai/grok-4.5,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,xai/grok-build-0.1,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,xai/grok-imagine-image,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,xai/grok-imagine-video,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,xai/grok-imagine-video-1.5,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,xai/grok-imagine-video-1.5-preview,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,xai/grok-stt,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,xai/grok-tts,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,xai/grok-voice-think-fast-1.0,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,xai/grok-voice-think-fast-2.0,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,xiaomi/mimo-v2.5,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,xiaomi/mimo-v2.5-pro,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,zai/glm-4.5,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,zai/glm-4.5-air,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,zai/glm-4.5v,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,zai/glm-4.6,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,zai/glm-4.6v,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,zai/glm-4.6v-flash,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,zai/glm-4.7,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,zai/glm-4.7-flash,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,zai/glm-4.7-flashx,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,zai/glm-5,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,zai/glm-5-turbo,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,zai/glm-5.1,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,zai/glm-5.2,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,zai/glm-5.2-fast,true,Bearer
+Vercel AI Gateway,https://ai-gateway.vercel.sh/v1/chat/completions,VERCEL_AI_GATEWAY_API_KEY,zai/glm-5v-turbo,true,Bearer
 Refiant,https://api.refiant.ai/v1/chat/completions,REFIANT_API_KEY,protea-1,true,Bearer
 Refiant,https://api.refiant.ai/v1/chat/completions,REFIANT_API_KEY,protea-5,true,Bearer
 Refiant,https://api.refiant.ai/v1/chat/completions,REFIANT_API_KEY,protea-10,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,thenlper/gte-base,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,Qwen/Qwen3-235B-A22B-Thinking-2507,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,moonshotai/Kimi-K2.7-Code,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,openai/gpt-oss-120b-Turbo,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,openai/gpt-oss-20b,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,Qwen/Qwen3-30B-A3B,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,Gryphe/MythoMax-L2-13b,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,Qwen/Qwen3.8-Max,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,openai/whisper-large-v3,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,Qwen/Qwen3-Embedding-8B,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,inworld-ai/realtime-tts-1.5-mini,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,mistralai/Voxtral-Small-24B-2507,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,sesame/csm-1b,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,zai-org/GLM-4.7,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,deepseek-ai/DeepSeek-V3.1,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,Qwen/Qwen3-235B-A22B-Instruct-2507,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,google/gemini-3.5-flash,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,zai-org/GLM-5,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,Bria/Bria-3.2-vector,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,google/nano-banana-2-lite,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,google/gemini-3-pro-image,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,XiaomiMiMo/MiMo-V2.5-Pro,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,google/gemma-4-E4B-it,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,stabilityai/sdxl-turbo,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,deepseek-ai/DeepSeek-V3-0324,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,hexgrad/Kokoro-82M,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,nvidia/Cosmos3-Super,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,Qwen/Qwen3.6-27B,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,Qwen/Qwen3-ASR-1.7B,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,XiaomiMiMo/MiMo-V2.5-tts-voicedesign,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,deepseek-ai/DeepSeek-V3.2,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,Qwen/Qwen3.5-27B,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,Qwen/Qwen3.6-35B-A3B,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,mistralai/Mistral-Nemo-Instruct-2407,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,intfloat/multilingual-e5-large-instruct,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,Qwen/Qwen-Image-Max,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,Qwen/Qwen-Image-Edit,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,deepseek-ai/DeepSeek-V4-Flash,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,black-forest-labs/FLUX-2-klein-9b,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,nvidia/NVIDIA-Nemotron-3-Super-120B-A12B,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,Qwen/Qwen3-32B,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,nvidia/Cosmos3-Nano,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,BAAI/bge-base-en-v1.5,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,Qwen/Qwen3.5-9B,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,google/gemma-4-31B-it-turbo,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,anthropic/claude-haiku-4-5,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,Qwen/Qwen3-Next-80B-A3B-Instruct,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,google/gemma-4-31B-it,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,sentence-transformers/clip-ViT-B-32,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,deepseek-ai/DeepSeek-V4-Pro,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,microsoft/phi-4,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,google/embeddinggemma-300m,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,inclusionAI/Ling-3.0-flash,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,bosonai/HiggsAudioV2.5,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,Wan-AI/Wan2.6-T2V,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,google/veo-3.1-fast,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,google/gemini-3.1-pro,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,Pixverse/Pixverse-T2V,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,zai-org/GLM-5.1,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,google/nano-banana-2,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,anthropic/claude-opus-5,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,moonshotai/Kimi-K2.5,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,black-forest-labs/FLUX-1-dev,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,zai-org/GLM-4.6,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,NousResearch/Hermes-3-Llama-3.1-405B,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,BAAI/bge-large-en-v1.5,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,Qwen/Qwen3-Max,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,Qwen/Qwen3-Embedding-0.6B,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,intfloat/multilingual-e5-large,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,anthropic/claude-fable-5,true,Bearer
 Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,anthropic/claude-opus-4-7,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,ResembleAI/chatterbox-multilingual,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,Pixverse/Pixverse-T2V-HD,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,mistralai/Mistral-Small-3.2-24B-Instruct-2506,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,ByteDance/Seed-2.0-code,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,Qwen/Qwen3.5-397B-A17B,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,Qwen/Qwen3-Coder-480B-A35B-Instruct-Turbo,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,black-forest-labs/FLUX-1.1-pro,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,ByteDance/Seedance-2.0,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,black-forest-labs/FLUX.1-Kontext-dev,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,BAAI/bge-m3-multi,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,black-forest-labs/FLUX-1-schnell,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,openai/gpt-oss-120b-Ultra,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,nvidia/llama-nemotron-embed-vl-1b-v2,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,Qwen/Qwen3.5-122B-A10B,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,Qwen/Qwen2.5-72B-Instruct,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,XiaomiMiMo/MiMo-V2.5,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,stepfun-ai/Step-3.7-Flash,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,nvidia/Nemotron-3-Nano-30B-A3B,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,anthropic/claude-sonnet-5,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,google/nano-banana-pro,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,google/gemma-3-12b-it,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,Bria/erase_foreground,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,google/gemini-2.5-flash,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,shibing624/text2vec-base-chinese,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,google/gemma-4-31B-it-Ultra,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,moonshotai/Kimi-K2.6,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,black-forest-labs/FLUX-2-pro,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,Bria/fibo,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,ResembleAI/chatterbox-turbo,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,inworld-ai/realtime-tts-1.5-max,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,Pixverse/Pixverse-6-T2V,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,ByteDance/Seedance-1.5-Pro,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,sentence-transformers/all-MiniLM-L6-v2,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,meta-llama/Llama-3.3-70B-Instruct-Turbo,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,sentence-transformers/clip-ViT-B-32-multilingual-v1,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,Wan-AI/Wan2.2-T2V-A14B,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,black-forest-labs/FLUX-2-dev,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,openai/gpt-oss-120b,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,black-forest-labs/FLUX-2-klein-4b,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,Qwen/Qwen3-Max-Thinking,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,sentence-transformers/multi-qa-mpnet-base-dot-v1,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,openai/whisper-large-v3-turbo,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,google/veo-3.1,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,BAAI/bge-m3,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,black-forest-labs/FLUX-2-max,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,ByteDance/Seedream-4,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,ByteDance/Seed-2.0-pro,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,Bria/blur_background,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,google/gemma-3-4b-it,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,google/gemma-4-26B-A4B-it,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,Qwen/Qwen3-TTS,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,google/gemini-3.1-flash-lite,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,Wan-AI/Wan2.6-T2I,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,mistralai/Mistral-Small-24B-Instruct-2501,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,MiniMaxAI/MiniMax-M2.7-Turbo,true,Bearer
 Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,zai-org/GLM-4.7-Flash,true,Bearer
-Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8,true,Bearer
-Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,Sao10K/L3-8B-Lunaris-v1-Turbo,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,Bria/fibo_edit,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,Qwen/Qwen3-VL-30B-A3B-Instruct,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,PrunaAI/p-video,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,PrunaAI/p-image,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,inworld-ai/realtime-tts-2,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,thinkingmachines/Inkling,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,Qwen/Qwen3-Embedding-4B,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,deepseek-ai/DeepSeek-V4-Flash-0731,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,nvidia/Nemotron-3.5-ASR-Streaming-Multilingual-0.6b,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,Qwen/Qwen3.7-Max,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,Qwen/Qwen3-ASR-0.6B,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,XiaomiMiMo/MiMo-V2.5-tts,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,Sao10K/L3.1-70B-Euryale-v2.2,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,sentence-transformers/paraphrase-MiniLM-L6-v2,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,intfloat/e5-base-v2,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,mistralai/Voxtral-Mini-3B-2507,true,Bearer
 Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,black-forest-labs/FLUX-1-Redux-dev,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,MiniMaxAI/MiniMax-M3,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,sentence-transformers/all-MiniLM-L12-v2,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,ByteDance/Seed-1.8,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,google/gemini-1.5-flash,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,anthropic/claude-sonnet-4-6,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,anthropic/claude-opus-4-8,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,Qwen/Qwen3.5-35B-A3B,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,deepseek-ai/DeepSeek-R1-0528,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,deepseek-ai/DeepSeek-V3.1-Terminus,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,meta-llama/Llama-4-Scout-17B-16E-Instruct,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,zai-org/GLM-5.2,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,google/gemini-1.5-flash-8b,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,nvidia/Nemotron-Content-Safety-3.5,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,Bria/remove_background,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,thinkingmachines/Inkling-Small,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,tencent/Hy3,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,BAAI/bge-en-icl,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,deepseek-ai/DeepSeek-V3,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,NousResearch/Hermes-3-Llama-3.1-70B,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,intfloat/e5-large-v2,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,Qwen/Qwen3-VL-235B-A22B-Instruct,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,ByteDance/Seed-2.0-mini,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,MiniMaxAI/MiniMax-M2.7,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,google/gemma-3-27b-it,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,Qwen/Qwen3-14B,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,thenlper/gte-large,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,meta-llama/Llama-Guard-4-12B,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,sentence-transformers/all-mpnet-base-v2,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,Qwen/Qwen3-TTS-VoiceDesign,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,google/gemini-2.5-pro,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,Bria/Bria-3.2,true,Bearer
+Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KEY,Bria/expand,true,Bearer
 Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,openai,true,Bearer
-Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,openai-fast,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,command-a-plus,true,Bearer
 Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,gpt-oss,true,Bearer
-Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,gpt-5.4,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,kimi-k3,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,gpt-5.6-luna,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,gpt-5.6-sol,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,gpt-5.6-terra,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,kimi-code,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,minimax,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,perplexity,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,grok-large,true,Bearer
 Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,gpt-5.4-mini,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,openai-large,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,llama,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,deepseek-pro,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,kimi,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,mistral-large,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,openai-audio-large,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,midijourney-large,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,nova,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,qwen-safety,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,glm,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,minimax-m2.7,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,grok,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,perplexity-fast,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,perplexity-reasoning,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,deepseek,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,gpt-5.4,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,midijourney,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,nova-fast,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,openai-audio,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,openai-fast,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,qwen-coder,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,zimage,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,dreamshaper,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,gpt-image-2,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,nova-canvas,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,klein,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,gptimage-large,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,gptimage,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,flux,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,kontext,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,nova-reel,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,trellis-2,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,universal-2,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,universal-3.5-pro,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,whisper,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,gpt-realtime-2.1,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,gpt-realtime-2.1-mini,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,gpt-realtime-2,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,openai-3-small,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,cohere-embed-v4,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,qwen3-embedding-8b,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,openai-3-large,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,vendouple/gpt-5.6-sol,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,YoannDev90/ling-3.0-flash:free,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,solarnode-developement/k3,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,pollinations-router/polli,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,morriszdweck/osaii-api-smart,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,morriszdweck/osaii-api-fast,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,Catniti/qwen3.7-flash,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,chirag-gamer/gpt-oss-120b,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,YoannDev90/laguna-s-2.1:free,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,vendouple/uncensored-image-enhanced,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,vendouple/kimi-k3,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,tomdacatto/ling-3.0-flash,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,Lorodn4x/minimax-m3,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,Lorodn4x/gpt-5.6-terra,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,vendouple/wai-illustrious-xl,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,CloudCompile/agnes-image-2.0-flash,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,meow18838/image-1,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,Spit-fires/flux-schnell,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,MarcosFRG/gemini-3.1-pro-preview,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,vendouple/laguna-s-2.1:free,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,vendouple/nano-banana-pro,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,vendouple/animagine,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,vendouple/flux-2,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,vendouple/seedream-5-lite,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,vendouple/luma-photon-1,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,vendouple/uncensored-image,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,Catniti/agnes-image-2.1-flash,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,sharktide/inferenceport-ai-lightning-image-turbo,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,Catniti/agnes-image-2.0-flash,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,vendouple/qwen3.8-max-preview,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,vendouple/claude-opus-4-8,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,gggff123/glm-5.2,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,Catniti/gemma-4-31b,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,Catniti/auto-router-1,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,sharktide/inferenceport-ai-gemini-2.5-flash,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,vendouple/gemma-4-31b-sdft-heretic-rp,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,sharktide/inferenceport-ai-codestral-2508,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,Minor-fun/deepseek-v3.2,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,CloudCompile/agnes-2.0-flash,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,solarnode-developement/hy3,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,sharktide/inferenceport.ai-gpt-oss-20b,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,CloudCompile/afforda-claude-haiku-4.5,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,YoannDev90/diffusiongemma-26b-a4b-it:free,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,timemachine-studio/mercury2,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,tomdacatto/gemma-4-31b-fast,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,sharktide/inferenceport-ai-lightning-text-v2,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,sharktide/inferenceport-ai-qwen-3.6-27b,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,sharktide/inferenceport-ai-minimax-m3,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,sharktide/inferenceport-ai-kimi-k2.7-code,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,Catniti/glm-4.7,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,Minor-fun/gemma-4-31B-it,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,MarcosFRG/glm-5.2,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,Catniti/gpt-oss-120b,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,vendouple/deepseek-v4-pro,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,Catniti/agnes-2.5-pro,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,MarcosFRG/gemini-3.1-flash-lite,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,MarcosFRG/gemma-3-27b,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,MarcosFRG/mimo-v2.5,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,mikl-shortcuts/ministral-3,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,MarcosFRG/minimax-m3,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,Bakhshi7889/gemma-4-31b-it,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,sharktide/inferenceport-ai-gpt-4.1,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,MarcosFRG/gemini-3-flash-preview,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,sharktide/inferenceport-ai-mimo-v2.5,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,sharktide/inferenceport-ai-command-r-plus,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,MarcosFRG/deepseek-v4-pro,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,MarcosFRG/gemini-2.5-flash-lite,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,MarcosFRG/deepseek-v4-flash,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,MarcosFRG/gemma-4-31b,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,tomdacatto/ezra,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,voodoohop/airforce-doubao-pro,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,voodoohop/airforce-grok-4-fast,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,voodoohop/airforce-qwen3-max,true,Bearer
+Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,voodoohop/anyvm-deepseek-chat,true,Bearer
 Kimi,https://kimi.moonshot.cn/api/chat,KIMI_COOKIE,Kimi-chat,true,Cookie

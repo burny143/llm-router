@@ -1,7 +1,64 @@
 // renderer.js
 // renderer.js — complete file
-const { startProxy, stopProxy, isProxyRunning, healthCheck, getDefaultConfig, getEnvVars, getConnectedModelList, getConnectedConfig, getProviderConfig, saveConfig, openConfigFileDialog, parseConfigCsvFile, parseConfigExcelFile, onDevLog, runFetchModels, onConfigReady, setPriorityOverride, getKnownOk, getRoutingLog, getPriorityState, onPriorityStateChanged } = window.api;
-const APP_CONSTANTS = window.api.constants || {};
+const { startProxy, stopProxy, isProxyRunning, healthCheck, getDefaultConfig, getEnvVars, getConnectedModelList, getConnectedConfig, getProviderConfig, saveConfig, onDevLog, runFetchModels, onConfigReady, setPriorityOverride, getKnownOk, getRoutingLog, getPriorityState, onPriorityStateChanged } = window.api;
+
+// --- Shared non-blocking modal utility ---------------------------------------
+// Native alert()/confirm() are synchronous and block the renderer's event
+// loop; if one opens while a <select> popup is still closing, Chromium can
+// leave that popup's invisible overlay stuck, eating clicks on every dropdown
+// across every tab until the page reloads. These reuse the existing
+// .modal-overlay/.modal-box CSS and never block, so they can't trigger that.
+function showNoticeModal(message) {
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    const box = document.createElement('div');
+    box.className = 'modal-box';
+    const msg = document.createElement('p');
+    msg.textContent = message;
+    const actions = document.createElement('div');
+    actions.className = 'modal-actions';
+    const okBtn = document.createElement('button');
+    okBtn.className = 'btn-primary';
+    okBtn.textContent = 'OK';
+    const close = () => { overlay.remove(); resolve(); };
+    okBtn.addEventListener('click', close);
+    actions.appendChild(okBtn);
+    box.appendChild(msg);
+    box.appendChild(actions);
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+    okBtn.focus();
+  });
+}
+
+function showConfirmModal(message) {
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    const box = document.createElement('div');
+    box.className = 'modal-box';
+    const msg = document.createElement('p');
+    msg.textContent = message;
+    const actions = document.createElement('div');
+    actions.className = 'modal-actions';
+    const cancelBtn = document.createElement('button');
+    cancelBtn.textContent = 'Cancel';
+    const okBtn = document.createElement('button');
+    okBtn.className = 'btn-danger';
+    okBtn.textContent = 'OK';
+    const finish = (result) => { overlay.remove(); resolve(result); };
+    cancelBtn.addEventListener('click', () => finish(false));
+    okBtn.addEventListener('click', () => finish(true));
+    actions.appendChild(cancelBtn);
+    actions.appendChild(okBtn);
+    box.appendChild(msg);
+    box.appendChild(actions);
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+    okBtn.focus();
+  });
+}
 
 let priorityOverrideKey = null;
 let priorityLocked = false;
@@ -204,7 +261,6 @@ const saveConfigBtn = document.getElementById('saveConfigBtn');
 const loadDefaultsBtn = document.getElementById('loadDefaultsBtn');
 const clearAllBtn = document.getElementById('clearAllBtn');
 const fetchModelsBtn = document.getElementById('fetchModelsBtn');
-const loadConfigFromCsvBtn = document.getElementById('loadConfigFromCsvBtn');
 
 function refreshConfigRow(realIdx) {
   const row = document.querySelector(`tr[data-idx="${realIdx}"]`);
@@ -293,6 +349,7 @@ cookieModelsTableBody.addEventListener('click', e => {
 });
 
 loadDefaultConfig();
+loadAssistantConfigForm();
 
 onConfigReady(async ({ entries }) => {
   await refreshProviderInfo();
@@ -313,7 +370,21 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     const configFooter = document.getElementById('configFooter');
     if (configFooter) configFooter.style.display = btn.dataset.tab === 'config' ? 'block' : 'none';
     if (btn.dataset.tab === 'usage') renderTokenUsage();
-    if (btn.dataset.tab === 'assistant') loadAssistantConfigForm();
+    // --- General Config (folded into the config tab, default sub-tab) ---
+    if (btn.dataset.tab === 'config') {
+      loadAssistantConfigForm();
+      // Always land on General Config (leftmost sub-tab) when opening
+      // Admin/Configuration, regardless of which sub-tab was active last time.
+      const configTab = document.getElementById('config-tab');
+      if (configTab) {
+        configTab.querySelectorAll(':scope > .sub-tabs .sub-tab-btn').forEach(b => b.classList.remove('active'));
+        configTab.querySelectorAll(':scope > .sub-tab-content').forEach(t => t.classList.remove('active'));
+        const generalTabBtn = configTab.querySelector('.sub-tab-btn[data-subtab="general-config"]');
+        const generalSubtab = document.getElementById('general-config-subtab');
+        if (generalTabBtn) generalTabBtn.classList.add('active');
+        if (generalSubtab) generalSubtab.classList.add('active');
+      }
+    }
   });
 });
 
@@ -330,9 +401,50 @@ document.querySelectorAll('.sub-tab-btn').forEach(btn => {
   });
 });
 
+// --- NEW: collapsible panels (Quick Chat / Connected Apps / Developer Logs) ---
+// State persisted to localStorage so a collapsed panel stays collapsed across
+// reloads. Each collapsible has a `data-persist-key` attribute and a
+// `.collapsible-header` toggle.
+function applyCollapseState(section) {
+  const key = section.dataset.persistKey;
+  const body = section.querySelector('.collapsible-body');
+  const caret = section.querySelector('.collapsible-caret');
+  if (!body) return;
+  if (!key) { body.style.display = ''; return; }
+  let collapsed = localStorage.getItem('collapse.' + key) === '1';
+  setCollapsed(section, body, caret, collapsed);
+}
+
+function setCollapsed(section, body, caret, collapsed) {
+  body.style.display = collapsed ? 'none' : 'block';
+  if (caret) caret.style.transform = collapsed ? 'rotate(-90deg)' : 'rotate(0)';
+  if (section.dataset.persistKey) localStorage.setItem('collapse.' + section.dataset.persistKey, collapsed ? '1' : '0');
+}
+
+function initCollapsibles() {
+  document.querySelectorAll('.collapsible-section').forEach((section) => {
+    applyCollapseState(section);
+    const header = section.querySelector('.collapsible-header');
+    if (!header) return;
+    header.addEventListener('click', (e) => {
+      // Don't toggle from the embedded Clear/Refresh buttons — let the click
+      // propagate to the header-level toggle only when the header itself
+      // (or its text/caret) is the target.
+      if (e.target.closest('button, input, select')) return;
+      const body = section.querySelector('.collapsible-body');
+      const caret = section.querySelector('.collapsible-caret');
+      const already = body.style.display === 'none';
+      setCollapsed(section, body, caret, !already);
+    });
+  });
+}
+initCollapsibles();
+
+// --- NEW: sync proxy toggle state on load ---
+syncProxyState();
+
 const portInput = document.getElementById('portInput');
-const connectBtn = document.getElementById('connectBtn');
-const disconnectBtn = document.getElementById('disconnectBtn');
+const proxyToggleBtn = document.getElementById('proxyToggleBtn');
 const serverAddress = document.getElementById('serverAddress');
 const priorityModelSelect = document.getElementById('priorityModelSelect');
 const priorityLockToggle = document.getElementById('priorityLockToggle');
@@ -424,29 +536,49 @@ function setServerStatus(running, port) {
     serverAddress.textContent = 'Server stopped';
     serverAddress.classList.add('stopped');
   }
+  // --- NEW: merged Connect/Stop toggle --- single button reflects state.
+  // NOTE: btn-primary and btn-danger must never both be present — with equal
+  // CSS specificity, whichever rule is declared later in style.css wins
+  // regardless of which class was added most recently, so the button could
+  // silently stay blue while labeled "STOP". Toggling both classes together
+  // (not just adding btn-danger on top) is what actually fixes that.
+  if (proxyToggleBtn) {
+    proxyToggleBtn.textContent = running ? 'STOP' : 'Connect';
+    proxyToggleBtn.classList.toggle('btn-danger', running);
+    proxyToggleBtn.classList.toggle('btn-primary', !running);
+    proxyToggleBtn.disabled = false;
+  }
 }
 
-connectBtn.addEventListener('click', async () => {
+// --- NEW: merged Connect/Stop toggle --- single button handles both directions.
+let proxyRunning = false;
+async function syncProxyState() {
+  try { proxyRunning = await isProxyRunning(); } catch (_) { proxyRunning = false; }
+  setServerStatus(proxyRunning, parseInt(portInput.value) || 8000);
+}
+
+proxyToggleBtn && proxyToggleBtn.addEventListener('click', async () => {
   const port = parseInt(portInput.value);
   if (!port) return;
-  const activeEntries = configEntries.filter(e => e.enabled);
-  const result = await startProxy(port, activeEntries);
-  if (result.success) {
-    setServerStatus(true, port);
-    connectBtn.disabled = true;
-    disconnectBtn.disabled = false;
-    // Defer one tick so any closing native <select> popup finishes first.
-    setTimeout(() => renderPriorityOverrideDropdown(), 0);
-  } else {
-    alert('Failed to start proxy: ' + result.error);
-  }
-});
 
-disconnectBtn.addEventListener('click', async () => {
-  await stopProxy();
-  setServerStatus(false);
-  connectBtn.disabled = false;
-  disconnectBtn.disabled = true;
+  if (!proxyRunning) {
+    // Connect
+    const activeEntries = configEntries.filter(e => e.enabled);
+    const result = await startProxy(port, activeEntries);
+    if (result.success) {
+      proxyRunning = true;
+      setServerStatus(true, port);
+      // Defer one tick so any closing native <select> popup finishes first.
+      setTimeout(() => renderPriorityOverrideDropdown(), 0);
+    } else {
+      await showNoticeModal('Failed to start proxy: ' + result.error);
+    }
+  } else {
+    // Stop
+    await stopProxy();
+    proxyRunning = false;
+    setServerStatus(false, port);
+  }
 });
 
 const connectedAppsCount = document.getElementById('connectedAppsCount');
@@ -482,7 +614,7 @@ async function pollProxyStats() {
   } catch (err) { /* proxy not running yet, or IPC not ready — ignore */ }
 }
 pollProxyStats();
-setInterval(pollProxyStats, (APP_CONSTANTS.TIMEOUTS && APP_CONSTANTS.TIMEOUTS.POLL_STATS_MS) || 3000);
+setInterval(pollProxyStats, 3000);
 
 const chatMessages = document.getElementById('chatMessages');
 const chatInput = document.getElementById('chatInput');
@@ -500,7 +632,7 @@ sendBtn.addEventListener('click', async () => {
 
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), (APP_CONSTANTS.TIMEOUTS && APP_CONSTANTS.TIMEOUTS.CHAT_UI_MS) || 60000);
+    const timeout = setTimeout(() => controller.abort(), 60000);
     let resp;
     try {
       resp = await fetch(`http://localhost:${portInput.value}/v1/chat/completions`, {
@@ -549,6 +681,12 @@ sendBtn.addEventListener('click', async () => {
 const devLogs = document.getElementById('devLogs');
 const clearLogsBtn = document.getElementById('clearLogsBtn');
 
+clearLogsBtn.addEventListener('click', () => { devLogs.innerHTML = ''; });
+
+// --- NEW: single Developer Logs feed ---
+// Request/response lines now arrive as plain, human-readable dev-log lines
+// (see proxy-server.js's logRequestLine/logResponseLine) — no [REQ]/[RES]
+// sub-tab split. Everything flows through the one onDevLog listener below.
 onDevLog(({ level, text, time }) => {
   const line = document.createElement('div');
   line.textContent = `[${time}] ${text}`;
@@ -560,97 +698,13 @@ onDevLog(({ level, text, time }) => {
   devLogs.scrollTop = devLogs.scrollHeight;
 });
 
-clearLogsBtn.addEventListener('click', () => { devLogs.innerHTML = ''; });
-
-// --- Request / Response Logs (Task 4) ---
-// Reuses the existing DEV_LOG pipeline: proxy-server.js tags request/response
-// lines with LOG_MARKERS.REQUEST/RESPONSE, we split them out here instead of
-// adding a second IPC channel.
-const requestLogsList = document.getElementById('requestLogsList');
-const responseLogsList = document.getElementById('responseLogsList');
-const reqResLogFilterInput = document.getElementById('reqResLogFilterInput');
-const clearReqResLogsBtn = document.getElementById('clearReqResLogsBtn');
-const reqResLiveTailToggle = document.getElementById('reqResLiveTailToggle');
-
-let requestLogEntries = [];
-let responseLogEntries = [];
-const MAX_REQ_RES_ENTRIES = 500;
-
-function matchesFilter(entry, filterText) {
-  if (!filterText) return true;
-  return JSON.stringify(entry).toLowerCase().includes(filterText.toLowerCase());
-}
-
-// Shared HTML-escape helper (single chain, used everywhere renderer injects
-// untrusted text into innerHTML — avoids a chain of ad-hoc .replace calls).
-function escapeHtml(s) {
-  return String(s)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
-function renderLogList(container, entries, kind) {
-  if (!container) return;
-  const filterText = reqResLogFilterInput ? reqResLogFilterInput.value.trim() : '';
-  const filtered = entries.filter(e => matchesFilter(e, filterText));
-  if (filtered.length === 0) {
-    container.innerHTML = '<div style="color:#888; font-style: italic;">No matching entries.</div>';
-    return;
-  }
-  container.innerHTML = filtered.map(e => {
-    const isError = kind === 'response' && (e.error || (e.status && e.status >= 400));
-    const summary = kind === 'request'
-      ? `[${e.time}] ${e.provider}/${e.model} → ${e.method} ${e.url} (${e.payloadSize}b, ~${e.tokenEstimate} tok)`
-      : `[${e.time}] ${e.provider}/${e.model} ← ${e.status ?? 'ERR'} (${e.latency}ms)${e.error ? ' — ' + e.error : ''}`;
-    return `<details class="req-res-log-entry ${isError ? 'status-error' : 'status-ok'}">
-      <summary>${escapeHtml(summary)}</summary>
-      <pre>${escapeHtml(JSON.stringify(e, null, 2))}</pre>
-    </details>`;
-  }).join('');
-}
-
-function renderReqResLogs() {
-  renderLogList(requestLogsList, requestLogEntries, 'request');
-  renderLogList(responseLogsList, responseLogEntries, 'response');
-}
-
-reqResLogFilterInput?.addEventListener('input', renderReqResLogs);
-clearReqResLogsBtn?.addEventListener('click', () => {
-  requestLogEntries = [];
-  responseLogEntries = [];
-  renderReqResLogs();
-});
-
-onDevLog(({ text }) => {
-  const liveTail = reqResLiveTailToggle ? reqResLiveTailToggle.checked : true;
-  if (!liveTail) return;
-  let changed = false;
-  if (window.api.logRequestMarker && text.startsWith(window.api.logRequestMarker)) {
-    try {
-      requestLogEntries.push(JSON.parse(text.slice(window.api.logRequestMarker.length).trim()));
-      if (requestLogEntries.length > MAX_REQ_RES_ENTRIES) requestLogEntries.shift();
-      changed = true;
-    } catch (e) { /* malformed line, ignore */ }
-  } else if (window.api.logResponseMarker && text.startsWith(window.api.logResponseMarker)) {
-    try {
-      responseLogEntries.push(JSON.parse(text.slice(window.api.logResponseMarker.length).trim()));
-      if (responseLogEntries.length > MAX_REQ_RES_ENTRIES) responseLogEntries.shift();
-      changed = true;
-    } catch (e) { /* malformed line, ignore */ }
-  }
-  if (changed) renderReqResLogs();
-});
-
 function addMessage(role, content, meta) {
   const div = document.createElement('div');
   const time = new Date().toLocaleTimeString();
-  // Escape HTML to prevent injection (shared helper, single replace chain).
-  const safeContent = escapeHtml(content);
+  // Escape HTML to prevent injection
+  const safeContent = String(content).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   if (role === 'assistant' && meta) {
-    div.innerHTML = `<strong>[${time}] ${role}:</strong> ${safeContent}<div class="chat-meta"><span class="meta-provider">${escapeHtml(meta.provider)}</span> / ${escapeHtml(meta.model)} · ${escapeHtml(meta.elapsed)}ms</div>`;
+    div.innerHTML = `<strong>[${time}] ${role}:</strong> ${safeContent}<div class="chat-meta"><span class="meta-provider">${meta.provider}</span> / ${meta.model} · ${meta.elapsed}ms</div>`;
   } else {
     div.innerHTML = `<strong>[${time}] ${role}:</strong> ${safeContent}`;
   }
@@ -713,9 +767,9 @@ fetchModelsBtn.addEventListener('click', async () => {
     try {
       const result = await runFetchModels();
       if (progressBar) progressBar.style.display = 'none';
-      if (!result.success) { alert('Failed to fetch models: ' + (result.error || 'Unknown error')); return; }
+      if (!result.success) { await showNoticeModal('Failed to fetch models: ' + (result.error || 'Unknown error')); return; }
       const entries = result.entries || [];
-      if (entries.length === 0) { alert('No models were fetched.'); return; }
+      if (entries.length === 0) { await showNoticeModal('No models were fetched.'); return; }
       latestProviderModels = {};
       entries.forEach(e => {
         if (!latestProviderModels[e.provider]) latestProviderModels[e.provider] = [];
@@ -736,42 +790,15 @@ fetchModelsBtn.addEventListener('click', async () => {
         // Defer one tick so any closing native <select> popup finishes first.
         setTimeout(() => renderAllConfigTables(), 0);
         await updateConfigLabel();
-        alert(`Loaded ${configEntries.length} model entries from ${latestModelsFileName || '(unknown)'}.`);
+        await showNoticeModal(`Loaded ${configEntries.length} model entries from ${latestModelsFileName || '(unknown)'}.`);
       } else {
-        alert('Failed to save config: ' + saveResult.error);
+        await showNoticeModal('Failed to save config: ' + saveResult.error);
       }
     } catch (err) {
       if (progressBar) progressBar.style.display = 'none';
-      alert('Error fetching models: ' + err.message);
+      await showNoticeModal('Error fetching models: ' + err.message);
     }
   };
-});
-
-loadConfigFromCsvBtn?.addEventListener('click', async () => {
-  const result = await openConfigFileDialog();
-  if (result.canceled || !result.filePath) return;
-  let loadResult;
-  const ext = result.filePath.toLowerCase();
-  if (ext.endsWith('.csv')) loadResult = await parseConfigCsvFile(result.filePath);
-  else loadResult = await parseConfigExcelFile(result.filePath);
-  if (loadResult && loadResult.success) {
-    configEntries = loadResult.entries.map(entry => {
-      const info = providerInfo[entry.provider];
-      if (info) return { ...entry, baseURL: info.baseURL, apiKeyEnv: info.apiKeyEnv, authType: info.authType || entry.authType || 'Bearer' };
-      return entry;
-    });
-    const saveResult = await saveConfig(configEntries);
-    if (saveResult.success) {
-      // Defer one tick so any closing native <select> popup finishes first.
-      setTimeout(() => renderAllConfigTables(), 0);
-      await updateConfigLabel();
-      alert(`Loaded ${configEntries.length} config entries from ${result.filePath}.`);
-    } else {
-      alert('Failed to save config: ' + saveResult.error);
-    }
-  } else {
-    alert('Failed to load file: ' + (loadResult ? loadResult.error : 'Unknown error'));
-  }
 });
 
 async function updateConfigLabel() {
@@ -785,20 +812,22 @@ async function updateConfigLabel() {
 saveConfigBtn.addEventListener('click', async () => {
   try {
     const saveResult = await saveConfig(configEntries);
-    if (!saveResult.success) { alert('Failed to save config file: ' + saveResult.error); return; }
+    if (!saveResult.success) { await showNoticeModal('Failed to save config file: ' + saveResult.error); return; }
     await updateConfigLabel();
-    const running = await isProxyRunning();
+    const running = proxyRunning || (await isProxyRunning());
     if (running) {
+      proxyRunning = true;
       const port = parseInt(portInput.value);
       const activeEntries = configEntries.filter(e => e.enabled);
       const result = await startProxy(port, activeEntries);
       if (result.success) console.log('Configuration applied. Proxy restarted.');
-      else alert('Failed to apply configuration: ' + result.error);
+      else await showNoticeModal('Failed to apply configuration: ' + result.error);
     } else {
+      proxyRunning = false;
       console.log('Configuration saved.');
     }
   } catch (err) {
-    alert('Error applying configuration: ' + err.message);
+    await showNoticeModal('Error applying configuration: ' + err.message);
   }
 });
 
@@ -828,6 +857,7 @@ pingAllBtn.addEventListener('click', async () => {
 });
 
 const refreshUsageBtn = document.getElementById('refreshUsageBtn');
+const priceRefreshBtn = document.getElementById('priceRefreshBtn');
 const usageTableBody = document.querySelector('#usageTable tbody');
 const usageSummary = document.getElementById('usageSummary');
 
@@ -844,9 +874,10 @@ async function renderTokenUsage() {
         ? 'Yes (est.)'
         : `Partial (${estimatedRequests}/${u.requests})`;
     const row = document.createElement('tr');
-    // No price table exists anywhere in this codebase — cost is a clearly
+    // No price table exists anywhere in this codebase — cost stays a clearly
     // marked placeholder rather than a fabricated number (Task 3).
-    row.innerHTML = `<td>${i + 1}</td><td>${u.provider}</td><td>${u.model}</td><td>${u.requests}</td><td>${u.promptTokens.toLocaleString()}</td><td>${u.completionTokens.toLocaleString()}</td><td><strong>${u.totalTokens.toLocaleString()}</strong></td><td>${estimatedLabel}</td><td style="color:#888;">N/A (no price table)</td>`;
+    const authLabel = u.authType === 'cookie' ? '🍪 Cookie' : '🔑 API Key';
+    row.innerHTML = `<td>${i + 1}</td><td>${u.provider}</td><td>${u.model}</td><td>${u.requests}</td><td>${authLabel}</td><td>${u.promptTokens.toLocaleString()}</td><td>${u.completionTokens.toLocaleString()}</td><td><strong>${u.totalTokens.toLocaleString()}</strong></td><td>${estimatedLabel}</td><td style="color:#888;">N/A (no price table)</td>`;
     usageTableBody.appendChild(row);
     totalRequests += u.requests; totalPrompt += u.promptTokens; totalCompletion += u.completionTokens; totalTokens += u.totalTokens;
     totalEstimatedRequests += estimatedRequests;
@@ -856,7 +887,17 @@ async function renderTokenUsage() {
 
 refreshUsageBtn.addEventListener('click', renderTokenUsage);
 
-// --- Assistant Config tab (Task 5) ---
+// --- NEW: Price Refresh ---
+// No pricing data source ships with the app, so this can't fetch prices.
+// It clears the stale "no price table" state note by re-rendering (a no-op
+// today) and leaves an honest inline status so the button's behavior is
+// explicit rather than silently doing nothing — wire this to a pricing
+// endpoint when one exists.
+priceRefreshBtn && priceRefreshBtn.addEventListener('click', () => {
+  usageSummary.innerHTML = `<strong>Est. Cost: N/A — no price table configured. Price Refresh has no data source to query.</strong>`;
+});
+
+// --- General Config (leftmost sub-tab of the Admin/Configuration tab) ---
 const systemPromptOverrideInput = document.getElementById('systemPromptOverrideInput');
 const toolCallEmulationToggle = document.getElementById('toolCallEmulationToggle');
 const previewToolFormatBtn = document.getElementById('previewToolFormatBtn');
@@ -868,7 +909,8 @@ const loggingVerbositySelect = document.getElementById('loggingVerbositySelect')
 const largeContextModeToggle = document.getElementById('largeContextModeToggle');
 const largeContextThresholdInput = document.getElementById('largeContextThresholdInput');
 const largeContextChunkTokensInput = document.getElementById('largeContextChunkTokensInput');
-const largeContextInterChunkDelayInput = document.getElementById('largeContextInterChunkDelayInput');
+const largeContextConcurrencyDefaultInput = document.getElementById('largeContextConcurrencyDefaultInput');
+const largeContextConcurrencyCookieInput = document.getElementById('largeContextConcurrencyCookieInput');
 const saveAssistantConfigBtn = document.getElementById('saveAssistantConfigBtn');
 
 let assistantConfigLoaded = false;
@@ -885,7 +927,9 @@ async function loadAssistantConfigForm() {
     if (largeContextModeToggle) largeContextModeToggle.checked = !!config.largeContextMode;
     if (largeContextThresholdInput) largeContextThresholdInput.value = config.largeContextThreshold ?? 100000;
     if (largeContextChunkTokensInput) largeContextChunkTokensInput.value = config.largeContextChunkTokens ?? 20000;
-    if (largeContextInterChunkDelayInput) largeContextInterChunkDelayInput.value = config.largeContextInterChunkDelayMs ?? 500;
+    const concurrency = config.largeContextConcurrency || { default: 5, cookie: 1 };
+    if (largeContextConcurrencyDefaultInput) largeContextConcurrencyDefaultInput.value = concurrency.default ?? 5;
+    if (largeContextConcurrencyCookieInput) largeContextConcurrencyCookieInput.value = concurrency.cookie ?? 1;
     assistantConfigLoaded = true;
   } catch (err) {
     console.warn('Could not load assistant config:', err.message);
@@ -903,17 +947,20 @@ saveAssistantConfigBtn?.addEventListener('click', async () => {
     largeContextMode: largeContextModeToggle ? largeContextModeToggle.checked : false,
     largeContextThreshold: largeContextThresholdInput ? Math.max(1000, parseInt(largeContextThresholdInput.value, 10) || 100000) : 100000,
     largeContextChunkTokens: largeContextChunkTokensInput ? Math.max(1000, parseInt(largeContextChunkTokensInput.value, 10) || 20000) : 20000,
-    largeContextInterChunkDelayMs: largeContextInterChunkDelayInput ? Math.max(0, parseInt(largeContextInterChunkDelayInput.value, 10) || 500) : 500
+    largeContextConcurrency: {
+      default: largeContextConcurrencyDefaultInput ? Math.max(1, parseInt(largeContextConcurrencyDefaultInput.value, 10) || 5) : 5,
+      cookie: largeContextConcurrencyCookieInput ? Math.max(1, parseInt(largeContextConcurrencyCookieInput.value, 10) || 1) : 1
+    }
   };
   try {
     const result = await window.api.saveAssistantConfig(config);
     if (result.success) {
-      alert('Assistant config saved. Changes apply to new requests immediately.');
+      await showNoticeModal('General config saved. Changes apply to new requests immediately.');
     } else {
-      alert('Failed to save assistant config: ' + result.error);
+      await showNoticeModal('Failed to save general config: ' + result.error);
     }
   } catch (err) {
-    alert('Error saving assistant config: ' + err.message);
+    await showNoticeModal('Error saving general config: ' + err.message);
   }
 });
 
@@ -978,10 +1025,10 @@ function showWebProviderForm() {
 addWebProviderBtn?.addEventListener('click', () => {
   // Always rebuild the cached refs: a previous setup run may have left the modal
   // in a stale state (form swapped out, buttons hidden).
-  webProviderNameInput.value = APP_CONSTANTS.DEFAULT_QWEN_NAME || 'Qwen';
-  webProviderUrlInput.value = (APP_CONSTANTS.DEFAULT_QWEN_URL || 'https://chat.qwen.ai') + '/';
+  webProviderNameInput.value = 'Qwen';
+  webProviderUrlInput.value = 'https://chat.qwen.ai/';
   webProviderCookieInput.value = '';
-  if (webProviderPresetSelect) webProviderPresetSelect.value = APP_CONSTANTS.DEFAULT_QWEN_NAME || 'Qwen';
+  if (webProviderPresetSelect) webProviderPresetSelect.value = 'Qwen';
   webProviderModal.style.display = 'flex';
   showWebProviderForm();
   webProviderModalProceed.style.display = '';
@@ -1021,7 +1068,7 @@ webProviderNameInput?.addEventListener('input', () => {
 webProviderModalProceed?.addEventListener('click', async () => {
   const name = webProviderNameInput.value.trim();
   const url = webProviderUrlInput.value.trim();
-  if (!name || !url) { alert('Please enter both a provider name and a login URL.'); return; }
+  if (!name || !url) { await showNoticeModal('Please enter both a provider name and a login URL.'); return; }
 
   const useAutoRetrieve = (webProviderCookieInput.value.trim().length === 0);
 
@@ -1048,13 +1095,13 @@ webProviderModalProceed?.addEventListener('click', async () => {
        });
        // Do not auto-close or auto-reload — let the user dismiss when ready.
     } else {
-      alert('Failed: ' + (result.error || 'Unknown error'));
+      await showNoticeModal('Failed: ' + (result.error || 'Unknown error'));
       showWebProviderForm();
       webProviderModalProceed.disabled = false;
       webProviderModalCancel.disabled = false;
     }
   } catch (err) {
-    alert('Failed: ' + (err.message || 'Unknown error'));
+    await showNoticeModal('Failed: ' + (err.message || 'Unknown error'));
     showWebProviderForm();
     webProviderModalProceed.disabled = false;
     webProviderModalCancel.disabled = false;
@@ -1062,19 +1109,20 @@ webProviderModalProceed?.addEventListener('click', async () => {
 });
 
 const clearWebProviderSessionBtn = document.getElementById('clearWebProviderSessionBtn');
-clearWebProviderSessionBtn?.addEventListener('click', () => {
+clearWebProviderSessionBtn?.addEventListener('click', async () => {
   const providerName = document.getElementById('clearWebProviderSelect')?.value || 'Qwen';
-  // Defer one tick: opening a blocking native confirm()/alert() while a <select>
-  // popup is still closing leaves a stuck invisible popup layer that eats clicks.
-  setTimeout(async () => {
-    if (!confirm(`Are you sure you want to clear all stored ${providerName} cookies and session data?`)) return;
-    const result = await window.api.clearWebProviderSession(providerName);
-    if (result.success) {
-      alert(`${providerName} session cleared. Please use "Add Web Provider" to log in again.`);
-    } else {
-      alert(`Failed to clear ${providerName} session: ` + result.error);
-    }
-  }, 0);
+  // Uses the non-blocking showConfirmModal (not native confirm()) — a native,
+  // synchronous confirm()/alert() opened while a <select> popup is still
+  // closing can leave a stuck invisible popup layer that eats every
+  // dropdown's clicks across every tab until the page reloads.
+  const confirmed = await showConfirmModal(`Are you sure you want to clear all stored ${providerName} cookies and session data?`);
+  if (!confirmed) return;
+  const result = await window.api.clearWebProviderSession(providerName);
+  if (result.success) {
+    await showNoticeModal(`${providerName} session cleared. Please use "Add Web Provider" to log in again.`);
+  } else {
+    await showNoticeModal(`Failed to clear ${providerName} session: ` + result.error);
+  }
 });
 
 // Load provider presets (Qwen, Kimi, ...) once the renderer is ready.
