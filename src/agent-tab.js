@@ -61,6 +61,11 @@
   const streamToggle = el('agentStreamToggle');
   const alwaysApproveToggle = el('agentAlwaysApproveToggle');
 
+  // --- NEW: agent-side timeout / token limits ---
+  const timeoutMsInput = el('agentTimeoutMs');
+  const maxOutputTokensInput = el('agentMaxOutputTokens');
+  const maxInputTokensInput = el('agentMaxInputTokens');
+
   // --- NEW: slash commands / undo ---
   const paletteBtn = el('agentPaletteBtn');
   const paletteModal = el('agentPaletteModal');
@@ -125,18 +130,25 @@
     scrollMessagesToBottom();
   }
 
-  function endStreamingBubble(fullText) {
-    if (currentAssistantBubble && currentAssistantBubble._streamCursor) {
-      currentAssistantBubble._streamCursor.remove();
-      delete currentAssistantBubble._streamCursor;
-    }
-
-    // fullText is authoritative (covers cases where the backend's final
-    // content differs slightly from the concatenated tokens); reconcile.
-    if (currentAssistantBubble && typeof fullText === 'string') {
-      currentAssistantBubble.textContent = fullText;
-    }
+function endStreamingBubble(fullText) {
+  if (currentAssistantBubble && currentAssistantBubble._streamCursor) {
+    currentAssistantBubble._streamCursor.remove();
+    delete currentAssistantBubble._streamCursor;
   }
+
+  // Safety net: remove any lingering cursor nodes that weren't cleaned up
+  // (e.g. if onAgentStreamEnd didn't fire for a previous turn).
+  document.querySelectorAll('.agent-stream-cursor').forEach(node => node.remove());
+
+  // fullText is authoritative (covers cases where the backend's final
+  // content differs slightly from the concatenated tokens); reconcile.
+  if (currentAssistantBubble && typeof fullText === 'string') {
+    const cursor = currentAssistantBubble._streamCursor;
+    currentAssistantBubble.textContent = fullText;
+    // Preserve cursor reference removal if we just cleared the bubble
+    if (cursor) cursor.remove();
+  }
+}
 
   function addToolCard(id, name, args) {
     const card = document.createElement('div');
@@ -199,6 +211,76 @@
       .replace(/'/g, '&#39;');
   }
 
+  // --- FIX: replacement for window.confirm() ----------------------------------
+  // window.confirm()/alert() are synchronous, OS-native modal dialogs. In
+  // Electron they run outside the normal BrowserWindow message/hit-test loop,
+  // and returning focus from them to the renderer is unreliable — after the
+  // user clicks OK, mouse input can land on stale hit-test state, leaving
+  // native form controls (in particular <select> elements and, on some
+  // platforms, text <input>s) unresponsive to clicks until the window loses
+  // and regains focus. That's the "textbox and dropdown do nothing after
+  // clicking OK" behavior. Building the confirmation as normal in-page DOM
+  // (same pattern as approvalModal/diffModal elsewhere in this file) keeps
+  // everything inside the regular renderer event loop, so no hit-test state
+  // gets stranded. This resolves to a Promise<boolean> so callers can
+  // `if (!(await confirmDialog(...))) return;` exactly like window.confirm().
+  function confirmDialog(message) {
+    return new Promise((resolve) => {
+      const overlay = document.createElement('div');
+      overlay.className = 'agent-confirm-overlay';
+      overlay.style.cssText =
+        'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;' +
+        'justify-content:center;background:rgba(0,0,0,0.45);';
+
+      const box = document.createElement('div');
+      box.className = 'agent-confirm-box';
+      box.style.cssText =
+        'background:var(--agent-modal-bg,#1e1e1e);color:var(--agent-modal-fg,#eee);' +
+        'max-width:420px;width:90%;padding:20px;border-radius:8px;' +
+        'box-shadow:0 8px 30px rgba(0,0,0,0.5);font-size:14px;line-height:1.4;';
+
+      const msgEl = document.createElement('div');
+      msgEl.textContent = message;
+      msgEl.style.marginBottom = '16px';
+      box.appendChild(msgEl);
+
+      const btnRow = document.createElement('div');
+      btnRow.style.cssText = 'display:flex;justify-content:flex-end;gap:8px;';
+
+      const cancelBtn = document.createElement('button');
+      cancelBtn.type = 'button';
+      cancelBtn.textContent = 'Cancel';
+
+      const okBtn = document.createElement('button');
+      okBtn.type = 'button';
+      okBtn.textContent = 'OK';
+
+      btnRow.appendChild(cancelBtn);
+      btnRow.appendChild(okBtn);
+      box.appendChild(btnRow);
+      overlay.appendChild(box);
+      document.body.appendChild(overlay);
+
+      function cleanup(result) {
+        document.removeEventListener('keydown', onKeydown, true);
+        overlay.remove();
+        resolve(result);
+      }
+
+      function onKeydown(e) {
+        if (e.key === 'Escape') { e.preventDefault(); cleanup(false); }
+        else if (e.key === 'Enter') { e.preventDefault(); cleanup(true); }
+      }
+
+      cancelBtn.addEventListener('click', () => cleanup(false));
+      okBtn.addEventListener('click', () => cleanup(true));
+      overlay.addEventListener('click', (e) => { if (e.target === overlay) cleanup(false); });
+      document.addEventListener('keydown', onKeydown, true);
+
+      okBtn.focus();
+    });
+  }
+
   // --- NEW: per-project cached chat sessions ---------------------------------
   // Replays a session's cached OpenAI-format message history into the chat
   // pane: user messages -> user bubbles, assistant text -> assistant bubbles,
@@ -247,7 +329,9 @@
 
   // Renders the tab strip above the message list: "Global" always present,
   // plus one tab per project the agent has ever switched into (cached on the
-  // main-process side — nothing is persisted here in the renderer).
+  // main-process side — nothing is persisted here in the renderer). Each tab
+  // also gets a small clear-history icon so cache/history can be reset per
+  // tab without switching into it or losing the tab itself.
   async function refreshChatTabs() {
     if (!chatTabsEl || !api.agentGetChatSessions) return;
     let sessions = [];
@@ -257,6 +341,9 @@
     const activeKey = mode === 'project' && projectRoot ? projectRoot : 'global';
 
     sessions.forEach((s) => {
+      const wrap = document.createElement('span');
+      wrap.className = 'agent-chat-tab-wrap' + (s.key === activeKey ? ' active' : '');
+
       const tab = document.createElement('button');
       tab.type = 'button';
       tab.className = 'agent-chat-tab' + (s.key === activeKey ? ' active' : '');
@@ -273,7 +360,33 @@
           addSystemNote('Could not switch chat: ' + err.message, true);
         }
       });
-      chatTabsEl.appendChild(tab);
+      wrap.appendChild(tab);
+
+      if (api.agentClearChat) {
+        const clearBtn = document.createElement('button');
+        clearBtn.type = 'button';
+        clearBtn.className = 'agent-chat-tab-clear';
+        clearBtn.title = 'Clear cache/history for ' + s.label;
+        clearBtn.textContent = '🗑';
+        clearBtn.addEventListener('click', async (e) => {
+          e.stopPropagation(); // don't also trigger the tab's own switch handler
+          if (!(await confirmDialog(`Clear cached history for "${s.label}"? This can't be undone.`))) return;
+          try {
+            const result = await api.agentClearChat(s.key);
+            if (result && result.isActive) {
+              renderMessagesFromHistory([]);
+              setUndoEnabled(false);
+              addSystemNote('(chat history cleared)');
+            }
+            refreshChatTabs();
+          } catch (err) {
+            addSystemNote('Could not clear chat: ' + err.message, true);
+          }
+        });
+        wrap.appendChild(clearBtn);
+      }
+
+      chatTabsEl.appendChild(wrap);
     });
   }
 
@@ -446,6 +559,11 @@
   });
 
   clearFolderBtn.addEventListener('click', async () => {
+    // This now removes the project's cached chat session/tab entirely (not
+    // just switches away from it — see clearProjectFolder in
+    // agent-controller.js), so confirm before doing something irreversible.
+    const label = (projectRoot || '').split(/[\/\\]/).pop() || projectRoot || 'this project';
+    if (!(await confirmDialog(`Turn off "${label}" and clear its cached chat history? This can't be undone.`))) return;
     try {
       const result = await api.clearProjectFolder();
       applyMode('global', null);
@@ -548,6 +666,11 @@
 
     streamToggle.checked = saved.streamResponses !== false; // default true
     alwaysApproveToggle.checked = !!saved.alwaysApproveWrites; // default false
+
+    // Agent-side timeout / token limits (fall back to defaults if unset)
+    timeoutMsInput.value = (saved.agentTimeoutMs && saved.agentTimeoutMs > 0) ? saved.agentTimeoutMs : 60000;
+    maxOutputTokensInput.value = (saved.agentMaxOutputTokens && saved.agentMaxOutputTokens > 0) ? saved.agentMaxOutputTokens : 8192;
+    maxInputTokensInput.value = (saved.agentMaxInputTokens && saved.agentMaxInputTokens > 0) ? saved.agentMaxInputTokens : 128000;
   }
 
   streamToggle.addEventListener('change', async () => {
@@ -558,6 +681,25 @@
   alwaysApproveToggle.addEventListener('change', async () => {
     try { await api.saveAgentConfig({ alwaysApproveWrites: alwaysApproveToggle.checked }); }
     catch (err) { addSystemNote('Could not save setting: ' + err.message, true); }
+  });
+
+  // --- NEW: agent-side timeout / token-limit inputs ---
+  timeoutMsInput.addEventListener('change', async () => {
+    const val = Math.max(0, parseInt(timeoutMsInput.value, 10) || 0);
+    try { await api.saveAgentConfig({ agentTimeoutMs: val }); }
+    catch (err) { addSystemNote('Could not save timeout: ' + err.message, true); }
+  });
+
+  maxOutputTokensInput.addEventListener('change', async () => {
+    const val = Math.max(0, parseInt(maxOutputTokensInput.value, 10) || 0);
+    try { await api.saveAgentConfig({ agentMaxOutputTokens: val }); }
+    catch (err) { addSystemNote('Could not save max output tokens: ' + err.message, true); }
+  });
+
+  maxInputTokensInput.addEventListener('change', async () => {
+    const val = Math.max(0, parseInt(maxInputTokensInput.value, 10) || 0);
+    try { await api.saveAgentConfig({ agentMaxInputTokens: val }); }
+    catch (err) { addSystemNote('Could not save max input tokens: ' + err.message, true); }
   });
 
   // --- Upload files --------------------------------------------------------------
@@ -750,20 +892,60 @@
   // Mirrors the agent's activity in the sidebar Task Progress list, distinct
   // from the chat tool cards above. Shows active tools (spinner), per-request
   // token usage, and an end-of-turn summary line.
+  //
+  // Raw backend tool function names (list_directory, read_file, ...) aren't
+  // meaningful to a user watching the sidebar — this maps each known tool to
+  // a short, human-readable TODO-style label. Unknown/future tool names fall
+  // back to the raw name so nothing silently disappears.
+   const TOOL_TASK_LABELS = {
+    list_directory: 'List',
+    read_file: 'Read',
+    write_file: 'Write',
+    search_code: 'Search',
+    run_command: 'Run',
+    scratchpad_write: 'Save'
+  };
+
+  // Extract a short subject (file/folder path) from tool args for compact display.
+  function taskSubjectFor(name, args) {
+    if (!args) return '';
+    if (name === 'list_directory' || name === 'read_file' || name === 'write_file' || name === 'search_code') {
+      return args.path || '';
+    }
+    if (name === 'run_command') {
+      return args.command ? 'cmd: ' + (args.command.length > 30 ? args.command.slice(0, 30) + '…' : args.command) : '';
+    }
+    if (name === 'scratchpad_write') {
+      return args.path || '';
+    }
+    return '';
+  }
+
+  function taskLabelFor(toolName) {
+    return TOOL_TASK_LABELS[toolName] || toolName || 'Working';
+  }
+
   function resetTaskProgress() {
     if (!taskProgressEl) return;
     taskProgressEl.innerHTML = '<div class="agent-task-progress-empty">Idle</div>';
   }
 
-  function addTaskProgressEntry(id, label) {
+  // Store args so completeTaskProgressEntry can extract a subject path
+  const taskArgs = new Map();
+
+  function addTaskProgressEntry(id, label, args) {
     if (!taskProgressEl) return;
+    const subject = taskSubjectFor(label, args);
+    taskArgs.set(id, { label, subject });
     const empty = taskProgressEl.querySelector('.agent-task-progress-empty');
     if (empty) empty.remove();
     const row = document.createElement('div');
     row.className = 'agent-progress-item';
     row.dataset.taskId = id;
+    // Compact: "Read - src/foo.js" then "⏳" spinner, result replaces spinner
+    const displayText = subject ? (label + ' — ' + subject) : label;
     row.innerHTML =
-      '<span class="agent-progress-label">' + escapeHtml(label) + '</span>' +
+      '<span class="agent-progress-label">' + escapeHtml(displayText) + '</span>' +
       '<span class="agent-progress-spinner">⏳</span>' +
       '<span class="agent-progress-result" style="display:none;"></span>';
     taskProgressEl.appendChild(row);
@@ -776,7 +958,15 @@
     row.querySelector('.agent-progress-spinner').style.display = 'none';
     const resultEl = row.querySelector('.agent-progress-result');
     resultEl.style.display = 'inline';
-    resultEl.textContent = resultText === undefined ? '✓' : ('✓ ' + (resultText.ok ? 'ok' : 'failed'));
+    const ok = resultText && resultText.ok;
+    // Show concise status: "✓ ok" or "✗ failed" with a shortened error
+    let text = ok ? '✓ ok' : '✗ failed';
+    if (resultText && !ok && resultText.message) {
+      const msg = resultText.message.length > 60 ? resultText.message.slice(0, 60) + '…' : resultText.message;
+      text += ' — ' + msg;
+    }
+    resultEl.textContent = text;
+    taskArgs.delete(id);
   }
 
   function addTokenUsageEntry(usage) {
@@ -806,18 +996,16 @@
   }
 
   if (api.onAgentToolList) {
-    // Available tool set for the turn (header context) — but the live entries
-    // below are driven by AGENT_TOOL_START / AGENT_TOOL_RESULT so the list
-    // tracks exactly which tool ran and its outcome, not just what was offered.
-    api.onAgentToolList((data) => {
+    // This event only reports which tools are OFFERED to the model for the
+    // turn — it fires with the same fixed set every time (all tools available
+    // in the current mode), not what the model actually intends to do. Using
+    // it to render a "plan" was misleading (a static checklist that never
+    // changed). The real, model-driven feed is the live AGENT_TOOL_START /
+    // AGENT_TOOL_RESULT entries below — those only appear when the model
+    // actually calls that tool, in the order it calls them. So this handler
+    // just resets the panel for the new turn and otherwise does nothing.
+    api.onAgentToolList(() => {
       resetTaskProgress();
-      const tools = (data && data.tools) || [];
-      if (tools.length) {
-        const avail = document.createElement('div');
-        avail.className = 'agent-progress-available';
-        avail.textContent = tools.length + ' tool(s) available';
-        taskProgressEl && taskProgressEl.appendChild(avail);
-      }
     });
   }
 
@@ -830,7 +1018,7 @@
   if (api.onAgentToolStart) {
     api.onAgentToolStart((data) => {
       addToolCard(data.id, data.name, data.args);
-      addTaskProgressEntry(data.id, data.name || 'tool');
+      addTaskProgressEntry(data.id, taskLabelFor(data.name), data.args);
     });
   }
   if (api.onAgentToolResult) {

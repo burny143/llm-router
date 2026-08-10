@@ -16,3 +16,5 @@ Deep Infra,https://api.deepinfra.com/v1/openai/chat/completions,DEEPINFRA_API_KE
 Pollination,https://gen.pollinations.ai/v1/chat/completion,POLLINATION_API_KEY,https://gen.pollinations.ai/v1/models,Bearer
 Qwen,https://chat.qwen.ai/api/v2/chat/completions?chat_id=7a64578f-9a23-45be-ace4-9d9aee57d5a3,QWEN_COOKIE,,Cookie
 Kimi,https://kimi.moonshot.cn/api/chat,KIMI_COOKIE,,Cookie
+InferX,https://model.inferx.net/v1,INFERX_API_KEY,,Bearer
+DeepSeek,https://openrouter.ai/api/v1,DEEPSEEK_API_KEY,,Bearer

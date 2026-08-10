@@ -5,7 +5,6 @@ const { getFilePath } = require('./state-store');
 const {
   DEFAULT_COOKIE_USER_AGENT,
   FILE_ROLES,
-  BROWSER_FETCH_TIMEOUT_MS,
   BROWSER_FETCH_HANG_GUARD_MS
 } = require('./shared-constants');
 
@@ -157,7 +156,7 @@ class BrowserHttpClient {
     return session;
   }
 
-  async _fetchInPage(page, url, payload, headers, method = 'POST') {
+  async _fetchInPage(page, url, payload, headers, method = 'POST', timeoutMs) {
     return page.evaluate(async ({ url, payload, headers, method, timeoutMs }) => {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -179,38 +178,41 @@ class BrowserHttpClient {
       } finally {
         clearTimeout(timer);
       }
-    }, { url, payload, headers, method, timeoutMs: BROWSER_FETCH_TIMEOUT_MS });
+    }, { url, payload, headers, method, timeoutMs: timeoutMs || 60000 });
   }
 
-   async request(url, payload, headers, cookies, profileKey, method = 'POST') {
+   async request(url, payload, headers, cookies, profileKey, method = 'POST', fetchTimeoutMs) {
     const session = await this._getSession(url, cookies, profileKey);
     // NOTE: cookies were already injected inside _getSession — no second call here.
     console.log(`[BrowserHttpClient] dispatching in-page ${method} to ${url.toString().slice(0, 80)} payload=${JSON.stringify(payload).slice(0, 120)}`);
 
-     // Outer timeout: catches a Playwright-level hang (page.evaluate never resolves).
-     // BROWSER_FETCH_HANG_GUARD_MS is deliberately LONGER than the inner
-     // AbortController timeout (BROWSER_FETCH_TIMEOUT_MS) so this guard only
-     // fires on a genuine Playwright-level hang, never on ordinary race
-     // ambiguity with the inner fetch timeout.
-     let result;
-     try {
-       result = await Promise.race([
-         this._fetchInPage(session.page, url, payload, headers, method),
-         new Promise((_, rej) => setTimeout(() => rej(new Error('browser fetch timed out')), BROWSER_FETCH_HANG_GUARD_MS))
-       ]);
-     } catch (e) {
-       console.log(`[BrowserHttpClient] in-page fetch ABORTED: ${e.message}`);
-       throw new Error(`Browser fetch failed: ${e.message}`);
-     }
-     if (!result.ok) {
-       console.log(`[BrowserHttpClient] in-page fetch returned status=${result.status} text=${String(result.text).slice(0, 200)}`);
-       throw new Error(`Browser fetch failed: ${result.text}`);
-     }
+    // Outer timeout: catches a Playwright-level hang (page.evaluate never resolves).
+    // Deliberately LONGER than the inner AbortController timeout so this guard only
+    // fires on a genuine Playwright-level hang, never on ordinary race ambiguity
+    // with the inner fetch timeout. The inner timeout comes from the proxy's
+    // assistantConfig.cookieProviderTimeoutMs (60s default); the hang guard is
+    // that + 10s (or the shared-constants fallback if not specified).
+    const innerTimeoutMs = fetchTimeoutMs || 60000;
+    const hangGuardMs = BROWSER_FETCH_HANG_GUARD_MS > innerTimeoutMs ? BROWSER_FETCH_HANG_GUARD_MS : innerTimeoutMs + 10000;
+    let result;
+    try {
+      result = await Promise.race([
+        this._fetchInPage(session.page, url, payload, headers, method, innerTimeoutMs),
+        new Promise((_, rej) => setTimeout(() => rej(new Error('browser fetch timed out')), hangGuardMs))
+      ]);
+    } catch (e) {
+      console.log(`[BrowserHttpClient] in-page fetch ABORTED: ${e.message}`);
+      throw new Error(`Browser fetch failed: ${e.message}`);
+    }
+    if (!result.ok) {
+      console.log(`[BrowserHttpClient] in-page fetch returned status=${result.status} text=${String(result.text).slice(0, 200)}`);
+      throw new Error(`Browser fetch failed: ${result.text}`);
+    }
 
-     if (containsAny(result.text, WAF_MARKERS)) {
-       console.log(`[BrowserHttpClient] WAF/challenge markers detected in response, reloading origin...`);
-       await this._loadOriginClean(session.page, originForUrl(url));
-       result = await this._fetchInPage(session.page, url, payload, headers, method);
+    if (containsAny(result.text, WAF_MARKERS)) {
+      console.log(`[BrowserHttpClient] WAF/challenge markers detected in response, reloading origin...`);
+      await this._loadOriginClean(session.page, originForUrl(url));
+      result = await this._fetchInPage(session.page, url, payload, headers, method, innerTimeoutMs);
        if (!result.ok) throw new Error(`Browser fetch failed: ${result.text}`);
        if (containsAny(result.text, WAF_MARKERS)) {
          throw new Error('WAF/CAPTCHA detected in browser response');

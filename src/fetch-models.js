@@ -55,7 +55,7 @@ const hasStripPrefixColumn = !!stripPrefixKey;
 let providerFlags = {};
 if (!hasStripPrefixColumn) {
     try {
-        const flagsPath = getFilePath('providerFlags');
+        const flagsPath = getFilePath(FILE_ROLES.PROVIDER_FLAGS);
         if (fs.existsSync(flagsPath)) {
             providerFlags = JSON.parse(fs.readFileSync(flagsPath, 'utf-8')) || {};
         }

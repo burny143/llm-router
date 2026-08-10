@@ -1,3 +1,4 @@
+// setup-web-provider.js
 const { chromium } = require('playwright');
 const fs = require('fs');
 const path = require('path');
@@ -39,11 +40,19 @@ const SUBMIT_SELECTORS = ['button:has-text("Log in")', 'button:has-text("Sign in
 const CHAT_INPUT_SELECTORS = ['textarea', 'div[contenteditable="true"]', 'div[contenteditable="plaintext-only"]', 'input[type="text"]', 'div[class*="chat-input" i]', 'div[data-testid*="input" i]'];
 const SMS_CODE_SELECTORS = ['input[inputmode="numeric"]', 'input[autocomplete="one-time-code"]', 'input[placeholder*="code" i]', 'input[placeholder*="验证码" i]'];
 
-const ANALYTICS_URL_PATTERNS = [/aplus\./i, /\/aes(\.|\/)/i, /analytics/i, /telemetry/i, /track(ing)?/i, /beacon/i, /sentry/i, /\/collect/i, /report/i, /metrics/i, /\/log(\/|\.)/i, /pixel/i, /hotjar/i, /clarity/i, /doubleclick/i, /umami/i, /\/stats/i, /monitor/i, /\/events?(\?|\/|$)/i, /heartbeat/i, /retention/i, /kimi\.com\/api\/(searcher|suggestion|conversation|upload|user)/i, /\.log\.kimi/i, /\.log\.moonshot/i];
+// Use strings to construct RegExp to avoid JS literal parsing errors with unescaped slashes
+const ANALYTICS_URL_PATTERNS = [
+  'aplus\\.', 'aes(.|/)', 'analytics', 'telemetry', 'track(ing)?', 'beacon', 'sentry',
+  'collect', 'report', 'metrics', 'log(/|.)', 'pixel', 'hotjar', 'clarity', 'doubleclick',
+  'umami', 'stats', 'monitor', 'events?(\\?|/|$)', 'heartbeat', 'retention',
+  'kimi\\.com/api/(searcher|suggestion|conversation|upload|user)', '\\.log\\.kimi', '\\.log\\.moonshot'
+].map(s => new RegExp(s, 'i'));
+
 function isAnalyticsUrl(url) { return ANALYTICS_URL_PATTERNS.some(re => re.test(url)); }
 
 const CHAT_CONTAINER_KEYS = ['messages', 'contents', 'parts', 'history'];
 const CHAT_TEXT_KEYS = ['prompt', 'question', 'query', 'content', 'text', 'input', 'message', 'user_message', 'input_text'];
+
 function looksLikeChatPayload(value, depth = 0) {
   if (!value || typeof value !== 'object' || depth > 4) return false;
   if (Array.isArray(value)) return value.some(item => looksLikeChatPayload(item, depth + 1));
@@ -57,13 +66,9 @@ function looksLikeChatPayload(value, depth = 0) {
   return keys.some(k => value[k] && typeof value[k] === 'object' && looksLikeChatPayload(value[k], depth + 1));
 }
 
-// envPrefixFor is imported from state-store.js — the single canonical
-// implementation shared by capture, runtime proxy, and cookie paths, so the
-// profile dir for capture and runtime can never drift apart.
-
 async function writeFileWithRetry(filePath, content, maxRetries = 5, delayMs = 300) {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try { fs.writeFileSync(filePath, content); return; } 
+    try { fs.writeFileSync(filePath, content); return; }
     catch (err) {
       const isLockError = err.code === 'EBUSY' || err.code === 'EPERM' || err.code === 'EACCES';
       if (!isLockError || attempt === maxRetries) throw err;
@@ -109,8 +114,6 @@ async function attemptAutoLogin(page, providerName) {
     if (password) {
       await tryFill(page, PASSWORD_SELECTORS, password, 'password');
     } else {
-      // SMS-code login (e.g. Kimi): fill a code if one was supplied in .env,
-      // otherwise tell the user to enter the code sent to their phone.
       const smsCode = process.env[`${envPrefix}_SMS_CODE`];
       if (smsCode) await tryFill(page, SMS_CODE_SELECTORS, smsCode, 'SMS code');
     }
@@ -133,19 +136,27 @@ async function attemptAutoChat(page) {
     }
     if (!chatLoc) { console.log('  [auto] could not find a chat input box — please send a message manually.'); return false; }
     await chatLoc.click();
+    await chatLoc.focus().catch(() => {});
     await page.waitForTimeout(300);
-    // Real keystrokes, not fill(): Vue/contenteditable editors (e.g. Kimi) only
-    // enable their Send button in response to genuine input/key events.
     await page.keyboard.type('Hello', { delay: 30 });
     await page.waitForTimeout(500);
 
-    const sendBtn = page.locator('button[aria-label*="Send" i], button[data-testid*="send" i], button:has-text("Send")').first();
-    // Wait (short, capped) for the Send button to become enabled — Kimi keeps it
-    // disabled until there is text. Clicking a disabled button would otherwise
-    // make Playwright burn the full 30s actionability timeout.
+    const sendBtn = page.locator([
+      'button[aria-label*="Send" i]',
+      'button[aria-label*="submit" i]',
+      'button[data-testid*="send" i]',
+      'button:has-text("Send")',
+      'button:has-text("发送")',
+      'button[class*="send" i]',
+      'button[class*="submit" i]',
+      'div[class*="send" i]',
+      'div[role="button"][aria-label*="send" i]'
+    ].join(', ')).first();
+
     let enabled = false;
     for (let i = 0; i < 20; i++) {
-      enabled = await sendBtn.isEnabled().catch(() => false);
+      const isVisible = await sendBtn.isVisible().catch(() => false);
+      enabled = isVisible && await sendBtn.isEnabled().catch(() => true);
       if (enabled) break;
       await page.waitForTimeout(250);
     }
@@ -155,8 +166,8 @@ async function attemptAutoChat(page) {
       console.log('  [auto] test message sent (Send button).');
       return true;
     }
-    // Fallback: some editors submit on Enter even when the Send button is hidden.
     await chatLoc.press('Enter').catch(() => {});
+    await page.keyboard.press('Enter').catch(() => {});
     await page.waitForTimeout(800);
     console.log('  [auto] Send button never enabled — pressed Enter as fallback.');
     return true;
@@ -202,8 +213,6 @@ function extractSseBody(text) {
       if (!candidate || candidate === '[DONE]') continue;
       try { payload = JSON.parse(candidate); } catch (e) { continue; }
     } else if (l[0] === '{' || l[0] === '[') {
-      // Some web UIs (e.g. Kimi) stream raw JSON objects per line instead of
-      // SSE `data:` frames. Try parsing those too.
       try { payload = JSON.parse(l); } catch (e) { continue; }
     } else {
       continue;
@@ -240,9 +249,6 @@ function extractText(data) {
   return longest || null;
 }
 
-// Use Playwright's page.evaluate to run fetch() INSIDE the browser context.
-// This guarantees a perfect TLS fingerprint and uses the browser's actual cookies,
-// completely bypassing x5sec WAF detection that blocks Node.js axios.
 async function verifyCapturedRequest(page, capturedData, authToken) {
   try {
     const resp = await page.evaluate(async ({ url, payload, headers }) => {
@@ -253,19 +259,15 @@ async function verifyCapturedRequest(page, capturedData, authToken) {
       });
       const text = await res.text();
       return { status: res.status, text: text };
-    }, { 
-      url: capturedData.url, 
-      payload: capturedData.payload, 
-      headers: { 
-        ...capturedData.headers, 
+    }, {
+      url: capturedData.url,
+      payload: capturedData.payload,
+      headers: {
+        ...capturedData.headers,
         'Content-Type': 'application/json',
-        // Kimi authenticates via the Local Storage `refresh_token`, not via the
-        // `kimi-auth` cookie — ping with it as a Bearer token so the verification
-        // actually exercises the token the runtime will use.
         ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {})
-      } 
+      }
     });
-    
     if (resp.text.includes('rgv587_flag') || resp.text.includes('captcha') || resp.text.includes('x5secdata')) {
       return { ok: false, status: resp.status, snippet: resp.text.slice(0, 200) };
     }
@@ -293,9 +295,8 @@ async function setupWebProvider(providerName, startUrl) {
     let postData;
     try { postData = JSON.parse(request.postData()); } catch (e) { return; }
     if (!looksLikeChatPayload(postData)) return;
-    // Sites like Kimi POST conversation-list/heartbeat payloads that happen to look
-    // chat-like. Prefer URLs that clearly point at a chat completion endpoint.
-    const isPreferred = /\/api\/chat\//i.test(url) || /completion\/?stream/i.test(url) || /\/chat\/completions/i.test(url);
+    
+    const isPreferred = /api\/chat/i.test(url) || /completion.*?stream/i.test(url) || /chat\/completions/i.test(url);
     if (!capturedData || (isPreferred && !capturedPreferred)) {
       capturedData = { url, headers: request.headers(), payload: postData };
       capturedPreferred = isPreferred || capturedPreferred;
@@ -320,28 +321,39 @@ async function setupWebProvider(providerName, startUrl) {
 
   if (!capturedData) {
     await context.close().catch(() => {});
-    if (browserClosedEarly) throw new Error('The browser was closed before any chat request was captured.');
-    throw new Error('No chat API request captured. Please log in and send a test message.');
+    throw new Error('Failed to capture cookie,please enter manually');
   }
 
   const cookies = await context.cookies();
   const cookieHeader = cookies.map(c => `${c.name}=${c.value}`).join('; ');
 
-  // Kimi does NOT authenticate through cookies — its API expects the Local
-  // Storage `refresh_token` as a Bearer token. Grab it from the browser's
-  // storage while we still have the context open.
   let authToken = null;
   try {
-    const storage = await context.storageState();
-    for (const origin of storage.origins) {
-      const item = (origin.localStorage || []).find(entry => entry.name === 'refresh_token');
-      if (item && item.value) { authToken = item.value; break; }
+    authToken = await page.evaluate(() => {
+      try {
+        return localStorage.getItem('refresh_token') || window.localStorage.getItem('refresh_token');
+      } catch (e) {
+        return null;
+      }
+    });
+    if (!authToken) {
+      const storage = await context.storageState();
+      for (const origin of storage.origins || []) {
+        const item = (origin.localStorage || []).find(entry => entry.name === 'refresh_token');
+        if (item && item.value) { authToken = item.value; break; }
+      }
     }
   } catch (err) {
     console.warn(`[capture] could not read Local Storage: ${err.message}`);
   }
+
   if (authToken) console.log('🎫 Captured refresh_token from Local Storage (Kimi-style auth).');
   else console.log('⚠️ No refresh_token found in Local Storage — falling back to cookie-only auth.');
+
+  if (providerName.toLowerCase().includes('kimi') && !authToken) {
+    await context.close().catch(() => {});
+    throw new Error('Failed to capture cookie,please enter manually');
+  }
 
   console.log('🔎 Pinging the captured endpoint using the real browser context to verify...');
   const verification = await verifyCapturedRequest(page, capturedData, authToken);
@@ -376,25 +388,19 @@ async function setupWebProvider(providerName, startUrl) {
 
   const rulesPath = getFilePath('webProviderRules');
   let rules = fs.existsSync(rulesPath) ? JSON.parse(fs.readFileSync(rulesPath, 'utf-8')) : {};
-  
   const headersToSave = { ...capturedData.headers };
   delete headersToSave['host'];
   delete headersToSave['content-length'];
   delete headersToSave['cookie'];
   delete headersToSave['connection'];
   delete headersToSave['accept-encoding'];
-
-  rules[providerName] = { 
-    samplePayload: capturedData.payload, 
+  rules[providerName] = {
+    samplePayload: capturedData.payload,
     headers: headersToSave,
-    userAgent: capturedData.headers['user-agent'], 
-    origin: capturedData.headers['origin'], 
+    userAgent: capturedData.headers['user-agent'],
+    origin: capturedData.headers['origin'],
     referer: capturedData.headers['referer'],
-    // Kimi-style providers authenticate via the Local Storage `refresh_token`
-    // (Bearer), not via cookies — saved so the runtime can attach it.
     ...(authToken ? { authToken } : {}),
-    // The on-disk browser profile used for capture — runtime proxy requests reuse this
-    // SAME profile dir so the request comes from the same device/cookie-jar that logged in.
     profileKey: envPrefixFor(providerName).toLowerCase()
   };
   await writeFileWithRetry(rulesPath, JSON.stringify(rules, null, 2));
@@ -408,4 +414,5 @@ if (require.main === module) {
   const url = process.argv[3] || 'https://chat.qwen.ai';
   setupWebProvider(provider, url).then(() => process.exit(0)).catch(err => { console.error(err); process.exit(1); });
 }
+
 module.exports = { setupWebProvider };

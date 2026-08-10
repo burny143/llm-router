@@ -360,13 +360,14 @@ async function doCompletion(model, messages, refreshToken, useSearch, opts) {
   try {
     const { accessToken, userId } = await acquireToken(refreshToken);
     const sendMessages = messagesPrepare(messages);
+    const completionTimeoutMs = opts.timeoutMs > 0 ? opts.timeoutMs : 120000;
     const resp = await axios.post(`${KIMI_API_BASE}/api/chat/${convId}/completion/stream`, {
       kimiplus_id: /^[0-9a-z]{20}$/.test(model) ? model : undefined,
       messages: sendMessages,
       refs: [],
       use_search: useSearch
     }, {
-      timeout: 120000,
+      timeout: completionTimeoutMs,
       signal: opts.signal,
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -437,12 +438,13 @@ async function doCompletion(model, messages, refreshToken, useSearch, opts) {
  * @param {string} params.refreshToken
  * @param {boolean} [params.useSearch=false]  enable Kimi web search
  * @param {AbortSignal} [params.signal]
+ * @param {number} [params.timeoutMs]  per-request timeout for the completion stream (default 120000)
  */
-async function completion({ model, messages, refreshToken, useSearch = false, signal }) {
+async function completion({ model, messages, refreshToken, useSearch = false, signal, timeoutMs }) {
   let lastErr;
   for (let attempt = 0; attempt < MAX_ATTEMPT_COUNT; attempt++) {
     try {
-      return await doCompletion(model || 'kimi', messages, refreshToken, useSearch, { signal });
+      return await doCompletion(model || 'kimi', messages, refreshToken, useSearch, { signal, timeoutMs });
     } catch (err) {
       lastErr = err;
       // Auth failures never recover on retry; rethrow immediately.

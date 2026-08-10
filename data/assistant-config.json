@@ -2,11 +2,16 @@
   "systemPromptOverride": "call user as \"FRED\" and use \"!\" to end the sentence always",
   "toolCallEmulation": true,
   "routingMode": "auto",
-  "retryCount": 0,
+  "retryCount": 1,
   "timeoutMs": 30000,
+  "pingIntervalMs": 30000,
+  "minRequestIntervalMs": 1000,
   "loggingVerbosity": "normal",
   "largeContextMode": false,
   "largeContextThreshold": 20000,
-  "largeContextChunkTokens": 5000,
-  "largeContextInterChunkDelayMs": 500
+  "largeContextChunkTokens": 4000,
+  "largeContextConcurrency": {
+    "default": 5,
+    "cookie": 1
+  }
 }

@@ -574,6 +574,26 @@ button.btn-primary:hover {
   border-color: #007bff;
   color: #fff;
 }
+.agent-chat-tab-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.agent-chat-tab-clear {
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: #fff;
+  color: #999;
+  font-size: 11px;
+  line-height: 1;
+  padding: 4px 5px;
+  cursor: pointer;
+}
+.agent-chat-tab-clear:hover {
+  background: #fdeaea;
+  color: #c0392b;
+  border-color: #e0b4b4;
+}
 .agent-messages {
   flex: 1 1 auto;
   overflow-y: auto;
@@ -875,22 +895,21 @@ button.btn-primary:hover {
 
 /* --- Agent tab: Task Progress sidebar panel --- */
 .agent-task-progress {
-  max-height: 320px;
+  max-height: calc(100vh - 200px);
   overflow-y: auto;
-  font-size: 12px;
-  font-family: monospace;
-  word-break: break-all;
+  font-size: 11px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 .agent-task-progress-empty { color: #999; font-style: italic; padding: 4px 0; }
 .agent-progress-item {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 2px 0;
+  gap: 4px;
+  padding: 1px 0;
   border-bottom: 1px solid #f0f0f0;
 }
-.agent-progress-label { flex: 1; }
+.agent-progress-label { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .agent-progress-spinner { color: #e0a800; }
-.agent-progress-result { color: #6bcb77; }
-.agent-progress-usage { justify-content: space-between; color: #555; }
-.agent-progress-summary { color: #28a745; font-weight: 600; }
+.agent-progress-result { color: #6bcb77; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

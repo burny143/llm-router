@@ -45,6 +45,16 @@ let running = false;
 
 let globalConfig = loadAgentConfig();
 
+// Fallback token estimator (used before proxy-server is required). Uses the same
+// ~4 chars/token heuristic that proxy-server.js uses for providers without
+// real usage reporting.
+function estimateTokensFromTextFallback(text) {
+  if (!text) return 0;
+  const str = typeof text === 'string' ? text : JSON.stringify(text);
+  if (!str) return 0;
+  return Math.max(1, Math.ceil(str.length / 4));
+}
+
 // --- Per-project cached chat sessions --------------------------------------
 // Each key is either 'global' or an absolute project path; value is
 // { messages: [] (OpenAI-format history), updatedAt: number }. Cached across
@@ -186,10 +196,27 @@ async function runAgentTurn(sendToRenderer, userText, uploadedFiles) {
       for (let attempt = 1; attempt <= MODEL_CALL_MAX_ATTEMPTS; attempt++) {
         if (abortRequested) break;
         try {
+          // --- Agent-side input token cap --- reject the model call before
+          // forwarding if the conversation exceeds the agent's configured
+          // context limit. Uses the proxy's token estimator (cheap heuristic).
+          const maxInputTokens = globalConfig.agentMaxInputTokens > 0 ? globalConfig.agentMaxInputTokens : 0;
+          if (maxInputTokens > 0) {
+            const estimateTokensFromText = proxy().estimateTokensFromText || estimateTokensFromTextFallback;
+            const estimated = estimateTokensFromText(JSON.stringify(messagesForModel));
+            if (estimated > maxInputTokens) {
+              throw new Error(`Agent context limit exceeded (~${estimated} tokens > ${maxInputTokens}). Trim history or increase the limit.`);
+            }
+          }
+          // Build per-call options: forward max_tokens cap (if set) and let the
+          // proxy apply its own timeout (agent doesn't override proxy timeoutMs;
+          // the proxy uses its own assistantConfig.timeoutMs).
+          const agentOpts = { tools };
+          const maxOutputTokens = globalConfig.agentMaxOutputTokens > 0 ? globalConfig.agentMaxOutputTokens : 0;
+          if (maxOutputTokens > 0) agentOpts.max_tokens = maxOutputTokens;
           if (streamingEnabled) {
             sendToRenderer(IPC_CHANNELS.AGENT_STREAM_START, {});
             let fullText = '';
-            const streamResult = await proxy().processChatCompletionStream(messagesForModel, { tools }, (token) => {
+            const streamResult = await proxy().processChatCompletionStream(messagesForModel, agentOpts, (token) => {
               fullText += token;
               sendToRenderer(IPC_CHANNELS.AGENT_STREAM_TOKEN, { token });
             });
@@ -203,7 +230,7 @@ async function runAgentTurn(sendToRenderer, userText, uploadedFiles) {
               tool_calls: streamResult.tool_calls || null
             });
           } else {
-            const response = await proxy().processChatCompletion(messagesForModel, { tools });
+             const response = await proxy().processChatCompletion(messagesForModel, agentOpts);
             message = (response && response.choices && response.choices[0] && response.choices[0].message) || {};
             if (message.content) {
               // Fallback path when streaming is off: whole message in one chunk.
@@ -283,6 +310,31 @@ async function runAgentTurn(sendToRenderer, userText, uploadedFiles) {
         };
         messagesForModel.push(toolMsg);
         getActiveMessages().push(toolMsg);
+      }
+
+      // If the loop above broke early due to an abort, every tool_call in this
+      // assistant message that never got a matching 'tool' response must still
+      // get one. The OpenAI-style API requires exactly one tool message per
+      // tool_call id — leaving any unanswered would corrupt this session's
+      // persisted history and break every future turn (the model call would be
+      // rejected as malformed). Backfill a synthetic "aborted" result for each
+      // tool_call id we haven't already answered.
+      if (abortRequested) {
+        const answeredIds = new Set(
+          getActiveMessages()
+            .filter((m) => m.role === 'tool')
+            .map((m) => m.tool_call_id)
+        );
+        for (const call of toolCalls) {
+          if (answeredIds.has(call.id)) continue;
+          const abortedMsg = {
+            role: 'tool',
+            tool_call_id: call.id,
+            content: JSON.stringify({ ok: false, message: 'Aborted by user before this tool call executed.' })
+          };
+          messagesForModel.push(abortedMsg);
+          getActiveMessages().push(abortedMsg);
+        }
       }
 
       // --- NEW: bounded step-limit extension (keep-alive) ---
@@ -586,11 +638,28 @@ async function setProjectRoot(newRoot, sendToRenderer) {
 }
 
 async function clearProjectFolder(sendToRenderer) {
+  // The key for the project we're leaving — captured BEFORE projectRoot is
+  // nulled below, so we know which cached session to actually remove.
+  const leavingKey = sessionKeyFor(projectRoot);
+
   projectRoot = null;
   globalConfig.lastProjectPath = null;
   saveAgentConfig(globalConfig);
   lastWrite = null; // --- NEW: undo ---
   activeSessionKey = sessionKeyFor(null);
+
+  // Previously this only switched the active session back to 'global' —
+  // the project's cached chat session (and its tab in the strip) stuck
+  // around untouched, so the button looked like it just changed tabs
+  // instead of actually turning the project off. Deleting its session here
+  // (Global's session is never eligible — sessionKeyFor(null) === 'global')
+  // makes this button do what its "Return to Global mode" title promises:
+  // the project's tab disappears and its cached history with it.
+  if (leavingKey !== 'global' && chatSessions.has(leavingKey)) {
+    chatSessions.delete(leavingKey);
+    persistChats();
+  }
+
   sendToRenderer(IPC_CHANNELS.AGENT_MODE_CHANGED, { mode: 'global', projectRoot: null });
   sendToRenderer(IPC_CHANNELS.AGENT_UNDO_STATE, { canUndo: false });
 }
@@ -758,6 +827,15 @@ function initAgentController({ ipcMain, dialog, sendToRenderer, getMainWindow })
 
   ipcMain.handle(IPC_CHANNELS.STOP_AGENT_SESSION, () => {
     abortRequested = true;
+    // Force-resolve any in-flight approval/diff-preview prompts as "denied" so
+    // a turn paused waiting on the user (e.g. awaiting write_file/run_command
+    // approval) doesn't hang forever — without this, requestApproval()'s
+    // Promise never settles, runAgentTurn()'s finally block never runs, and
+    // `running` stays true forever, permanently blocking every future turn.
+    for (const resolve of pendingApprovals.values()) resolve(false);
+    pendingApprovals.clear();
+    for (const resolve of pendingDiffPreviews.values()) resolve(false);
+    pendingDiffPreviews.clear();
     return true;
   });
 
@@ -833,14 +911,34 @@ function initAgentController({ ipcMain, dialog, sendToRenderer, getMainWindow })
     return { mode: getMode(), projectRoot, messages: getActiveMessages() };
   });
 
+  // --- NEW: per-tab clear cache/history ---
+  // Empties one chat session's message history in place. Unlike
+  // clearProjectFolder (which removes the whole session/tab and returns to
+  // Global mode), this keeps the tab itself — it's a "start fresh in this
+  // project/Global chat" action, callable from any tab without switching
+  // into it first.
+  ipcMain.handle(IPC_CHANNELS.AGENT_CLEAR_CHAT, (event, key) => {
+    const sessionKey = sessionKeyFor(key);
+    const sess = getSession(sessionKey);
+    sess.messages = [];
+    sess.updatedAt = Date.now();
+    const isActive = sessionKey === activeSessionKey;
+    if (isActive) {
+      lastWrite = null;
+      sendToRenderer(IPC_CHANNELS.AGENT_UNDO_STATE, { canUndo: false });
+    }
+    persistChats();
+    return { key: sessionKey, isActive, messages: sess.messages };
+  });
+
   ipcMain.handle(IPC_CHANNELS.SAVE_AGENT_CONFIG, async (event, config) => {
     globalConfig = { ...globalConfig, ...(config || {}) };
     // --- NEW: streaming support --- strip out any transient/renamed keys we
     // don't own (e.g. legacy globalMcpServers) so they can't sneak back in
     // and confuse the renderer. Always re-derive from DEFAULT_AGENT_CONFIG
     // shape — no MCP reconnect, there's nothing to reconnect anymore.
-    const { lastProjectPath, selectedModel, streamResponses, alwaysApproveWrites } = globalConfig;
-    globalConfig = { lastProjectPath, selectedModel, streamResponses, alwaysApproveWrites };
+     const { lastProjectPath, selectedModel, streamResponses, alwaysApproveWrites, agentTimeoutMs, agentMaxOutputTokens, agentMaxInputTokens } = globalConfig;
+     globalConfig = { lastProjectPath, selectedModel, streamResponses, alwaysApproveWrites, agentTimeoutMs, agentMaxOutputTokens, agentMaxInputTokens };
     saveAgentConfig(globalConfig);
     return globalConfig;
   });

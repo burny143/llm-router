@@ -275,11 +275,33 @@ function learnSuccess(entry, elapsed) {
 // demoted. Reuses probeOne so auth/payload handling for every provider
 // type (Bearer, Cookie, Kimi refresh-token) stays identical to a real
 // request; the only difference is the minimal message and short timeout.
-const PING_TIMEOUT_MS = 8000;
+// Fallback default for ping-before-demote timeout; the live value is
+// assistantConfig.pingTimeoutMs (defaults to 8000 in state-store.js).
+const DEFAULT_PING_TIMEOUT_MS = 8000;
+
+// Throttle gate: don't fire a ping at the same entry more than once per
+// pingIntervalMs. Without this, a burst of near-simultaneous failures for
+// one entry (e.g. several in-flight requests racing against it) would each
+// trigger their own verifyAndDemote() -> pingEntry() call and pile pings on
+// a provider that's already struggling. Keyed on provider/model so entries
+// are throttled independently. This is the single choke point every runtime
+// ping path (verifyAndDemote, and anything else that calls pingEntry) goes
+// through, so gating it here covers all of them.
+const lastPingAt = new Map();
 
 async function pingEntry(entry) {
+  const key = keyOf(entry);
+  const intervalMs = assistantConfig.pingIntervalMs > 0 ? assistantConfig.pingIntervalMs : 0;
+  const last = lastPingAt.get(key);
+  if (intervalMs > 0 && last !== undefined && (Date.now() - last) < intervalMs) {
+    // Too soon since the last ping for this entry — skip firing another
+    // network request and assume it's still reachable rather than
+    // hammering a provider that's mid cold-start/rate-limit.
+    return true;
+  }
+  lastPingAt.set(key, Date.now());
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), PING_TIMEOUT_MS);
+   const timer = setTimeout(() => controller.abort(), assistantConfig.pingTimeoutMs > 0 ? assistantConfig.pingTimeoutMs : DEFAULT_PING_TIMEOUT_MS);
   try {
     await probeOne(entry, { messages: [{ role: 'user', content: 'ping' }], rest: {} }, controller.signal);
     return true;
@@ -480,6 +502,58 @@ function looksLikeAuthError(data) {
   return markers.some(m => text.includes(m));
 }
 
+function looksLikeTokenLimitError(data) {
+  if (!data || typeof data !== 'object') return false;
+  const text = JSON.stringify(data).toLowerCase();
+  // Common token-limit / context-exceeded markers from various providers.
+  const markers = [
+    'context length', 'context window', 'max tokens', 'maximum tokens',
+    'token limit', 'context limit', 'too many tokens', 'exceeds.*max',
+    'input.*too.*long', 'prompt.*too.*long', 'context.*exceeded',
+    'maximum context', 'reduce.*tokens', 'reduce.*length',
+    'this model.*maximum context', 'context.*size.*exceed'
+  ];
+  return markers.some(m => text.includes(m));
+}
+
+// Guards extractContent against mistaking upstream error responses for
+// assistant content. Catches common error shapes: HTTP status codes, error
+// objects, rate-limit responses, payload-too-large errors, and any response
+// whose longest string is an error message rather than generated text.
+function looksLikeUpstreamError(data) {
+  if (!data || typeof data !== 'object') return false;
+
+  // HTTP-style error with a numeric status code (e.g. {status: 413, ...})
+  if (typeof data.status === 'number' && data.status >= 400 && data.status < 600) {
+    return true;
+  }
+  if (typeof data.code === 'number' && data.code >= 400 && data.code < 600) {
+    return true;
+  }
+
+  // Standard provider error envelope: { error: { message: "...", type: "..." } }
+  if (data.error && typeof data.error === 'object' && (data.error.message || data.error.type)) {
+    return true;
+  }
+
+  // Bare error object with a message that looks like an HTTP/proxy error
+  if (typeof data.message === 'string') {
+    const m = data.message.toLowerCase();
+    const errorMarkers = [
+      'payload too large', 'request entity too large', '413',
+      'rate limit', 'too many requests', '429',
+      'not found', '404', '503', 'service unavailable',
+      'upstream', 'bad gateway', '502',
+      'timeout', 'request timed out',
+      'connection', 'socket', 'network',
+      'unavailable', 'overloaded', 'busy'
+    ];
+    if (errorMarkers.some(marker => m.includes(marker))) return true;
+  }
+
+  return false;
+}
+
 function extractContent(data) {
   if (typeof data === 'string') {
     const trimmed = data.trim();
@@ -520,14 +594,18 @@ function extractContent(data) {
   if (typeof data.result === 'string') return data.result;
   if (typeof data.reply === 'string') return data.reply;
 
-  // message/output-style responses and the longest-string fallback are the two spots
-  // where an auth-error body (e.g. Zen's {code:401, message:'token expired or incorrect'})
-  // would otherwise be mistaken for assistant content. Guard both.
-  if (typeof data.message === 'string') {
-    if (looksLikeAuthError({ message: data.message })) return null;
-    return data.message;
-  }
-  if (typeof data.response === 'string') return data.response;
+   // message/output-style responses and the longest-string fallback are the two spots
+   // where an upstream error body (e.g. a rate-limit or 413 error echoed back)
+   // would otherwise be mistaken for assistant content. Guard both.
+   if (typeof data.message === 'string') {
+     if (looksLikeAuthError({ message: data.message })) return null;
+     if (looksLikeUpstreamError(data)) return null;
+     return data.message;
+   }
+   if (typeof data.response === 'string') {
+     if (looksLikeUpstreamError(data)) return null;
+     return data.response;
+   }
 
   if (data.data) {
     if (typeof data.data.text === 'string') return data.data.text;
@@ -536,11 +614,14 @@ function extractContent(data) {
     if (typeof data.data.message === 'string') return data.data.message;
   }
 
-  // Last resort before the longest-string fallback: reject auth-error bodies
-  // (e.g. Zen's "token expired or incorrect") so they aren't mistaken for content.
-  if (looksLikeAuthError(data)) return null;
+  // Last resort before the longest-string fallback: reject auth-error and
+   // upstream-error bodies (e.g. Zen's "token expired or incorrect",
+   // rate-limit responses, 413 payload-too-large) so they aren't mistaken
+   // for assistant content.
+   if (looksLikeAuthError(data)) return null;
+   if (looksLikeUpstreamError(data)) return null;
 
-  let longestString = '';
+   let longestString = '';
   const seen = new WeakSet();
 
   function findLongestString(obj) {
@@ -807,6 +888,34 @@ function orderEntries() {
   return [...modelEntries].sort((a, b) => rank(a) - rank(b));
 }
 
+// --- NEW: minimum request spacing (global "slow down" gate) ---
+// Free-tier LLM endpoints tend to rate-limit or outright ban bursts of
+// concurrent/rapid requests. probeParallel fires several candidate entries
+// at once, and retries/pings can pile on top of that, so this serializes
+// the actual moment each outbound request is allowed to fire: every caller
+// awaits acquireRequestSlot() right before hitting the network, and slots
+// are handed out no faster than assistantConfig.minRequestIntervalMs apart,
+// process-wide (not per-entry — the point is to slow the whole proxy down,
+// not just one provider). requestGateChain serializes slot acquisition so
+// concurrent callers can't all read a stale lastRequestSentAt and pass
+// through together.
+let requestGateChain = Promise.resolve();
+let lastRequestSentAt = 0;
+
+function acquireRequestSlot() {
+  const slot = requestGateChain.then(async () => {
+    const intervalMs = assistantConfig.minRequestIntervalMs > 0 ? assistantConfig.minRequestIntervalMs : 0;
+    if (intervalMs > 0) {
+      const wait = lastRequestSentAt + intervalMs - Date.now();
+      if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
+    }
+    lastRequestSentAt = Date.now();
+  });
+  // Keep the chain alive even if this slot's wait throws for some reason.
+  requestGateChain = slot.catch(() => {});
+  return slot;
+}
+
 async function probeOne(entry, { messages, rest }, signal) {
   const startTime = Date.now();
   const apiKey = process.env[entry.apiKeyEnv];
@@ -889,8 +998,10 @@ async function probeOne(entry, { messages, rest }, signal) {
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
+      await acquireRequestSlot();
       if (authType === 'Cookie') {
         const rule = webRules[entry.provider] || null;
+        const cookieTimeoutMs = assistantConfig.cookieProviderTimeoutMs > 0 ? assistantConfig.cookieProviderTimeoutMs : 60000;
 
         // Kimi-style providers authenticate via a `refresh_token` (stored as
         // `authToken` in the rules) and speak their own token-exchange API — no
@@ -902,14 +1013,15 @@ async function probeOne(entry, { messages, rest }, signal) {
             messages,
             refreshToken: rule.authToken,
             useSearch: false,
-            signal
+            signal,
+            timeoutMs: cookieTimeoutMs
           });
         } else {
           const browserClient = require('./browser-http-client');
           // Reuse the SAME persistent browser profile that captured this provider's cookie
           // so the request originates from the same device that logged in (bypasses WAF).
           const profileKey = rule && rule.profileKey ? rule.profileKey : envPrefixFor(entry.provider).toLowerCase();
-          response = await browserClient.request(entry.baseURL, payload, headers, apiKey, profileKey);
+          response = await browserClient.request(entry.baseURL, payload, headers, apiKey, profileKey, cookieTimeoutMs);
         }
       } else {
         response = await axios.post(entry.baseURL, payload, {
@@ -936,6 +1048,14 @@ async function probeOne(entry, { messages, rest }, signal) {
   }
 
   const elapsed = Date.now() - startTime;
+
+  // Check for token-limit errors from upstream before normalizing
+  if (looksLikeTokenLimitError(response.data)) {
+    const err = new Error('Upstream model context/token limit exceeded. Reduce your input or switch to a model with a larger context window.');
+    err.code = 'TOKEN_LIMIT_EXCEEDED';
+    throw err;
+  }
+
   const normalized = normalizeResponse(response.data);
 
   if (response.status >= 200 && response.status < 300 && normalized) {
@@ -961,6 +1081,10 @@ async function probeOne(entry, { messages, rest }, signal) {
   console.log(
     `[${entry.provider}/${entry.model}] returned ${response.status} but no usable content. Raw: ${rawSnippet}`
   );
+  // If upstream returned a token-limit error, surface it clearly
+  if (looksLikeTokenLimitError(response.data)) {
+    throw new Error('Upstream model context/token limit exceeded. Reduce your input or switch to a model with a larger context window.');
+  }
   throw new Error(`no usable content (${response.status})`);
 }
 
@@ -1095,13 +1219,50 @@ function startProxy(port, entries) {
     modelEntries = entries.filter(e => e.enabled);
 
     const app = express();
-    app.use(express.json());
+    // Raise the body-parser limit so large conversation histories from agentic
+    // clients (which can carry hundreds of messages / 600+ line summaries) don't
+    // get rejected with a 413 PayloadTooLargeError before they even reach the
+    // route handler. 10 MB is generous but bounded (won't OOM a normal machine).
+    app.use(express.json({ limit: '10mb' }));
 
     app.post('/v1/chat/completions', async (req, res) => {
       const { messages, stream, model: _clientModel, stream_options, tools, ...rest } = req.body;
 
-      totalRequests++;
-      const clientKey = touchClientStart(req.headers);
+       totalRequests++;
+       const clientKey = touchClientStart(req.headers);
+
+      // --- Outbound token cap (Task 5) ---
+      // Reject requests that ask the upstream for more output tokens than the
+      // configured ceiling (default 100k). Keeps the proxy from relaying
+      // accidentally-huge generation requests (e.g. a misbehaving client that
+      // omits max_tokens, or a client that sends an absurd value).
+      const maxOutputTokens = assistantConfig.maxOutputTokens > 0 ? assistantConfig.maxOutputTokens : 100000;
+      if (rest.max_tokens != null && Number(rest.max_tokens) > maxOutputTokens) {
+        touchClientEnd(clientKey, { success: false });
+        return res.status(400).json({
+          error: `max_tokens (${rest.max_tokens}) exceeds the proxy's outbound limit (${maxOutputTokens}). Lower your max_tokens or raise the limit in General Config.`
+        });
+      }
+
+      // --- Inbound token cap (context limit) ---
+      // Reject requests whose estimated prompt tokens exceed the configured
+      // ceiling (default 128k). Uses the same cheap character heuristic the
+      // proxy uses elsewhere (~4 chars/token).
+      // NOTE: messagesWithOverride must be computed first because the system
+      // prompt override (if any) is part of what gets counted against the cap.
+      let messagesWithOverride = messages;
+      if (assistantConfig.systemPromptOverride && assistantConfig.systemPromptOverride.trim()) {
+        messagesWithOverride = [{ role: 'system', content: assistantConfig.systemPromptOverride }, ...(messages || [])];
+      }
+
+      const maxInputTokens = assistantConfig.maxInputTokens > 0 ? assistantConfig.maxInputTokens : 128000;
+      const estimatedInputTokens = estimateMessagesTokens(messagesWithOverride);
+      if (estimatedInputTokens > maxInputTokens) {
+        touchClientEnd(clientKey, { success: false });
+        return res.status(400).json({
+          error: `Estimated prompt tokens (~${estimatedInputTokens}) exceed the proxy's context limit (${maxInputTokens}). Reduce your input or raise the limit in General Config.`
+        });
+      }
 
       const ordered = orderEntries();
       if (ordered.length === 0) {
@@ -1112,10 +1273,7 @@ function startProxy(port, entries) {
       // Assistant Config "system prompt override" (Task 5): when set, it is
       // injected as the first system message ahead of the client's own
       // messages, additive to whatever the client already sent.
-      let messagesWithOverride = messages;
-      if (assistantConfig.systemPromptOverride && assistantConfig.systemPromptOverride.trim()) {
-        messagesWithOverride = [{ role: 'system', content: assistantConfig.systemPromptOverride }, ...(messages || [])];
-      }
+      // (Variable already computed above so the inbound token cap can count it.)
 
       // --- Large Context Dispatcher ---
       // Intercepts BEFORE tool-call translation: oversized prompts are split,
@@ -1361,6 +1519,19 @@ async function processChatCompletionStream(messages, options = {}, onToken) {
 // the layer that turns this into a simulated token stream for the agent loop.
 async function processChatCompletion(messages, options = {}) {
   const { tools, ...rest } = options;
+
+  // Same outbound token cap as the HTTP route (see /v1/chat/completions).
+  const maxOutputTokens = assistantConfig.maxOutputTokens > 0 ? assistantConfig.maxOutputTokens : 100000;
+  if (rest.max_tokens != null && Number(rest.max_tokens) > maxOutputTokens) {
+    throw new Error(`max_tokens (${rest.max_tokens}) exceeds the proxy's outbound limit (${maxOutputTokens}).`);
+  }
+
+  // Same inbound token cap (context limit) as the HTTP route.
+  const maxInputTokens = assistantConfig.maxInputTokens > 0 ? assistantConfig.maxInputTokens : 128000;
+  const estimatedInputTokens = estimateMessagesTokens(messages);
+  if (estimatedInputTokens > maxInputTokens) {
+    throw new Error(`Estimated prompt tokens (~${estimatedInputTokens}) exceed the proxy's context limit (${maxInputTokens}).`);
+  }
 
   const ordered = orderEntries();
   if (ordered.length === 0) {

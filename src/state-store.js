@@ -2,6 +2,7 @@
 // derived from __dirname, so moving this file breaks every data-file path resolution.
 const fs = require('fs');
 const path = require('path');
+const { DEFAULT_PING_INTERVAL_MS, DEFAULT_MIN_REQUEST_INTERVAL_MS } = require('./shared-constants');
 
 // --- File registry (central "notepad" that maps each data-file role to a path) ---
 // file-registry.json is the single place that says WHICH file plays WHICH role.
@@ -255,8 +256,14 @@ const DEFAULT_ASSISTANT_CONFIG = {
   toolCallEmulation: true,         // backend-wired: gates translateRequest/translateResponse
   routingMode: 'auto',             // backend-wired: 'auto' (fastest known-good) | 'configOrder'
   retryCount: 0,                   // backend-wired: extra attempts per candidate on transient failure
-  timeoutMs: 30000,                // backend-wired: applies to direct (non Cookie/Kimi) requests only
+  timeoutMs: 30000,                // backend-wired: per-request timeout for direct (non-Cookie/Kimi) providers
+  cookieProviderTimeoutMs: 60000,  // backend-wired: per-request timeout for Cookie/web-session providers (browser-http-client)
+  pingTimeoutMs: 8000,             // backend-wired: timeout for ping-before-demote verification probes (proxy-server.js pingEntry())
+  maxOutputTokens: 100000,         // backend-wired: max_tokens a client may request; requests exceeding this are rejected with HTTP 400
+  maxInputTokens: 128000,          // backend-wired: estimated prompt tokens ceiling; requests exceeding this are rejected with HTTP 400 (0 = no limit)
   loggingVerbosity: 'normal',      // backend-wired: 'verbose' | 'normal' | 'quiet' — gates Request/Response Logs
+  pingIntervalMs: DEFAULT_PING_INTERVAL_MS, // backend-wired: minimum spacing between ping-before-demote probes fired at the same entry (proxy-server.js pingEntry())
+  minRequestIntervalMs: DEFAULT_MIN_REQUEST_INTERVAL_MS, // backend-wired: minimum spacing (ms) between ANY outbound requests to a model, process-wide (proxy-server.js acquireRequestSlot()) — keeps a free-tier proxy from firing a burst of concurrent requests
 
   // --- Large Context Dispatcher (backend-wired: large-context-dispatcher.js) ---
   largeContextMode: false,         // master toggle — when off, oversized prompts flow through the normal path
@@ -308,10 +315,16 @@ const DEFAULT_AGENT_CONFIG = {
   streamResponses: true,
   // --- NEW: diff preview / undo --- off by default: writes go through the
   // diff-preview accept/reject flow ("Quick approval" off). When true,
-  // executeWriteFile uses the lighter-weight Approve/Deny-only flow instead
+  // executeWriteFile uses the lighter-weighter Approve/Deny-only flow instead
   // ("Quick approval" on). Either setting always pauses for an explicit
   // user decision before writing — this only controls which prompt is shown.
-  alwaysApproveWrites: false
+  alwaysApproveWrites: false,
+  // --- Agent-side request control --- these limit the agent's own calls to
+  // the proxy. The proxy itself remains generic/unmodified; the agent applies
+  // these before forwarding requests. (0 = use proxy/default)
+  agentTimeoutMs: 60000,           // per-request timeout for the agent's model calls (ms)
+  agentMaxOutputTokens: 8192,      // cap on max_tokens the agent requests from the model
+  agentMaxInputTokens: 128000      // reject agent requests whose estimated prompt exceeds this (0 = no limit)
 };
 
 function saveAgentConfig(config) {

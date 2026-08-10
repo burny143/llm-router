@@ -56,6 +56,7 @@ contextBridge.exposeInMainWorld('api', {
   // --- NEW: per-project cached chat sessions ---
   agentGetChatSessions: () => ipcRenderer.invoke(IPC_CHANNELS.AGENT_GET_CHAT_SESSIONS),
   agentSwitchChat: (key) => ipcRenderer.invoke(IPC_CHANNELS.AGENT_SWITCH_CHAT, key),
+  agentClearChat: (key) => ipcRenderer.invoke(IPC_CHANNELS.AGENT_CLEAR_CHAT, key),
 
   onAgentStreamChunk: (callback) => {
     const handler = (_event, data) => callback(data);

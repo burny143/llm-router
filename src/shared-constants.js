@@ -21,8 +21,11 @@ const LOG_MARKERS = {
   DISPATCH: '[LCD]'
 };
 
-// Canonical provider name for Qwen — used by the cookie-capture script so the
-// provider literal never drifts between capture, config-write, and logs.
+// Canonical provider name for Qwen. NOTE: the only consumer, setup-qwen-cookie.js,
+// has been archived to /archive (superseded by the generalized
+// setup-web-provider.js, which is what RUN_WEB_PROVIDER_SETUP actually wires
+// up). This export is retained only so the archived script still works if
+// pulled back out of /archive — nothing in the live app imports it.
 const QWEN_PROVIDER_NAME = 'Qwen';
 
 // Data-file role keys passed to state-store.getFilePath(). Centralized here so
@@ -34,7 +37,8 @@ const FILE_ROLES = {
   ENV: 'env',
   WEB_PROVIDER_RULES: 'webProviderRules',
   LATEST_MODELS: 'latestModels',
-  MODELS: 'models'
+  MODELS: 'models',
+  PROVIDER_FLAGS: 'providerFlags'
 };
 
 // Browser in-page fetch timeouts (browser-http-client.js).
@@ -47,6 +51,24 @@ const FILE_ROLES = {
 // specific inner one on perfectly normal requests.
 const BROWSER_FETCH_TIMEOUT_MS = 60000;
 const BROWSER_FETCH_HANG_GUARD_MS = 70000;
+
+// Default minimum spacing between ping-before-demote probes fired at the
+// same provider/model entry (proxy-server.js's pingEntry()). Prevents a
+// burst of near-simultaneous failures for one entry from turning into a
+// burst of pings against a provider that's already struggling. Configurable
+// from the General Config UI (state-store.js DEFAULT_ASSISTANT_CONFIG.pingIntervalMs);
+// this is only the fallback default.
+const DEFAULT_PING_INTERVAL_MS = 30000;
+
+// Default minimum spacing (ms) between successive outbound requests to any
+// model, process-wide (proxy-server.js's acquireRequestSlot()). This proxy
+// mainly fronts free-tier LLM endpoints that are quick to rate-limit or ban
+// bursts of concurrent requests, so a small default delay keeps things slow
+// and polite even when several candidates are racing in parallel. Default
+// is 1 second; configurable from the General Config UI (state-store.js
+// DEFAULT_ASSISTANT_CONFIG.minRequestIntervalMs) — this is only the
+// fallback.
+const DEFAULT_MIN_REQUEST_INTERVAL_MS = 1000;
 
 const IPC_CHANNELS = {
   // Proxy control
@@ -142,6 +164,10 @@ const IPC_CHANNELS = {
   // renderer -> main: switch the active chat session by key ('global' or an
   // absolute project path). Returns { mode, projectRoot, messages }.
   AGENT_SWITCH_CHAT: 'agent:switch-chat',
+  // renderer -> main: clear the cached message history for one chat session
+  // by key, without switching to it or removing its tab. Returns
+  // { key, isActive, messages }.
+  AGENT_CLEAR_CHAT: 'agent:clear-chat',
 
   // main -> renderer streaming/event channels (renderer subscribes via preload's onX helpers)
   AGENT_STREAM_CHUNK: 'agent:stream-chunk',
@@ -177,4 +203,4 @@ const IPC_CHANNELS = {
   AGENT_UNDO_STATE: 'agent:undo-state',
 };
 
-module.exports = { IPC_CHANNELS, LOG_MARKERS, DEFAULT_COOKIE_USER_AGENT, QWEN_PROVIDER_NAME, FILE_ROLES, BROWSER_FETCH_TIMEOUT_MS, BROWSER_FETCH_HANG_GUARD_MS };
+module.exports = { IPC_CHANNELS, LOG_MARKERS, DEFAULT_COOKIE_USER_AGENT, QWEN_PROVIDER_NAME, FILE_ROLES, BROWSER_FETCH_TIMEOUT_MS, BROWSER_FETCH_HANG_GUARD_MS, DEFAULT_PING_INTERVAL_MS, DEFAULT_MIN_REQUEST_INTERVAL_MS };

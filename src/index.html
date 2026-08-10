@@ -26,7 +26,7 @@
           <span id="agentModeLight" class="agent-status-light global" title="Agent mode"></span>
           <span id="agentModeLabel">Global Agent</span>
           <button id="agentSelectFolderBtn" class="agent-btn-small">Select Folder</button>
-          <button id="agentClearFolderBtn" class="agent-btn-small agent-clear-btn" style="display:none;" title="Return to Global mode">✕</button>
+          <button id="agentClearFolderBtn" class="agent-btn-small agent-clear-btn" style="display:none;" title="Turn off this project: return to Global mode and clear its cached chat history">✕</button>
         </div>
         <div class="agent-model-select">
           <label for="agentModelDropdown">Model:</label>
@@ -43,6 +43,15 @@
           </label>
           <label class="agent-toggle-label" title="ON: a quick Approve/Deny prompt before each file write. OFF: a full diff-preview (Accept/Reject) before each file write. Either way, every write pauses for your decision.">
             <input type="checkbox" id="agentAlwaysApproveToggle"> Quick approval (skip diff review)
+          </label>
+          <label class="agent-token-limit-label" title="Per-request timeout for the agent's model calls (ms). 0 = use default.">
+            <input type="number" id="agentTimeoutMs" min="0" step="1000" value="60000" style="width:110px"> Timeout (ms)
+          </label>
+          <label class="agent-token-limit-label" title="Cap on max_tokens the agent requests from the model. 0 = no cap.">
+            <input type="number" id="agentMaxOutputTokens" min="0" step="1" value="8192" style="width:110px"> Max output tokens
+          </label>
+          <label class="agent-token-limit-label" title="Reject agent model calls if the conversation exceeds this many tokens. 0 = no limit.">
+            <input type="number" id="agentMaxInputTokens" min="0" step="1000" value="128000" style="width:140px"> Max input tokens
           </label>
         </div>
       </div>
@@ -283,6 +292,30 @@
           <td><input type="number" id="timeoutMsInput" min="1000" step="1000" style="width:90px;"> ms (direct API-key providers only)</td>
         </tr>
         <tr>
+          <td>Timeout (Cookie provider)</td>
+          <td><input type="number" id="cookieProviderTimeoutMsInput" min="1000" step="1000" style="width:90px;"> ms (Cookie / web-session providers only)</td>
+        </tr>
+        <tr>
+          <td>Ping timeout</td>
+          <td><input type="number" id="pingTimeoutMsInput" min="500" step="500" style="width:90px;"> ms timeout for ping-before-demote verification probes</td>
+        </tr>
+        <tr>
+          <td>Outbound token cap</td>
+          <td><input type="number" id="maxOutputTokensInput" min="1" step="1000" style="width:90px;"> max_tokens a client may request (requests exceeding this get HTTP 400)</td>
+        </tr>
+        <tr>
+          <td>Inbound token cap (context)</td>
+          <td><input type="number" id="maxInputTokensInput" min="0" step="1000" style="width:90px;"> estimated prompt tokens ceiling (0 = no limit; requests exceeding this get HTTP 400)</td>
+        </tr>
+        <tr>
+          <td>Ping interval</td>
+          <td><input type="number" id="pingIntervalInput" min="0" step="1" style="width:90px;"> sec minimum between ping-before-demote probes per entry (0 = no throttle)</td>
+        </tr>
+        <tr>
+          <td>Min. request spacing</td>
+          <td><input type="number" id="minRequestIntervalInput" min="0" step="1" style="width:90px;"> sec minimum between ANY outbound requests to a model (0 = no throttle) — keep this &gt; 0 for free-tier providers to avoid bursts</td>
+        </tr>
+        <tr>
           <td>Logging verbosity</td>
           <td>
             <select id="loggingVerbositySelect">
@@ -358,15 +391,11 @@
   <div id="usage-tab" class="tab-content">
     <h3>Token Usage</h3>
     <button id="refreshUsageBtn" class="btn-primary">Refresh</button>
-    <!-- NEW: Price Refresh — no pricing data source is shipped with the app, so
-         this just clears the (always-N/A) cost placeholder rather than
-         fabricating numbers. Wire this to a pricing endpoint when one exists. -->
-    <button id="priceRefreshBtn" class="btn-primary" style="float: right; margin-right: 8px;">Price Refresh</button>
     <div id="usageSummary" style="margin: 10px 0;"></div>
     <table id="usageTable">
       <thead>
         <tr>
-          <th>#</th><th>Provider</th><th>Model</th><th>Requests</th><th>Auth</th><th>Prompt Tokens</th><th>Completion Tokens</th><th>Total Tokens</th><th>Estimated</th><th>Est. Cost</th>
+          <th>#</th><th>Provider</th><th>Model</th><th>Requests</th><th>Prompt Tokens</th><th>Completion Tokens</th><th>Total Tokens</th><th>Est. Cost</th>
         </tr>
       </thead>
       <tbody></tbody>
