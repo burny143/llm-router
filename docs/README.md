@@ -1,8 +1,16 @@
-# LLM Proxy Router — High-Availability LLM API Proxy with Desktop GUI
+# LLM Proxy Router + Coding Agent — High-Availability LLM API Proxy with Desktop GUI
 
-A local Electron application that runs a **fallback LLM proxy server** on your machine. Configure a list of provider endpoints (API base URLs, API keys via environment variables, model names), and the proxy automatically routes requests to the fastest healthy endpoint, falls back through the rest in parallel when one fails, and learns at runtime to optimize routing.
+A local Electron application that runs a **fallback LLM proxy server** on your machine,
+plus a built-in **coding agent**. Configure a list of provider endpoints (API base URLs,
+API keys via environment variables, model names), and the proxy automatically routes
+requests to the fastest healthy endpoint, falls back through the rest in parallel when one
+fails, and learns at runtime to optimize routing.
 
-The proxy speaks **OpenAI-compatible `/v1/chat/completions`**, so any OpenAI SDK, `curl`, Open WebUI, Continue, etc. can point at `http://localhost:PORT/v1/chat/completions` and get automatic failover.
+The proxy speaks **OpenAI-compatible `/v1/chat/completions`**, so any OpenAI SDK, `curl`,
+Open WebUI, Continue, etc. can point at `http://localhost:PORT/v1/chat/completions` and
+get automatic failover. The coding agent (Agent tab) uses the same proxy pipeline
+internally and applies its own timeout/token limits without modifying the shared proxy
+configuration.
 
 ---
 
@@ -66,30 +74,60 @@ npm run dev        # Runs via start.js
 │  └─ Exposes window.api → renderer (secure IPC surface)        │
 │                                                                 │
 │  renderer.js (UI Process)                                      │
+│  ├─ Agent tab: coding agent (chat, file tools, undo, palette) │
 │  ├─ Config table (Provider / BaseURL / API Key Env / Model)   │
 │  ├─ Quick Chat (test proxy in-app)                            │
 │  ├─ Developer Logs (color-coded, capped 500 lines)            │
 │  ├─ Health Check tab                                          │
 │  └─ Token Usage tab                                           │
 └─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
+                               │
+                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │  proxy-server.js (Express Proxy Server — runs in main process) │
-│  ├─ Express server on /v1/chat/completions                    │
-│  ├─ Routing Engine: orderEntries()                             │
-│  │   └─ known-OK (sequential, fastest first) → rest (parallel) │
-│  ├─ probeOne() → HTTP POST to provider                         │
-│  ├─ extractContent() → validates real text in response         │
-│  ├─ learnSuccess() / learnFailure() → runtime learning        │
-│  ├─ recordUsage() → token counting                             │
-│  └─ setHealthResults() → live routing update (no restart)     │
+│  ├─ /v1/chat/completions handler                              │
+│  ├─ Routing Engine: orderEntries() → known-OK first, rest later │
+│  ├─ probeOne() → HTTP POST to provider                        │
+│  ├─ extractContent() → validates real text in response        │
+│  ├─ learnSuccess() / learnFailure() → runtime learning       │
+│  ├─ recordUsage() → token counting                           │
+│  ├─ setHealthResults() → live routing (no restart)         │
+│  ├─ processChatCompletion() → internal entry point for agent │
+│  └─ processChatCompletionStream() → streaming for agent      │
 └─────────────────────────────────────────────────────────────────┘
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│  agent-controller.js (Agent — runs in main process)                   │
+│  ├─ Coding agent loop: tool-calling turn-based execution               │
+│  ├─ File tools: read/write/create/delete/edit/rename, shell_exec       │
+│  ├─ Approval gate: diff-preview or quick approve/deny on every write   │
+│  ├─ Agent-side limits: timeoutMs, maxOutputTokens, maxInputTokens      │
+│  ├─ State persistence: agent-config.json, agent-chats.json             │
+│  └─ IPC surface: AGENT_* channels ↔ renderer.js (Agent tab)            │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
 ## Core Features
+
+### Coding Agent (Built-In)
+
+The app ships with a **foreground coding agent** accessible via the Agent tab. It connects
+to the proxy (same OpenAI-compatible `/v1/chat/completions` pipeline) and can read, write,
+and edit files in your project, run shell commands, and undo changes.
+
+- **Agent-side limits** — The agent manages its own `timeoutMs`, `maxOutputTokens`, and
+  `maxInputTokens` (configurable in the Agent tab settings). It enforces input token
+  checks *before* calling the proxy and forwards `max_tokens` caps downstream. The shared
+  proxy configuration is **not** modified.
+- **Approval gate** — Every file write pauses for your decision. Toggle "Quick approval"
+  for a simple Approve/Deny prompt, or leave it off for a full diff-preview (Accept/Reject).
+- **Undo** — Ctrl+Z reverts the most recent write.
+- **Project mode vs. Global mode** — Select a folder to give the agent filesystem + shell
+  access scoped to that directory. Global mode operates without project context.
+- **Streaming** — Token-by-token streaming by default; disable for whole-response delivery.
 
 ### Proxy Core
 - **Express server** at `http://localhost:PORT/v1/chat/completions`
@@ -175,17 +213,19 @@ in `data/` and are resolved via `file-registry.json` → `state-store.getFilePat
 |------|------|--------------|
 | `src/main.js` | Electron main process: window, IPC, health check, log forwarding, startup auto-load | `proxy-server.js`, `state-store.js`, `models-config.js`, `dotenv` |
 | `src/preload.js` | Context bridge → `window.api` (typed IPC surface) | `electron` (contextBridge, ipcRenderer) |
-| `src/renderer.js` | All UI logic: config table, quick chat, dev logs, health tab, token usage tab | `window.api` (from preload) |
-| `src/proxy-server.js` | Express proxy + routing engine (`probeSequential`, `probeParallel`, `learnSuccess`, `learnFailure`, `extractContent`, `recordUsage`, `injectUserText`) | `axios`, `dotenv`, `state-store.js`, `browser-http-client.js` (cookie auth), `kimi-web-client.js` (Kimi token flow) |
-| `src/state-store.js` | JSON/CSV persistence + `getFilePath(role)` registry resolution | `fs`, `path` |
+| `src/renderer.js` | All UI logic: agent tab, config table, quick chat, dev logs, health tab, token usage tab | `window.api` (from preload) |
+| `src/agent-controller.js` | Coding agent loop: tool execution, file tools, approval gate, agent-side timeout/token limits | `proxy-server.js` (processChatCompletion/stream), `state-store.js` |
+| `src/agent-tab.js` | Agent tab UI: chat rendering, tool list, diff-preview, undo, command palette | `window.api` (from preload), `agent-controller.js` IPC channels |
+| `src/proxy-server.js` | Express proxy + routing engine (`probeOne`, `extractContent`, `learnSuccess`/`learnFailure`, `recordUsage`, `processChatCompletion`/`processChatCompletionStream` for agent) | `axios`, `dotenv`, `state-store.js`, `browser-http-client.js`, `kimi-web-client.js` |
+| `src/state-store.js` | JSON/CSV persistence + `getFilePath(role)` registry + `DEFAULT_AGENT_CONFIG` | `fs`, `path` |
 | `src/setup-web-provider.js` | Playwright capture script (spawned by main.js): headed browser, capture chat request + cookies, write `.env` + ProviderConfig.csv + web-provider-rules.json | `playwright`, `dotenv`, `state-store.js` |
 | `src/browser-http-client.js` | Playwright in-page-fetch HTTP client for cookie-auth providers (WAF/TLS bypass) | `playwright`, `state-store.js` |
 | `src/kimi-web-client.js` | **NEW (2026-08-05)** — plain-axios Kimi token-exchange client: refresh_token → access_token (300s cache) → userId → convId → SSE completion → cleanup; zero Playwright; used by proxy-server.js and main.js health check | `axios` |
 | `src/tls-http-client.js` | **Archived** (dead code) — required uninstalled `tls-client` package; moved to `archive/` 2026-08-05 | — |
 | `src/models-config.js` | **Default catalog** — 17 providers with base URLs, env var names, model lists | (standalone) |
 | `src/fetch-models.js` | Model fetcher (regenerates `data/LatestModels.csv` + `data/models.csv`) | `axios`, `dotenv`, `state-store.js` |
-| `src/index.html` | Four tabs: Proxy Control, Admin/Configuration, Health Check, Token Usage | `style.css`, `renderer.js` (same folder) |
-| `src/style.css` | Light theming, tables, log colors, status labels | — |
+| `src/index.html` | Five tabs: Agent, Proxy Control, Admin/Configuration, Health Check, Token Usage | `style.css`, `renderer.js`, `agent-tab.js` |
+| `src/style.css` | Light theming, tables, log colors, status labels, agent chat/diff/modal styles | — |
 
 ### Configuration & Data Files (Source of Truth Hierarchy)
 
@@ -421,7 +461,33 @@ loadDefaultConfig()
 
 ## Tabs & UI Reference
 
-### 1. Proxy Control Tab
+### 1. Agent Tab (Coding Agent)
+The app includes a built-in **coding agent** that runs in the foreground and
+interacts with your codebase through the proxy. It streams responses token-by-token,
+applies edits via the filesystem (with approval), and remembers its model/timeout/token
+settings across sessions.
+
+| Element | Function |
+|---------|----------|
+| **Project indicator** | Shows Global mode or the selected project folder; Select Folder / Clear Folder buttons switch modes |
+| **Model dropdown** | Picks the provider/model the agent uses; 🔒 Lock toggle pins it (won't auto-revert on failure) |
+| **Stream responses** | Checkbox — stream the assistant's reply token-by-token (default ON) |
+| **Quick approval** | Checkbox — Approve/Deny-only flow vs. full diff preview before each write (either way, every write pauses for your decision) |
+| **Timeout (ms)** | Per-request timeout for the agent's model calls (default 60000) |
+| **Max output tokens** | Caps `max_tokens` the agent requests from the model (default 8192; 0 = no cap) |
+| **Max input tokens** | Rejects agent model calls if the estimated conversation exceeds this (default 128000; 0 = no limit) |
+| **Task Progress** | Live sidebar showing the current turn's tool calls + file-path status |
+| **File tree** | Filtered view of the project; Ctrl+Shift+F focuses the search box |
+| **Upload File** | Attaches a file to the next message (read as text; sent as `[Attached files]`) |
+| **Undo Last Change** | Reverts the most recent file write (Ctrl+Z) |
+| **Send / Stop** | Send message (Enter); Stop aborts the current turn |
+| **Command palette** | Ctrl+K — `/`-prefixed commands, undo, clear history, etc. |
+
+**Key design:** the agent configures its own timeout/token limits internally (saved to
+`agent-config.json`) and does **not** modify the shared proxy configuration. The proxy
+remains a generic, stateless OpenAI-compatible router for all connected clients.
+
+### 2. Proxy Control Tab
 | Element | Function |
 |---------|----------|
 | Port input | Proxy server port (default 8000) |
@@ -432,7 +498,7 @@ loadDefaultConfig()
 | Clear Logs | Clears developer logs panel |
 | Developer Logs | Main-process logs (color-coded, capped 500 lines) |
 
-### 2. Admin / Configuration Tab
+### 3. Admin / Configuration Tab
 | Element | Function |
 |---------|----------|
 | **+ Add Entry** | Adds new row with first ProviderConfig.csv provider, empty model |
@@ -449,14 +515,38 @@ loadDefaultConfig()
 **Model Dropdown**: Filtered to selected provider's models from `models.csv` + `models-config.js`
 (web providers get a `<Provider>-chat` placeholder model added automatically on capture)
 
-### 3. Health Check Tab
+#### General Config (sub-tab)
+The General Config sub-tab under Admin/Configuration controls proxy-wide runtime settings
+(saved to `data/assistant-config.json`):
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| Timeout | 30000 ms | Per-request timeout for direct API-key providers |
+| Timeout (Cookie provider) | 60000 ms | Per-request timeout for Cookie/web-session providers |
+| Ping timeout | 8000 ms | Timeout for ping-before-demote verification probes |
+| Ping interval | 30 sec | Minimum seconds between ping probes per entry (0 = no throttle) |
+| Min. request spacing | 1 sec | Minimum seconds between ANY outbound requests to a model (0 = no throttle) |
+| Outbound token cap | 100000 | Max `max_tokens` a client may request (exceeding = HTTP 400) |
+| Inbound token cap (context) | 128000 | Estimated prompt tokens ceiling (0 = no limit; exceeding = HTTP 400) |
+
+**Model failure / demotion:** when a known-OK model fails a real request, the proxy fires
+a single cheap "ping" probe (with the **Ping timeout**). If the ping also fails, the model
+is auto-removed from known-OK and demoted to the failed list. The **Ping interval** setting
+prevents rapid-fire pings against a struggling provider.
+
+**Locked model protection:** when you lock a model (🔒 in the Agent tab's model dropdown),
+it is **protected from demotion** — even if it's unresponsive and doesn't answer the ping
+probe, it stays in known-OK and remains the first-choice model. A warning is written to the
+Developer Logs so you know the model is not answering but is still being used per your lock.
+
+### 4. Health Check Tab
 | Element | Function |
 |---------|----------|
 | Ping All Models | Runs health check on all enabled entries |
 | Results Table | Provider, Model, Status (OK/Failed + latency) |
 | Summary | Total OK / Total Failed count |
 
-### 4. Token Usage Tab
+### 5. Token Usage Tab
 | Element | Function |
 |---------|----------|
 | Refresh | Reloads token usage from `token-usage.json` |
@@ -520,7 +610,7 @@ llm-proxy-gui/
 │   ├── models-config.js   # Default catalog (17 providers) — fallback
 │   ├── fetch-models.js    # Model fetcher script (reads ProviderConfig.csv)
 │   ├── start.js           # Dev launcher (npx electron .)
-│   ├── index.html         # 4-tab UI
+│   ├── index.html         # 5-tab UI (Agent, Proxy Control, Admin/Config, Health, Usage)
 │   ├── renderer.js        # UI logic
 │   └── style.css          # Theming
 ├── data/                  # Data files (resolved via file-registry.json)
@@ -642,6 +732,11 @@ npm run dev  # node start.js
 | **8 sync table rebuilds deferred** (renderer.js) | Wrapped remaining `renderConfigTable()`/`renderPriorityOverrideDropdown()` calls in `setTimeout(..., 0)` at delete/add/load/clear/fetch/load buttons; initial startup + `onConfigReady` stay synchronous |
 | **Kimi health-check 404 / no usable content** (proxy-server.js + main.js) | New `src/kimi-web-client.js` implements Kimi's token-exchange protocol (refresh_token → access_token 300s → userId → convId → SSE completion → cleanup) on `kimi.moonshot.cn` with plain axios + browser headers; proxy-server.js and main.js health check route through this client when `rule.authToken` exists; apiKey gate relaxed for token-auth providers |
 | **CLEAR_WEB_PROVIDER_SESSION blocked UI on Playwright flush** (main.js) | Handler now reclaims `mainWindow.focus()` immediately, fires `browserClient.close(profileKey)` detached (background), returns `{success:true}` to renderer instantly; belt-and-suspenders `.then()` re-focuses after flush; `.catch()` → `console.warn` so background errors aren't silently swallowed |
+| **Proxy startup crash: ReferenceError `messagesWithOverride` before initialization** (proxy-server.js) | Inbound token-cap check referenced `messagesWithOverride` (declared via `let` 17 lines later). Moved the system-prompt-override computation above the cap check. |
+| **Infinite loop: proxy echoed error responses as assistant content** (proxy-server.js `extractContent`) | Added `looksLikeUpstreamError()`: detects HTTP status codes (400-599), `{error:{message,type}}` envelopes, and error messages containing markers like "payload too large", "rate limit", "timeout", "upstream". Applied at three guard points in `extractContent` — before returning `data.message`, `data.response`, and the `findLongestString` fallback — so upstream error bodies (which contain the echoed input) are rejected rather than returned as assistant content. |
+| **Request entity too large: 413 on large agent conversations** (proxy-server.js) | Raised `express.json()` body-parser limit from the 100 KB default to 10 MB. |
+| **Agent-side timeout/token limits leaked into shared proxy config** (agent-controller.js) | Added `agentTimeoutMs`, `agentMaxOutputTokens`, `agentMaxInputTokens` to `DEFAULT_AGENT_CONFIG`; the agent applies these internally (input token check before each model call, `max_tokens` forwarded via options) and persists them to `agent-config.json` without touching the shared proxy configuration. |
+| **Locked models could be demoted after ping failure** (proxy-server.js `verifyAndDemote`/`learnFailure`) | When a model is user-locked (priority override pin), it is now protected from demotion even if the ping-before-demote probe fails. The model stays in known-Ok and remains first-choice; a warning is emitted to Developer Logs. |
 
 ---
 
@@ -651,4 +746,4 @@ MIT — see `package.json` for details.
 
 ---
 
-*Generated from project scan on 2026-08-04; Kimi token-exchange flow, CLEAR_WEB_PROVIDER_SESSION fix, and dropdown/config bug fixes added 2026-08-05. All file paths, line counts, and schemas verified against actual codebase.*
+*Generated from project scan on 2026-08-04; Kimi token-exchange flow, CLEAR_WEB_PROVIDER_SESSION fix, dropdown/config bug fixes added 2026-08-05; working-agent limit bug fixes (messagesWithOverride ordering, extractContent error guard, body-parser limit, agent-side timeout/token config, locked-model demotion protection) added 2026-08-10. All file paths, line counts, and schemas verified against actual codebase.*

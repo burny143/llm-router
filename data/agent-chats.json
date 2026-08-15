@@ -795,6 +795,218 @@
       {
         "role": "assistant",
         "content": " Here is a summary of the **LLM Proxy Router** project at `C:\\__Projects\\AI Projects\\llm-proxy-gui`, FRED!\n\n---\n\n## What It Is\n\nA local **Electron desktop app** that runs an **intelligent LLM API proxy server** on your machine. You configure multiple provider endpoints (OpenAI, Anthropic, Groq, Qwen, Kimi, etc.), and the proxy automatically routes requests to the fastest healthy endpoint, falls back through others in parallel when one fails, and learns at runtime to optimize routing. It speaks **OpenAI-compatible `/v1/chat/completions`**, so any OpenAI SDK client can point at `http://localhost:PORT/v1/chat/completions` and get automatic failover.\n\n---\n\n## Core Architecture\n\n| Layer | File | Role |\n|-------|------|------|\n| **Electron Main** | `src/main.js` | Window, IPC handlers, health checks, log forwarding, startup auto-load |\n| **Preload** | `src/preload.js` | Secure `contextBridge` → `window.api` for renderer |\n| **Renderer** | `src/renderer.js` | All UI logic: config table, quick chat, dev logs, health/token tabs |\n| **Proxy Server** | `src/proxy-server.js` | Express server + routing engine (`probeSequential` → `probeParallel`, runtime learning, token usage, streaming) |\n| **State Store** | `src/state-store.js` | JSON/CSV persistence + `getFilePath(role)` registry resolution |\n| **Agent Controller** | `src/agent-controller.js` | NEW — coding agent loop with tool calling (file read/write, shell commands, search) in Global or Project mode |\n| **Agent Tab** | `src/agent-tab.js` | NEW — renderer-side agent UI (streaming chat, file tree, approvals, diff preview, slash commands) |\n\n---\n\n## Key Features\n\n| Feature | Description |\n|---------|-------------|\n| **Intelligent Routing** | Known-OK models (fastest first, sequential) → untested (parallel, first success wins) |\n| **Runtime Learning** | `learnSuccess` promotes on first success; `learnFailure` demotes known-OK on failure |\n| **Health Check** | Content-aware ping — rejects HTTP 200 with error bodies; updates routing live |\n| **Streaming** | OpenAI-style SSE replay of buffered winner |\n| **Web Providers (Cookie Auth)** | Playwright capture for Qwen (browser-http-client.js) and Kimi (token-exchange client, no browser) |\n| **Token Usage Tracking** | Per `provider::model` counters with prompt/completion/total |\n| **Coding Agent** | NEW — Global mode (chat only) or Project mode (file/shell tools with approval gates, diff preview, undo) |\n| **Large Context Dispatcher** | Splits oversized prompts, summarizes in parallel, assembles final answer |\n\n---\n\n## Data Files (in `data/`)\n\n| File | Purpose |\n|------|---------|\n| `ProviderConfig.csv` | **Primary provider metadata** — base URLs, API key env vars, auth types |\n| `UltimateConfig.csv` | **Primary proxy config truth** — provider/model/enable rows (1038 entries) |\n| `proxy-config.json` | Auto-generated cache from UltimateConfig.csv |\n| `models.csv` | Dropdown model source (41 rows) |\n| `known-ok.json` | Persisted routing priority |\n| `token-usage.json` | Per-model token counters |\n| `settings.json` | Model-list auto-connect path |\n| `web-provider-rules.json` | Captured request rules for cookie-auth providers |\n| `.env` | API keys + web provider cookies (gitignored) |\n\n---\n\n## Agent / Coding Assistant (New)\n\nThe project now includes a full **coding agent** accessible via the **Agent tab**:\n\n- **Global mode**: Chat-only, no filesystem access\n- **Project mode**: Select a folder → agent gains `list_directory`, `read_file`, `write_file`, `search_code`, `run_command` tools\n- **Safety features**: Every `write_file` and `run_command` requires explicit user approval (with diff preview for writes)\n- **Streaming responses**: Token-by-token display with blinking cursor\n- **Undo**: One-step revert of the last file write\n- **Slash commands**: Command palette (`Ctrl+K`) for quick actions\n- **Task progress panel**: Shows available tools and step status\n- **Resilience**: Retry on transient model failures, stuck-loop detection, step-limit extension for productive runs\n\n---\n\n## Quick Commands\n\n```bash\nnpm start      # Launch Electron app\nnpm run dev    # Dev launcher\n```\n\n---\n\n## Current State\n\nThe app is **feature-complete** with a working proxy, health checks, token tracking, web provider support (Qwen cookie, Kimi token exchange), and a new **coding agent** with tool calling, streaming, approvals, and project-mode file access. The `docs/` folder contains extensive architecture documentation (`README.md`, `APP.md`, `AI_REFERENCE.md`, `CONFIG_REFERENCE.md`, `AGENTS.md`)."
+      },
+      {
+        "role": "user",
+        "content": "can you check this project"
+      },
+      {
+        "role": "assistant",
+        "content": "I already checked this project for you, FRED! Here's what I found:\n\n**Project**: `llm-proxy-gui` — A local Electron app that runs an intelligent LLM API proxy with automatic failover, runtime learning, and a desktop GUI!\n\n**Core Components**:\n- **Proxy Server** (`src/proxy-server.js`): Express-based OpenAI-compatible API with smart routing (known-OK sequential → untested parallel), health checks, token usage tracking, and streaming support\n- **Web Providers**: Cookie-auth support for Qwen (Playwright browser capture) and Kimi (token-exchange protocol, no browser needed)\n- **Coding Agent** (`src/agent-controller.js` + `src/agent-tab.js`): NEW feature with Global/Project modes, tool calling (file read/write, shell commands), streaming responses, diff previews, and approval gates\n- **State Management** (`src/state-store.js`): JSON/CSV persistence with file registry resolution\n\n**Data Files** (in `data/`):\n- `ProviderConfig.csv` — Provider metadata (base URLs, API keys, auth types)\n- `UltimateConfig.csv` — Primary proxy config (1038 entries)\n- `models.csv` — Dropdown model source (41 rows)\n- Runtime state: `known-ok.json`, `token-usage.json`, `settings.json`, `web-provider-rules.json`\n\n**Key Features**:\n- Intelligent fallback routing with latency-based prioritization\n- Content-aware health checks (rejects HTTP 200 with error bodies)\n- Large Context Dispatcher for oversized prompts\n- Agent with stuck-loop detection, retry resilience, and undo support\n\n**Scripts**: `npm start` (Electron), `npm run dev` (dev launcher)\n\nEverything looks functional and well-documented in the `docs/` folder! Is there something specific you'd like me to investigate deeper, FRED?"
+      },
+      {
+        "role": "user",
+        "content": "does it have http://localhost:8000/v1/chat/completions in its code?"
+      },
+      {
+        "role": "assistant",
+        "content": null,
+        "tool_calls": [
+          {
+            "id": "call_1786758415814_0_0az79c",
+            "type": "function",
+            "function": {
+              "name": "search_code",
+              "arguments": "{\"query\":\"http://localhost:8000/v1/chat/completions\"}"
+            }
+          }
+        ]
+      },
+      {
+        "role": "tool",
+        "tool_call_id": "call_1786758415814_0_0az79c",
+        "content": "data\\agent-chats.json:715: \"content\": \"# LLM Proxy Router — High-Availability LLM API Proxy with Desktop GUI\\n\\nA local Electron application that runs a **fallback LLM proxy server** on your machine. Configure a list of provide\ndocs\\README.md:55: 7. Test in **Quick Chat** or point any OpenAI client to `http://localhost:8000/v1/chat/completions`"
+      },
+      {
+        "role": "assistant",
+        "content": " Yes, FRED! I found `http://localhost:8000/v1/chat/completions` in the code!\n\n**Matches**:\n- `docs\\README.md:55` — Documentation telling users to point OpenAI clients to that URL\n- `data\\agent-chats.json:715` — Inside saved chat history content\n\nThe proxy server itself is configurable — the **default port is 8000** (seen in `src/main.js` where `ENSURE_PROXY_RUNNING` uses port `8000`), but the actual port is set by the user in the **Proxy Control tab** UI. The endpoint path `/v1/chat/completions` is hardcoded in `src/proxy-server.js` as the Express route handler, FRED!"
+      },
+      {
+        "role": "user",
+        "content": "i wanna know how the proxy and agent works, if agent send a message to the model, it will go through proxy right? will proxy send another message to the LLM again even though it is not responding yet? given we have 1 second interval only?"
+      },
+      {
+        "role": "assistant",
+        "content": null,
+        "tool_calls": [
+          {
+            "id": "call_1786758841536_0_a3ey15",
+            "type": "function",
+            "function": {
+              "name": "read_file",
+              "arguments": "{\"path\":\"src/agent-controller.js\",\"start_line\":1,\"end_line\":50}"
+            }
+          },
+          {
+            "id": "call_1786758841536_1_h3bszs",
+            "type": "function",
+            "function": {
+              "name": "read_file",
+              "arguments": "{\"path\":\"src/proxy-server.js\",\"start_line\":680,\"end_line\":750}"
+            }
+          },
+          {
+            "id": "call_1786758841536_2_5mhowz",
+            "type": "function",
+            "function": {
+              "name": "search_code",
+              "arguments": "{\"query\":\"minRequestIntervalMs\"}"
+            }
+          },
+          {
+            "id": "call_1786758841536_3_x4qlcx",
+            "type": "function",
+            "function": {
+              "name": "search_code",
+              "arguments": "{\"query\":\"acquireRequestSlot\"}"
+            }
+          }
+        ]
+      },
+      {
+        "role": "tool",
+        "tool_call_id": "call_1786758841536_0_a3ey15",
+        "content": "// agent-controller.js\n//\n// Backs the renderer's \"Agent\" tab: a two-mode (Global / Project) coding\n// agent loop built on top of the existing proxy (processChatCompletion,\n// added in proxy-server.js) and the existing multi-provider routing/fallback\n// it already does for the \"/v1/chat/completions\" HTTP route.\n//\n// Mode summary:\n//   - Global mode  (projectRoot === null): no filesystem/shell tools; only\n//     `scratchpad_write` (writes to a temp dir, never the project) plus\n//     whatever the user has uploaded as chat context.\n//   - Project mode (projectRoot === an absolute path): adds list_directory,\n//     read_file, write_file, search_code, run_command — all path-guarded to\n//     stay inside projectRoot, and write_file/run_command require an\n//     explicit renderer-side approval round-trip before they execute.\n//\n// This module owns all of that state; main.js just calls initAgentController\n// once at startup and otherwise never touches it.\n\nconst fs = require('fs');\nconst path = require('path');\nconst os = require('os');\nconst crypto = require('crypto');\nconst { spawn, exec } = require('child_process');\nconst { IPC_CHANNELS } = require('./shared-constants');\nconst {\n  loadAgentConfig,\n  saveAgentConfig,\n  loadAgentChats,\n  saveAgentChats\n} = require('./state-store');\n\n// Deferred require (same pattern large-context-dispatcher.js uses) so a\n// require-time cycle between proxy-server.js and this module can't happen —\n// proxy-server.js never requires agent-controller.js, but it's cheap\n// insurance and keeps both modules independently loadable/testable.\nfunction proxy() {\n  return require('./proxy-server');\n}\n\n// --- Module state ---------------------------------------------------------\nlet projectRoot = null;              // null => Global mode\nlet abortRequested = false;\nlet running = false;\n\nlet globalConfig = loadAgentConfig();\n\n// Fallback token estimator (used before proxy-server is required). Uses the same\n// ~4 chars/token heuristic that proxy-server.js uses for providers without\n// real usage reporting."
+      },
+      {
+        "role": "tool",
+        "tool_call_id": "call_1786758841536_1_h3bszs",
+        "content": "  }\r\n\r\n  // Check if the upstream response contains tool calls in text form.\r\n  // translateResponse handles both tool_call and plain-text responses.\r\n  const requestId = (data && data.id) || `chatcmpl-${Date.now()}`;\r\n  const model = (data && data.model) || '';\r\n  return translateResponse(data, requestId, model);\r\n}\r\n\r\nfunction sendSseResponse(res, data, entry) {\r\n  const model = entry.model;\r\n  const requestId = data.id || `chatcmpl-${Date.now()}`;\r\n\r\n  // If normalizeResponse already detected tool calls (finish_reason \"tool_calls\"),\r\n  // emit the tool_calls chunk directly instead of trying to extract text content.\r\n  const finishReason = data.choices?.[0]?.finish_reason;\r\n  const toolCalls = data.choices?.[0]?.message?.tool_calls;\r\n\r\n  if (finishReason === 'tool_calls' && Array.isArray(toolCalls) && toolCalls.length > 0) {\r\n    res.status(200);\r\n    res.setHeader('Content-Type', 'text/event-stream');\r\n    res.setHeader('Cache-Control', 'no-cache');\r\n    res.setHeader('Connection', 'keep-alive');\r\n\r\n    const writeChunk = (delta, finishReason, extra) => {\r\n      const payload = {\r\n        id: requestId,\r\n        object: 'chat.completion.chunk',\r\n        created: Math.floor(Date.now() / 1000),\r\n        model,\r\n        choices: [{ index: 0, delta, finish_reason: finishReason }],\r\n        ...extra\r\n      };\r\n      res.write(`data: ${JSON.stringify(payload)}\\n\\n`);\r\n    };\r\n\r\n    writeChunk({ role: 'assistant', content: '' }, null);\r\n    writeChunk({\r\n      role: 'assistant',\r\n      tool_calls: toolCalls.map((tc, i) => ({\r\n        index: i,\r\n        id: tc.id,\r\n        type: 'function',\r\n        function: { name: tc.function.name, arguments: tc.function.arguments },\r\n      })),\r\n    }, null);\r\n    writeChunk({}, 'tool_calls');\r\n\r\n    if (data.usage && typeof data.usage === 'object' && Object.keys(data.usage).length > 0) {\r\n      writeChunk({}, null, { usage: data.usage });\r\n    }\r\n\r\n    res.write('data: [DONE]\\n\\n');\r\n    res.end();\r\n    return;\r\n  }\r\n\r\n  const content = extractContent(data);\r\n\r\n  // If the upstream response still contains tool calls in text form\r\n  // (not yet translated by normalizeResponse), emit proper tool_calls finish.\r\n  if (content && typeof content === 'string') {\r\n    const parsedCalls = parseToolCallsFromText(content);\r\n    if (parsedCalls) {\r\n      res.status(200);\r\n      res.setHeader('Content-Type', 'text/event-stream');\r\n      res.setHeader('Cache-Control', 'no-cache');\r\n      res.setHeader('Connection', 'keep-alive');\r\n\r\n      const writeChunk = (delta, finishReason, extra) => {\r\n        const payload = {\r"
+      },
+      {
+        "role": "tool",
+        "tool_call_id": "call_1786758841536_2_5mhowz",
+        "content": "data\\agent-chats.json:664: \"content\": \"// proxy-server.js\\n// proxy-server.js — complete file\\nconst fs = require('fs');\\nconst express = require('express');\\nconst axios = require('axios');\\nconst { getFilePath, envPrefixFor }\ndata\\assistant-config.json:12: \"minRequestIntervalMs\": 1000,\nsrc\\proxy-server.js:917: // are handed out no faster than assistantConfig.minRequestIntervalMs apart,\nsrc\\proxy-server.js:927: const intervalMs = assistantConfig.minRequestIntervalMs > 0 ? assistantConfig.minRequestIntervalMs : 0;\nsrc\\renderer.js:917: if (minRequestIntervalInput) minRequestIntervalInput.value = Math.round((config.minRequestIntervalMs ?? 1000) / 1000);\nsrc\\renderer.js:947: minRequestIntervalMs: minRequestIntervalInput ? Math.max(0, parseInt(minRequestIntervalInput.value, 10) || 0) * 1000 : 1000,\nsrc\\shared-constants.js:69: // DEFAULT_ASSISTANT_CONFIG.minRequestIntervalMs) — this is only the\nsrc\\state-store.js:266: minRequestIntervalMs: DEFAULT_MIN_REQUEST_INTERVAL_MS, // backend-wired: minimum spacing (ms) between ANY outbound requests to a model, process-wide (proxy-server.js acquireRequestSlot()) — keeps a fr"
+      },
+      {
+        "role": "tool",
+        "tool_call_id": "call_1786758841536_3_x4qlcx",
+        "content": "data\\agent-chats.json:664: \"content\": \"// proxy-server.js\\n// proxy-server.js — complete file\\nconst fs = require('fs');\\nconst express = require('express');\\nconst axios = require('axios');\\nconst { getFilePath, envPrefixFor }\nsrc\\proxy-server.js:916: // awaits acquireRequestSlot() right before hitting the network, and slots\nsrc\\proxy-server.js:925: function acquireRequestSlot() {\nsrc\\proxy-server.js:1021: await acquireRequestSlot();\nsrc\\shared-constants.js:64: // model, process-wide (proxy-server.js's acquireRequestSlot()). This proxy\nsrc\\state-store.js:266: minRequestIntervalMs: DEFAULT_MIN_REQUEST_INTERVAL_MS, // backend-wired: minimum spacing (ms) between ANY outbound requests to a model, process-wide (proxy-server.js acquireRequestSlot()) — keeps a fr"
+      },
+      {
+        "role": "assistant",
+        "content": null
+      },
+      {
+        "role": "user",
+        "content": "what happened"
+      },
+      {
+        "role": "assistant",
+        "content": null,
+        "tool_calls": [
+          {
+            "id": "call_1786759547774_0_vdnc31",
+            "type": "function",
+            "function": {
+              "name": "read_file",
+              "arguments": "{\"path\":\"src/proxy-server.js\",\"start_line\":910,\"end_line\":940}"
+            }
+          },
+          {
+            "id": "call_1786759547774_1_af0hbi",
+            "type": "function",
+            "function": {
+              "name": "read_file",
+              "arguments": "{\"path\":\"src/proxy-server.js\",\"start_line\":1010,\"end_line\":1040}"
+            }
+          },
+          {
+            "id": "call_1786759547774_2_o8mdrq",
+            "type": "function",
+            "function": {
+              "name": "read_file",
+              "arguments": "{\"path\":\"src/agent-controller.js\",\"start_line\":130,\"end_line\":200}"
+            }
+          }
+        ]
+      },
+      {
+        "role": "tool",
+        "tool_call_id": "call_1786759547774_0_vdnc31",
+        "content": "    const rotated = knownOk.map(keyOf);\r\n    rotateIndex = rotateIndex % rotated.length;\r\n    const pickedKey = rotated[rotateIndex];\r\n    rotateIndex += 1;\r\n    const rank = (entry) => {\r\n      const k = keyOf(entry);\r\n      if (k === pickedKey) return -1;\r\n      if (okSpeed.has(k)) return okSpeed.get(k);\r\n      if (knownFailedKeys.has(k)) return knownOk.length + 999;\r\n      return knownOk.length;\r\n    };\r\n    return [...modelEntries].sort((a, b) => rank(a) - rank(b));\r\n  }\r\n\r\n  const rank = (entry) => {\r\n    const k = keyOf(entry);\r\n    if (priorityOverrideKey && k === priorityOverrideKey) return -1;\r\n    if (okSpeed.has(k)) return okSpeed.get(k);\r\n    if (knownFailedKeys.has(k)) return knownOk.length + 999;\r\n    return knownOk.length;\r\n  };\r\n\r\n  return [...modelEntries].sort((a, b) => rank(a) - rank(b));\r\n}\r\n\r\n// --- NEW: minimum request spacing (global \"slow down\" gate) ---\r\n// Free-tier LLM endpoints tend to rate-limit or outright ban bursts of\r\n// concurrent/rapid requests. probeParallel fires several candidate entries\r\n// at once, and retries/pings can pile on top of that, so this serializes\r\n// the actual moment each outbound request is allowed to fire: every caller\r\n// awaits acquireRequestSlot() right before hitting the network, and slots\r"
+      },
+      {
+        "role": "tool",
+        "tool_call_id": "call_1786759547774_1_af0hbi",
+        "content": "          .map((m) => {\r\n            const text = flattenMessageContent(m && m.content);\r\n            return text ? `[${String((m && m.role) || 'user').toUpperCase()}]\\n${text}` : '';\r\n          })\r\n          .filter(Boolean)\r\n          .join('\\n\\n');\r\n\r\n        const lastUserMessage = messages.filter(m => m.role === 'user').pop();\r\n        const fallbackText = flattenMessageContent(lastUserMessage ? lastUserMessage.content : '');\r\n\r\n        injectUserTextWithFallback(payload, fullConversationText || fallbackText);\r\n      }\r\n\r\n      // Kimi-style providers authenticate via the Local Storage `refresh_token`\r\n      // (Bearer), not via cookies — attach it when the capture saved one.\r\n      if (rule.authToken) {\r\n        headers['Authorization'] = `Bearer ${rule.authToken}`;\r\n      }\r\n    }\r\n  } else {\r\n    headers['Authorization'] = `Bearer ${apiKey}`;\r\n  }\r\n\r\n  logRequestLine(entry, payload, headers, messages);\r\n\r\n  // Assistant Config \"retry count\" (Task 5): extra attempts for this one\r\n  // candidate before giving up on it (findWinner still moves on to the next\r\n  // candidate as before once attempts are exhausted).\r\n  const maxAttempts = 1 + Math.max(0, parseInt(assistantConfig.retryCount, 10) || 0);\r\n\r\n  let response;\r"
+      },
+      {
+        "role": "tool",
+        "tool_call_id": "call_1786759547774_2_o8mdrq",
+        "content": "const MAX_AGENT_STEPS = 25; // guards against a runaway tool-call chain\n// --- NEW: agent-loop resilience (keep-alive) ---\n// Previously a single failed model call (transient network blip, one bad\n// probe before the routing layer's own retry/fallback kicks in) aborted the\n// ENTIRE task immediately via AGENT_ERROR. This retries the model call\n// itself a few times with a short backoff before giving up on the turn —\n// separate from (and on top of) proxy-server.js's own per-candidate\n// retryCount, which only covers one candidate before findWinner moves on.\nconst MODEL_CALL_MAX_ATTEMPTS = 3;\nconst MODEL_CALL_RETRY_DELAY_MS = 1500;\n// If the model issues the exact same tool call (name + args) this many\n// times in a row, it's stuck in a loop rather than making progress —\n// interrupt with a corrective nudge instead of silently burning the whole\n// step budget on the same failing action.\nconst STUCK_LOOP_THRESHOLD = 3;\n// If the step budget runs out but the last few steps show real progress\n// (successful tool calls, no repeated failures), grant a bounded number of\n// extra steps once rather than just giving up — a real \"keep going until\n// actually done\" behavior instead of a hard cliff.\nconst STEP_LIMIT_EXTENSION = 10;\n\nfunction sleep(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }\n\nfunction toolCallSignature(call) {\n  const name = call.function && call.function.name;\n  const args = call.function && call.function.arguments;\n  return `${name}:${args}`;\n}\n\nasync function runAgentTurn(sendToRenderer, userText, uploadedFiles) {\n  if (running) throw new Error('Agent is already processing a turn.');\n  running = true;\n  abortRequested = false;\n  try {\n    let content = userText || '';\n    if (Array.isArray(uploadedFiles) && uploadedFiles.length) {\n      const ctx = uploadedFiles\n        .filter((f) => f && f.content != null)\n        .map((f) => `--- uploaded: ${f.filename} ---\\n${f.content}`)\n        .join('\\n\\n');\n      if (ctx) content = `${content}\\n\\n[Attached files]\\n${ctx}`;\n    }\n    getActiveMessages().push({ role: 'user', content });\n\n    const mode = getMode();\n    const tools = buildToolDefs(mode);\n    // --- NEW: task-progress panel --- let the renderer mirror this turn's\n    // available tools in the Task Progress sidebar. Cheap (a handful of names)\n    // and keeps the panel accurate even on tool-call-only turns.\n    sendToRenderer(IPC_CHANNELS.AGENT_TOOL_LIST, { tools: tools.map((t) => t.function.name) });\n    const messagesForModel = [{ role: 'system', content: buildSystemPrompt(mode) }, ...getActiveMessages()];\n\n    let stepLimit = MAX_AGENT_STEPS;\n    let extensionGranted = false;\n    let recentToolSignatures = [];\n    let finalMessage = null;\n\n    for (let step = 0; step < stepLimit; step++) {\n      if (abortRequested) { sendToRenderer(IPC_CHANNELS.AGENT_DONE, { aborted: true }); return; }\n\n      // --- NEW: streaming support ---\n      const streamingEnabled = globalConfig.streamResponses !== false;\n      let message;\n\n      // --- NEW: retry-on-transient-error (keep-alive) ---\n      let lastCallError = null;\n      for (let attempt = 1; attempt <= MODEL_CALL_MAX_ATTEMPTS; attempt++) {\n        if (abortRequested) break;\n        try {\n          // --- Agent-side input token cap --- reject the model call before\n          // forwarding if the conversation exceeds the agent's configured"
+      },
+      {
+        "role": "assistant",
+        "content": null,
+        "tool_calls": [
+          {
+            "id": "call_1786759561026_0_lnn433",
+            "type": "function",
+            "function": {
+              "name": "read_file",
+              "arguments": "{\"path\":\"src/proxy-server.js\",\"start_line\":916,\"end_line\":945}"
+            }
+          },
+          {
+            "id": "call_1786759561026_1_yr7cti",
+            "type": "function",
+            "function": {
+              "name": "read_file",
+              "arguments": "{\"path\":\"src/proxy-server.js\",\"start_line\":1018,\"end_line\":1035}"
+            }
+          },
+          {
+            "id": "call_1786759561026_2_mdge8g",
+            "type": "function",
+            "function": {
+              "name": "read_file",
+              "arguments": "{\"path\":\"src/agent-controller.js\",\"start_line\":175,\"end_line\":220}"
+            }
+          },
+          {
+            "id": "call_1786759561026_3_5xjzz5",
+            "type": "function",
+            "function": {
+              "name": "read_file",
+              "arguments": "{\"path\":\"src/shared-constants.js\",\"start_line\":60,\"end_line\":80}"
+            }
+          }
+        ]
+      },
+      {
+        "role": "tool",
+        "tool_call_id": "call_1786759561026_0_lnn433",
+        "content": "      if (k === pickedKey) return -1;\r\n      if (okSpeed.has(k)) return okSpeed.get(k);\r\n      if (knownFailedKeys.has(k)) return knownOk.length + 999;\r\n      return knownOk.length;\r\n    };\r\n    return [...modelEntries].sort((a, b) => rank(a) - rank(b));\r\n  }\r\n\r\n  const rank = (entry) => {\r\n    const k = keyOf(entry);\r\n    if (priorityOverrideKey && k === priorityOverrideKey) return -1;\r\n    if (okSpeed.has(k)) return okSpeed.get(k);\r\n    if (knownFailedKeys.has(k)) return knownOk.length + 999;\r\n    return knownOk.length;\r\n  };\r\n\r\n  return [...modelEntries].sort((a, b) => rank(a) - rank(b));\r\n}\r\n\r\n// --- NEW: minimum request spacing (global \"slow down\" gate) ---\r\n// Free-tier LLM endpoints tend to rate-limit or outright ban bursts of\r\n// concurrent/rapid requests. probeParallel fires several candidate entries\r\n// at once, and retries/pings can pile on top of that, so this serializes\r\n// the actual moment each outbound request is allowed to fire: every caller\r\n// awaits acquireRequestSlot() right before hitting the network, and slots\r\n// are handed out no faster than assistantConfig.minRequestIntervalMs apart,\r\n// process-wide (not per-entry — the point is to slow the whole proxy down,\r\n// not just one provider). requestGateChain serializes slot acquisition so\r\n// concurrent callers can't all read a stale lastRequestSentAt and pass\r\n// through together.\r"
+      },
+      {
+        "role": "tool",
+        "tool_call_id": "call_1786759561026_1_yr7cti",
+        "content": "        const fallbackText = flattenMessageContent(lastUserMessage ? lastUserMessage.content : '');\r\n\r\n        injectUserTextWithFallback(payload, fullConversationText || fallbackText);\r\n      }\r\n\r\n      // Kimi-style providers authenticate via the Local Storage `refresh_token`\r\n      // (Bearer), not via cookies — attach it when the capture saved one.\r\n      if (rule.authToken) {\r\n        headers['Authorization'] = `Bearer ${rule.authToken}`;\r\n      }\r\n    }\r\n  } else {\r\n    headers['Authorization'] = `Bearer ${apiKey}`;\r\n  }\r\n\r\n  logRequestLine(entry, payload, headers, messages);\r\n\r\n  // Assistant Config \"retry count\" (Task 5): extra attempts for this one\r"
+      },
+      {
+        "role": "tool",
+        "tool_call_id": "call_1786759561026_2_mdge8g",
+        "content": "    const tools = buildToolDefs(mode);\n    // --- NEW: task-progress panel --- let the renderer mirror this turn's\n    // available tools in the Task Progress sidebar. Cheap (a handful of names)\n    // and keeps the panel accurate even on tool-call-only turns.\n    sendToRenderer(IPC_CHANNELS.AGENT_TOOL_LIST, { tools: tools.map((t) => t.function.name) });\n    const messagesForModel = [{ role: 'system', content: buildSystemPrompt(mode) }, ...getActiveMessages()];\n\n    let stepLimit = MAX_AGENT_STEPS;\n    let extensionGranted = false;\n    let recentToolSignatures = [];\n    let finalMessage = null;\n\n    for (let step = 0; step < stepLimit; step++) {\n      if (abortRequested) { sendToRenderer(IPC_CHANNELS.AGENT_DONE, { aborted: true }); return; }\n\n      // --- NEW: streaming support ---\n      const streamingEnabled = globalConfig.streamResponses !== false;\n      let message;\n\n      // --- NEW: retry-on-transient-error (keep-alive) ---\n      let lastCallError = null;\n      for (let attempt = 1; attempt <= MODEL_CALL_MAX_ATTEMPTS; attempt++) {\n        if (abortRequested) break;\n        try {\n          // --- Agent-side input token cap --- reject the model call before\n          // forwarding if the conversation exceeds the agent's configured\n          // context limit. Uses the proxy's token estimator (cheap heuristic).\n          const maxInputTokens = globalConfig.agentMaxInputTokens > 0 ? globalConfig.agentMaxInputTokens : 0;\n          if (maxInputTokens > 0) {\n            const estimateTokensFromText = proxy().estimateTokensFromText || estimateTokensFromTextFallback;\n            const estimated = estimateTokensFromText(JSON.stringify(messagesForModel));\n            if (estimated > maxInputTokens) {\n              throw new Error(`Agent context limit exceeded (~${estimated} tokens > ${maxInputTokens}). Trim history or increase the limit.`);\n            }\n          }\n          // Build per-call options: forward max_tokens cap (if set) and let the\n          // proxy apply its own timeout (agent doesn't override proxy timeoutMs;\n          // the proxy uses its own assistantConfig.timeoutMs).\n          const agentOpts = { tools };\n          const maxOutputTokens = globalConfig.agentMaxOutputTokens > 0 ? globalConfig.agentMaxOutputTokens : 0;\n          if (maxOutputTokens > 0) agentOpts.max_tokens = maxOutputTokens;\n          if (streamingEnabled) {\n            sendToRenderer(IPC_CHANNELS.AGENT_STREAM_START, {});\n            let fullText = '';\n            const streamResult = await proxy().processChatCompletionStream(messagesForModel, agentOpts, (token) => {\n              fullText += token;"
+      },
+      {
+        "role": "tool",
+        "tool_call_id": "call_1786759561026_3_5xjzz5",
+        "content": "// this is only the fallback default.\nconst DEFAULT_PING_INTERVAL_MS = 30000;\n\n// Default minimum spacing (ms) between successive outbound requests to any\n// model, process-wide (proxy-server.js's acquireRequestSlot()). This proxy\n// mainly fronts free-tier LLM endpoints that are quick to rate-limit or ban\n// bursts of concurrent requests, so a small default delay keeps things slow\n// and polite even when several candidates are racing in parallel. Default\n// is 1 second; configurable from the General Config UI (state-store.js\n// DEFAULT_ASSISTANT_CONFIG.minRequestIntervalMs) — this is only the\n// fallback.\nconst DEFAULT_MIN_REQUEST_INTERVAL_MS = 1000;\n\nconst IPC_CHANNELS = {\n  // Proxy control\n  START_PROXY: 'start-proxy',\n  STOP_PROXY: 'stop-proxy',\n  IS_PROXY_RUNNING: 'is-proxy-running',\n  // --- NEW: INITIALIZE button ---\n  // renderer->main: ensure the proxy is up before starting the agent (the\n  // agent routes every model call through the local proxy). If already"
+      },
+      {
+        "role": "assistant",
+        "content": "Here is exactly how the **Agent → Proxy → LLM** flow works, FRED!\n\n---\n\n## The Flow\n\n**Agent** (`agent-controller.js`) → **Proxy internal API** (`proxy-server.js` `processChatCompletion()`) → **LLM provider**\n\nThe agent does **NOT** go through the HTTP `localhost:8000` endpoint. Instead, it calls `proxy().processChatCompletion(messages, opts)` directly — the same internal function the HTTP route uses, but bypassing Express!\n\n---\n\n## Does the Proxy Send Duplicate Messages?\n\n**NO!** Here is why, FRED!\n\n### 1. The Proxy Has a Global \"Slow Down\" Gate\n\nIn `proxy-server.js` lines 916-945, there is `acquireRequestSlot()`:\n\n```javascript\n// Every caller awaits this RIGHT BEFORE hitting the network\n// Slots are handed out no faster than minRequestIntervalMs apart (default: 1000ms)\nawait acquireRequestSlot();\n```\n\nThis is **process-wide serialization**! Even if the agent calls the proxy multiple times rapidly, each outbound request to an actual LLM provider must wait its turn. The proxy maintains a chain of promises so requests go out **one at a time**, spaced by at least `minRequestIntervalMs` (default 1 second).\n\n### 2. The Agent Has Its Own Retry Logic\n\nIn `agent-controller.js` lines 175-220, the agent retries **failed model calls** up to 3 times with 1.5s delay:\n\n```javascript\nfor (let attempt = 1; attempt <= MODEL_CALL_MAX_ATTEMPTS; attempt++) {\n  try {\n    const response = await proxy().processChatCompletion(messagesForModel, agentOpts);\n    // ...\n  } catch (err) {\n    if (attempt < MODEL_CALL_MAX_ATTEMPTS) {\n      await sleep(MODEL_CALL_RETRY_DELAY_MS); // 1500ms\n    }\n  }\n}\n```\n\nBut these retries only happen if the **previous call failed**! A successful call does not retry.\n\n### 3. The Proxy's Internal Routing Waits for Completion\n\n`processChatCompletion()` uses `findWinner()` which calls `probeSequential()` or `probeParallel()`. These functions **await the full response** from the LLM before returning:\n\n```javascript\n// probeOne awaits the COMPLETE response\nconst result = await probeOne(entry, ctx, signal);\n```\n\nThere is no fire-and-forget! The proxy waits for the LLM to respond (or timeout), then returns the result to the agent.\n\n---\n\n## What About the 1-Second Interval?\n\nThe `minRequestIntervalMs = 1000` is the **minimum gap between ANY two outbound requests** to LLM providers. This means:\n\n| Scenario | Behavior |\n|----------|----------|\n| Agent sends message → LLM responds in 5s | Next request can fire immediately after response (but still respects the 1s gap from the *previous* request's send time) |\n| Agent tool loop: call LLM → get tool_calls → execute tools → call LLM again | The second LLM call will wait until 1s has passed since the first LLM call was *sent* |\n| Two rapid agent messages | The second is delayed by the gate until 1s after the first was sent |\n\n---\n\n## Summary\n\n- **Agent → Proxy**: Direct function call (`processChatCompletion`), not HTTP\n- **Proxy → LLM**: One request at a time, spaced by `minRequestIntervalMs` (1s default)\n- **No duplicates**: The proxy waits for each LLM response before returning; retries only happen on failure\n- **The 1s interval is between *outbound* requests**, not between agent turns — if your conversation with the agent involves multiple model calls (tool loops), each call is spaced by at least 1 second!\n\nDoes this answer your question, FRED?"
       }
     ],
     "updatedAt": 1786325880762

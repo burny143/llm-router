@@ -317,6 +317,20 @@ async function pingEntry(entry) {
 // directly wherever a candidate just failed and routing is about to fall
 // back to the next one.
 async function verifyAndDemote(entry) {
+  const key = keyOf(entry);
+
+  // --- NEW: locked pins are never demoted AND block fallback ---
+  // When a user explicitly locks a model (priorityLocked = true), the system
+  // honors that choice: even if the model is unresponsive, it stays in known-OK
+  // and continues to be used. Fallback to other models is BLOCKED — the request
+  // will fail instead of silently using a different model. A warning is logged
+  // so the user knows the model is not answering and no fallback occurred.
+  if (priorityOverrideKey === key && priorityLocked) {
+    console.warn(`[proxy] WARNING: Locked priority model ${entry.provider}/${entry.model} is unresponsive — staying pinned (per user lock). FALLBACK BLOCKED: request will fail rather than use another model.`);
+    pushRoutingEvent('lock-warning', `Locked priority model ${entry.provider}/${entry.model} is unresponsive — staying pinned per user lock. FALLBACK BLOCKED.`);
+    return;
+  }
+
   const responded = await pingEntry(entry);
   if (responded) {
     pushRoutingEvent('ping-ok', `${entry.provider}/${entry.model} failed a request but responded to a follow-up ping — keeping it known-OK.`);
@@ -329,6 +343,17 @@ async function verifyAndDemote(entry) {
 function learnFailure(entry) {
   const key = keyOf(entry);
   const wasOk = knownOk.some(k => keyOf(k) === key);
+
+  // --- NEW: locked pins are protected from demotion ---
+  // When a model is explicitly locked as the priority override, learnFailure()
+  // is a no-op for it: it stays in knownOk and knownFailedKeys is not touched.
+  // A warning was already logged in verifyAndDemote() (the normal caller).
+  // This also covers any direct learnFailure() call path as a safety net.
+  if (priorityOverrideKey === key && priorityLocked) {
+    console.warn(`[proxy] WARNING: Locked priority model ${entry.provider}/${entry.model} requested to be demoted but staying pinned (per user lock).`);
+    return;
+  }
+
   knownOk = knownOk.filter(k => keyOf(k) !== key);
   knownFailedKeys.add(key);
   if (wasOk) {
@@ -336,12 +361,8 @@ function learnFailure(entry) {
     saveResults(knownOk.map(k => ({ provider: k.provider, model: k.model, status: 'OK', latency: k.latency })));
   }
   if (priorityOverrideKey === key) {
-    if (priorityLocked) {
-      pushRoutingEvent('lock-fallback', `Locked priority model ${entry.provider}/${entry.model} failed — falling back for this request only, pin stays locked.`);
-    } else {
-      priorityOverrideKey = null;
-      pushRoutingEvent('pin-cleared', `Priority pin on ${entry.provider}/${entry.model} cleared after a request failure — reverted to auto routing.`);
-    }
+    priorityOverrideKey = null;
+    pushRoutingEvent('pin-cleared', `Priority pin on ${entry.provider}/${entry.model} cleared after a request failure — reverted to auto routing.`);
   }
 }
 
@@ -812,6 +833,29 @@ async function probeInBatches(entries, ctx, batchSize) {
 }
 
 async function findWinner(ordered, ctx) {
+  // --- NEW: locked priority model gets exclusive first try, no fallback ---
+  // If a model is explicitly locked, the user wants ONLY that model.
+  // Try it first (sequentially), and if it fails, FAIL THE REQUEST —
+  // do not silently fall back to other models.
+  if (priorityOverrideKey && priorityLocked) {
+    const lockedEntry = ordered.find(e => keyOf(e) === priorityOverrideKey);
+    if (lockedEntry) {
+      const controller = new AbortController();
+      const timeoutMs = assistantConfig.timeoutMs > 0 ? assistantConfig.timeoutMs : 30000;
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      const result = await probeOne(lockedEntry, ctx, controller.signal).catch(() => null);
+      clearTimeout(timer);
+      if (result) {
+        learnSuccess(result.entry, result.elapsed);
+        console.log(`[${result.entry.provider}/${result.entry.model}] used for this request (locked priority).`);
+        return result;
+      }
+      await verifyAndDemote(lockedEntry);
+      pushRoutingEvent('lock-fallback-blocked', `Locked priority model ${lockedEntry.provider}/${lockedEntry.model} failed — fallback blocked per user lock. Request will fail.`);
+      return null;
+    }
+  }
+
   if (knownOk.length > 0) {
     const okCandidates = ordered.filter(e => knownOk.some(o => keyOf(o) === keyOf(e)));
     const okResult = await probeSequential(okCandidates, ctx);
@@ -1175,6 +1219,14 @@ async function probeSequential(entries, ctx) {
 
     if (result) return result;
     await verifyAndDemote(entry);
+
+    // --- NEW: locked priority model failed — honor the lock, don't fall back ---
+    // If the user explicitly locked a model, they want ONLY that model.
+    // If it fails, the request should fail rather than silently falling back.
+    if (priorityOverrideKey && priorityLocked && keyOf(entry) === priorityOverrideKey) {
+      pushRoutingEvent('lock-fallback-blocked', `Locked priority model ${entry.provider}/${entry.model} failed — fallback blocked per user lock. Request will fail.`);
+      return null;
+    }
   }
   return null;
 }
