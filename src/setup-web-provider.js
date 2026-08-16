@@ -3,7 +3,8 @@ const { chromium } = require('playwright');
 const fs = require('fs');
 const path = require('path');
 const { getFilePath, parseCsv, envPrefixFor } = require('./state-store');
-require('dotenv').config({ path: getFilePath('env') });
+const { FILE_ROLES } = require('./shared-constants');
+require('dotenv').config({ path: getFilePath(FILE_ROLES.ENV) });
 
 async function tryFill(page, selectors, value, label) {
   for (const sel of selectors) {
@@ -79,7 +80,7 @@ async function writeFileWithRetry(filePath, content, maxRetries = 5, delayMs = 3
 }
 
 async function launchProviderBrowser(providerName) {
-  const dataDir = path.dirname(getFilePath('providerConfig'));
+  const dataDir = path.dirname(getFilePath(FILE_ROLES.PROVIDER_CONFIG));
   const profileDir = path.join(dataDir, 'browser-profiles', envPrefixFor(providerName).toLowerCase());
   const options = { headless: false, ignoreDefaultArgs: ['--enable-automation'], args: ['--disable-blink-features=AutomationControlled'] };
   const attempts = [{ label: 'system Google Chrome', channel: 'chrome' }, { label: 'system Microsoft Edge', channel: 'msedge' }, { label: 'bundled Chromium', channel: undefined }];
@@ -363,7 +364,7 @@ async function setupWebProvider(providerName, startUrl) {
   }
   console.log(`🔎 Verification ping OK (HTTP ${verification.status}) — cookie works.`);
 
-  const envPath = getFilePath('env');
+  const envPath = getFilePath(FILE_ROLES.ENV);
   let envContent = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf-8') : '';
   const envKey = `${envPrefixFor(providerName)}_COOKIE`;
   envContent = envContent.split('\n').filter(line => !line.startsWith(`${envKey}=`)).join('\n');
@@ -371,7 +372,7 @@ async function setupWebProvider(providerName, startUrl) {
   envContent += `\n${envKey}="${envValue}"\n`;
   await writeFileWithRetry(envPath, envContent.trim() + '\n');
 
-  const csvPath = getFilePath('providerConfig');
+  const csvPath = getFilePath(FILE_ROLES.PROVIDER_CONFIG);
   const existingCsv = fs.existsSync(csvPath) && fs.readFileSync(csvPath, 'utf-8').trim().length > 0 ? fs.readFileSync(csvPath, 'utf-8') : '';
   let header = existingCsv ? existingCsv.split(/\r?\n/)[0].split(',').map(h => h.trim()).filter(Boolean) : ['provider', 'baseURL', 'apiKeyEnv', 'modelsEndpoint', 'authType'];
   ['provider', 'baseURL', 'apiKeyEnv', 'modelsEndpoint', 'authType'].forEach(h => { if (!header.includes(h)) header.push(h); });
@@ -386,7 +387,7 @@ async function setupWebProvider(providerName, startUrl) {
   const csvLines = [header.join(','), ...rows.map(r => header.map(h => escapeCsv(r[h])).join(','))];
   await writeFileWithRetry(csvPath, csvLines.join('\n') + '\n');
 
-  const rulesPath = getFilePath('webProviderRules');
+  const rulesPath = getFilePath(FILE_ROLES.WEB_PROVIDER_RULES);
   let rules = fs.existsSync(rulesPath) ? JSON.parse(fs.readFileSync(rulesPath, 'utf-8')) : {};
   const headersToSave = { ...capturedData.headers };
   delete headersToSave['host'];

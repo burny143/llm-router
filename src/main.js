@@ -7,9 +7,9 @@ const axios = require('axios');
 const https = require('https');
 const { startProxy, stopProxy, isProxyRunning, setHealthResults, extractContent, getTokenUsage, getProxyStats, getKnownOk, setPriorityOverride, getRoutingLog, getPriorityState, setPriorityStateListener, injectUserTextWithFallback, reloadAssistantConfig, previewToolFormat } = require('./proxy-server');
 const { saveResults, loadResults, saveSettings, loadSettings, saveConfigBoth, syncConfigFromCsv, pruneConfigEntries, loadProviderConfig, CONFIG_CSV, PROVIDER_CONFIG_CSV, getFilePath, envPrefixFor, parseCsv, loadAssistantConfig, saveAssistantConfig } = require('./state-store');
-const { IPC_CHANNELS, DEFAULT_COOKIE_USER_AGENT } = require('./shared-constants');
+const { IPC_CHANNELS, DEFAULT_COOKIE_USER_AGENT, FILE_ROLES } = require('./shared-constants');
 const { initAgentController } = require('./agent-controller');
-require('dotenv').config({ path: getFilePath('env') });
+require('dotenv').config({ path: getFilePath(FILE_ROLES.ENV) });
 
 const chromeAgent = new https.Agent({
   ciphers: 'TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384',
@@ -21,7 +21,7 @@ const chromeAgent = new https.Agent({
 let webRules = {};
 function reloadWebRules() {
   try {
-    const rulesPath = getFilePath('webProviderRules');
+    const rulesPath = getFilePath(FILE_ROLES.WEB_PROVIDER_RULES);
     if (fs.existsSync(rulesPath)) {
       webRules = JSON.parse(fs.readFileSync(rulesPath, 'utf-8'));
     } else {
@@ -174,7 +174,7 @@ ipcMain.handle(IPC_CHANNELS.RUN_WEB_PROVIDER_SETUP, async (event, providerName, 
       // child exits — for either success or failure.
       if (mainWindow && !mainWindow.isDestroyed()) mainWindow.focus();
       if (code === 0) {
-        require('dotenv').config({ path: getFilePath('env'), override: true });
+        require('dotenv').config({ path: getFilePath(FILE_ROLES.ENV), override: true });
         reloadWebRules();
         addOrUpdateWebProviderEntry(providerName);
         queueConfigReady({ entries: configEntries });
@@ -198,14 +198,14 @@ ipcMain.handle(IPC_CHANNELS.CLEAR_WEB_PROVIDER_SESSION, async (event, providerNa
   try {
     const name = providerName || 'Qwen';
     const envKey = `${envPrefixFor(name)}_COOKIE`;
-    const envPath = getFilePath('env');
+    const envPath = getFilePath(FILE_ROLES.ENV);
     if (fs.existsSync(envPath)) {
       let content = fs.readFileSync(envPath, 'utf-8');
       content = content.split('\n').filter(line => !line.startsWith(`${envKey}=`)).join('\n');
       fs.writeFileSync(envPath, content);
     }
     
-    const rulesPath = getFilePath('webProviderRules');
+    const rulesPath = getFilePath(FILE_ROLES.WEB_PROVIDER_RULES);
     if (fs.existsSync(rulesPath)) {
       const rules = JSON.parse(fs.readFileSync(rulesPath, 'utf-8'));
       delete rules[name];
@@ -248,7 +248,7 @@ ipcMain.handle(IPC_CHANNELS.SET_PROVIDER_COOKIE, async (event, providerName, coo
   try {
     const prefix = envPrefixFor(providerName);
     const envKey = `${prefix}_COOKIE`;
-    const envPath = getFilePath('env');
+    const envPath = getFilePath(FILE_ROLES.ENV);
     if (fs.existsSync(envPath)) {
       let content = fs.readFileSync(envPath, 'utf-8');
       content = content.split('\n').filter(line => !line.startsWith(`${envKey}=`)).join('\n');
@@ -261,7 +261,7 @@ ipcMain.handle(IPC_CHANNELS.SET_PROVIDER_COOKIE, async (event, providerName, coo
     const preset = WEB_PROVIDER_PRESETS[providerName];
 
     // Upsert ProviderConfig.csv row
-    const csvPath = getFilePath('providerConfig');
+    const csvPath = getFilePath(FILE_ROLES.PROVIDER_CONFIG);
     const existingCsv = fs.existsSync(csvPath) ? fs.readFileSync(csvPath, 'utf-8') : '';
     let header = existingCsv ? existingCsv.split(/\r?\n/)[0].split(',').map(h => h.trim()).filter(Boolean) : [];
     ['provider', 'baseURL', 'apiKeyEnv', 'modelsEndpoint', 'authType'].forEach(h => { if (!header.includes(h)) header.push(h); });
@@ -280,7 +280,7 @@ ipcMain.handle(IPC_CHANNELS.SET_PROVIDER_COOKIE, async (event, providerName, coo
     fs.writeFileSync(csvPath, [header.join(','), ...rows.map(r => header.map(h => escapeCsv(r[h])).join(','))].join('\n') + '\n');
 
     // Seed web-provider-rules.json if not already captured
-    const rulesPath = getFilePath('webProviderRules');
+    const rulesPath = getFilePath(FILE_ROLES.WEB_PROVIDER_RULES);
     let rules = {};
     if (fs.existsSync(rulesPath)) { try { rules = JSON.parse(fs.readFileSync(rulesPath, 'utf-8')) || {}; } catch (e) { rules = {}; } }
     if (!rules[providerName]) {
@@ -361,14 +361,14 @@ ipcMain.handle(IPC_CHANNELS.GET_DEFAULT_CONFIG, () => {
 
 ipcMain.handle(IPC_CHANNELS.GET_DEFAULT_FILE_NAMES, () => {
   return {
-    latestModelsFileName: path.basename(getFilePath('latestModels')),
-    providerConfigFileName: path.basename(getFilePath('providerConfig')),
-    ultimateConfigFileName: path.basename(getFilePath('ultimateConfig'))
+    latestModelsFileName: path.basename(getFilePath(FILE_ROLES.LATEST_MODELS)),
+    providerConfigFileName: path.basename(getFilePath(FILE_ROLES.PROVIDER_CONFIG)),
+    ultimateConfigFileName: path.basename(getFilePath(FILE_ROLES.ULTIMATE_CONFIG))
   };
 });
 
 ipcMain.handle(IPC_CHANNELS.GET_ENV_VARS, () => {
-  const envPath = getFilePath('env');
+  const envPath = getFilePath(FILE_ROLES.ENV);
   const envVars = [];
   if (fs.existsSync(envPath)) {
     const content = fs.readFileSync(envPath, 'utf-8');
@@ -390,7 +390,7 @@ ipcMain.handle(IPC_CHANNELS.GET_ENV_VARS, () => {
 });
 
 function loadLatestModels() {
-  const latestPath = getFilePath('latestModels');
+  const latestPath = getFilePath(FILE_ROLES.LATEST_MODELS);
   if (!fs.existsSync(latestPath)) return;
   try {
     const text = fs.readFileSync(latestPath, 'utf-8');
@@ -406,9 +406,9 @@ function loadLatestModels() {
     }
     latestProviderModels = providerModels;
     const totalModels = Object.values(providerModels).reduce((sum, arr) => sum + arr.length, 0);
-    console.log(`Loaded ${path.basename(getFilePath('latestModels'))}: ${Object.keys(providerModels).length} provider(s), ${totalModels} model(s)`);
+    console.log(`Loaded ${path.basename(getFilePath(FILE_ROLES.LATEST_MODELS))}: ${Object.keys(providerModels).length} provider(s), ${totalModels} model(s)`);
   } catch (err) {
-    console.warn(`Could not load ${path.basename(getFilePath('latestModels'))}:`, err.message);
+    console.warn(`Could not load ${path.basename(getFilePath(FILE_ROLES.LATEST_MODELS))}:`, err.message);
   }
 }
 
@@ -426,7 +426,7 @@ function connectModelFile(filePath, rows) {
 function autoConnectModelFile() {
   const settings = loadSettings();
   let filePath = settings.modelsFile;
-  const modelsCsv = getFilePath('models');
+  const modelsCsv = getFilePath(FILE_ROLES.MODELS);
   if ((!filePath || !fs.existsSync(filePath)) && fs.existsSync(modelsCsv)) {
     filePath = modelsCsv;
     saveSettings({ modelsFile: filePath });
@@ -460,7 +460,7 @@ ipcMain.handle(IPC_CHANNELS.GET_CONNECTED_MODEL_LIST, () => {
     providerModels: availableProviderModels,
     latestProviderModels: latestProviderModels,
     file: modelsFile,
-    latestModelsFileName: path.basename(getFilePath('latestModels')),
+    latestModelsFileName: path.basename(getFilePath(FILE_ROLES.LATEST_MODELS)),
     providerConfigFileName: path.basename(PROVIDER_CONFIG_CSV)
   };
 });
@@ -496,7 +496,7 @@ function buildModelListsForProviders(providerMap) {
 }
 
 async function autoConnectConfigFile() {
-  const configPath = getFilePath('ultimateConfig');
+  const configPath = getFilePath(FILE_ROLES.ULTIMATE_CONFIG);
   const configExists = fs.existsSync(configPath) && fs.readFileSync(configPath, 'utf-8').trim().length > 0;
   if (configExists) {
     let entries = syncConfigFromCsv();
@@ -532,7 +532,7 @@ ipcMain.handle(IPC_CHANNELS.SAVE_CONFIG, async (event, entries) => {
   try {
     saveConfigBoth(entries);
     configEntries = entries;
-    console.log(`Config saved: ${entries.length} entries (${path.basename(getFilePath('ultimateConfig'))} + proxy-config.json updated).`);
+    console.log(`Config saved: ${entries.length} entries (${path.basename(getFilePath(FILE_ROLES.ULTIMATE_CONFIG))} + proxy-config.json updated).`);
     return { success: true };
   } catch (err) {
     return { success: false, error: err.message };
@@ -585,7 +585,7 @@ ipcMain.handle(IPC_CHANNELS.RUN_FETCH_MODELS, async () => {
         return;
       }
       try {
-        const csvText = fs.readFileSync(getFilePath('latestModels'), 'utf-8');
+        const csvText = fs.readFileSync(getFilePath(FILE_ROLES.LATEST_MODELS), 'utf-8');
         const rows = parseCsv(csvText);
         const entries = [];
         for (const row of rows) {

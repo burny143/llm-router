@@ -18,15 +18,20 @@ const LOG_MARKERS = {
   // Emitted by large-context-dispatcher.js for chunk/lane progress so the
   // existing Developer Logs console feed shows dispatcher activity without
   // needing a dedicated IPC channel.
-  DISPATCH: '[LCD]'
+  DISPATCH: '[LCD]',
+  // NEW: emitted by proxy-server.js's queue tracker whenever a logical
+  // inbound request is queued (waiting on findWinner()/acquireRequestSlot())
+  // or dequeued/dispatched, so Developer Logs shows queueing activity
+  // per-app without a dedicated IPC channel.
+  QUEUE: '[QUEUE]'
 };
 
-// Canonical provider name for Qwen. NOTE: the only consumer, setup-qwen-cookie.js,
-// has been archived to /archive (superseded by the generalized
-// setup-web-provider.js, which is what RUN_WEB_PROVIDER_SETUP actually wires
-// up). This export is retained only so the archived script still works if
-// pulled back out of /archive — nothing in the live app imports it.
-const QWEN_PROVIDER_NAME = 'Qwen';
+// BUGFIX (Task 9): QWEN_PROVIDER_NAME used to live here "only so the archived
+// script still works if pulled back out of /archive" — dead weight tied
+// directly to setup-qwen-cookie.js, which is now actually archived (Task 8,
+// see /archive/setup-qwen-cookie.js) with the literal 'Qwen' inlined into it
+// instead. Removed here since its only consumer no longer lives in the
+// active source tree.
 
 // Data-file role keys passed to state-store.getFilePath(). Centralized here so
 // the fetch-models / browser-http-client / setup-qwen-cookie scripts all agree
@@ -38,7 +43,21 @@ const FILE_ROLES = {
   WEB_PROVIDER_RULES: 'webProviderRules',
   LATEST_MODELS: 'latestModels',
   MODELS: 'models',
-  PROVIDER_FLAGS: 'providerFlags'
+  PROVIDER_FLAGS: 'providerFlags',
+  // NEW (Task 10): the remaining role keys getFilePath() recognizes (see
+  // state-store.js's DEFAULT_PATHS), added so every getFilePath() call site
+  // across main.js/proxy-server.js/setup-web-provider.js/state-store.js can
+  // use a FILE_ROLES.* constant instead of a hand-typed string literal — a
+  // future rename is then a one-line change here instead of a
+  // find-and-replace across 4 files.
+  ULTIMATE_CONFIG: 'ultimateConfig',
+  KNOWN_OK: 'knownOk',
+  TOKEN_USAGE: 'tokenUsage',
+  SETTINGS: 'settings',
+  ASSISTANT_CONFIG: 'assistantConfig',
+  AGENT_CONFIG: 'agentConfig',
+  AGENT_CHATS: 'agentChats',
+  PROXY_CONFIG: 'proxyConfig'
 };
 
 // Browser in-page fetch timeouts (browser-http-client.js).
@@ -203,4 +222,4 @@ const IPC_CHANNELS = {
   AGENT_UNDO_STATE: 'agent:undo-state',
 };
 
-module.exports = { IPC_CHANNELS, LOG_MARKERS, DEFAULT_COOKIE_USER_AGENT, QWEN_PROVIDER_NAME, FILE_ROLES, BROWSER_FETCH_TIMEOUT_MS, BROWSER_FETCH_HANG_GUARD_MS, DEFAULT_PING_INTERVAL_MS, DEFAULT_MIN_REQUEST_INTERVAL_MS };
+module.exports = { IPC_CHANNELS, LOG_MARKERS, DEFAULT_COOKIE_USER_AGENT, FILE_ROLES, BROWSER_FETCH_TIMEOUT_MS, BROWSER_FETCH_HANG_GUARD_MS, DEFAULT_PING_INTERVAL_MS, DEFAULT_MIN_REQUEST_INTERVAL_MS };

@@ -348,10 +348,27 @@ function receiveStream(model, convId, stream) {
       }
     });
 
+    // BUGFIX: `end`/`close` used to unconditionally settle(null), resolving
+    // with the default `content: ''` / `finish_reason: 'stop'` object even
+    // when the stream closed WITHOUT ever delivering a `cmpl` chunk or an
+    // `all_done`/`error` event (e.g. the connection drops mid-stream). That
+    // silently returned a fake "successful" empty completion — the same
+    // "no usable content (HTTP 200)" failure mode probeOne() now guards
+    // against on the HTTP-provider path. Reject instead when nothing usable
+    // ever arrived, so the caller's retry/fallback logic actually engages.
+    const settleEndOfStream = () => {
+      parser.flush();
+      if (!settled && !data.choices[0].message.content) {
+        settle(new Error('Kimi stream ended with no content (no cmpl/all_done event received)'));
+      } else {
+        settle(null);
+      }
+    };
+
     stream.on('data', buf => parser.feed(buf.toString()));
     stream.once('error', err => settle(err));
-    stream.once('end', () => { parser.flush(); settle(null); });
-    stream.once('close', () => { parser.flush(); settle(null); });
+    stream.once('end', settleEndOfStream);
+    stream.once('close', settleEndOfStream);
   });
 }
 

@@ -2,7 +2,7 @@
 // derived from __dirname, so moving this file breaks every data-file path resolution.
 const fs = require('fs');
 const path = require('path');
-const { DEFAULT_PING_INTERVAL_MS, DEFAULT_MIN_REQUEST_INTERVAL_MS } = require('./shared-constants');
+const { DEFAULT_PING_INTERVAL_MS, DEFAULT_MIN_REQUEST_INTERVAL_MS, FILE_ROLES } = require('./shared-constants');
 
 // --- File registry (central "notepad" that maps each data-file role to a path) ---
 // file-registry.json is the single place that says WHICH file plays WHICH role.
@@ -75,15 +75,15 @@ function envPrefixFor(providerName) {
 // Keep the legacy constants working for any code that still destructures them.
 // They are now derived from the registry, so editing file-registry.json redirects
 // the app without touching code.
-const STATE_FILE = getFilePath('knownOk');
-const USAGE_FILE = getFilePath('tokenUsage');
-const SETTINGS_FILE = getFilePath('settings');
-const ASSISTANT_CONFIG_FILE = getFilePath('assistantConfig');
-const AGENT_CONFIG_FILE = getFilePath('agentConfig');
-const AGENT_CHATS_FILE = getFilePath('agentChats');
-const CONFIG_FILE = getFilePath('proxyConfig');
-const CONFIG_CSV = getFilePath('ultimateConfig');
-const PROVIDER_CONFIG_CSV = getFilePath('providerConfig');
+const STATE_FILE = getFilePath(FILE_ROLES.KNOWN_OK);
+const USAGE_FILE = getFilePath(FILE_ROLES.TOKEN_USAGE);
+const SETTINGS_FILE = getFilePath(FILE_ROLES.SETTINGS);
+const ASSISTANT_CONFIG_FILE = getFilePath(FILE_ROLES.ASSISTANT_CONFIG);
+const AGENT_CONFIG_FILE = getFilePath(FILE_ROLES.AGENT_CONFIG);
+const AGENT_CHATS_FILE = getFilePath(FILE_ROLES.AGENT_CHATS);
+const CONFIG_FILE = getFilePath(FILE_ROLES.PROXY_CONFIG);
+const CONFIG_CSV = getFilePath(FILE_ROLES.ULTIMATE_CONFIG);
+const PROVIDER_CONFIG_CSV = getFilePath(FILE_ROLES.PROVIDER_CONFIG);
 
 // Simple CSV parsing (no external deps — handles basic quoted/unquoted fields)
 function parseCsv(text) {

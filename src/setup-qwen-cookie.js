@@ -1,5 +1,15 @@
 // setup-qwen-cookie.js
 //
+// ARCHIVED (audit 2026-08-07 note, made true by this move — see shared-constants.js):
+// superseded by the generalized setup-web-provider.js, which is what
+// RUN_WEB_PROVIDER_SETUP actually wires up. Nothing in the live app imports
+// this file or requires it from a build/packaging manifest — it is kept here
+// only for reference / in case a Qwen-specific one-shot capture flow like
+// this one is needed again standalone. If pulled back out of /archive, note
+// that shared-constants.js no longer exports QWEN_PROVIDER_NAME (removed
+// once this file was actually archived) — the literal 'Qwen' below replaces
+// that import so this script keeps working unmodified.
+//
 // One-shot Qwen (chat.qwen.ai) cookie capture: opens a headed browser, waits for
 // the user to be logged in, auto-sends a test message, captures the chat
 // completion request (URL + headers + payload) and the session cookies, then
@@ -21,8 +31,13 @@ const { chromium } = require('playwright');
 const fs = require('fs');
 const path = require('path');
 const dotenv = require('dotenv');
-const { getFilePath, parseCsv } = require('./state-store');
-const { DEFAULT_COOKIE_USER_AGENT, QWEN_PROVIDER_NAME, FILE_ROLES } = require('./shared-constants');
+const { getFilePath, parseCsv } = require('../state-store');
+const { DEFAULT_COOKIE_USER_AGENT, FILE_ROLES } = require('../shared-constants');
+
+// QWEN_PROVIDER_NAME used to be imported from shared-constants.js, but that
+// export was removed once this file was archived (its only consumer). Inlined
+// here so this script still works unmodified if pulled back out of /archive.
+const QWEN_PROVIDER_NAME = 'Qwen';
 
 const QWEN_START_URL = 'https://chat.qwen.ai';
 // The chat-completion endpoint path segment Qwen's SPA POSTs to. Matched as a

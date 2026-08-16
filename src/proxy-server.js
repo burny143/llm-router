@@ -1065,7 +1065,15 @@ async function probeOne(entry, { messages, rest }, signal) {
           // Reuse the SAME persistent browser profile that captured this provider's cookie
           // so the request originates from the same device that logged in (bypasses WAF).
           const profileKey = rule && rule.profileKey ? rule.profileKey : envPrefixFor(entry.provider).toLowerCase();
-          response = await browserClient.request(entry.baseURL, payload, headers, apiKey, profileKey, cookieTimeoutMs);
+          // BUGFIX: browser-http-client.js's real signature is
+          // request(url, payload, headers, cookies, profileKey, method = 'POST', fetchTimeoutMs).
+          // This call was passing cookieTimeoutMs (a number) positionally into the
+          // `method` slot, so every non-Kimi Cookie-auth provider (Qwen and anything
+          // set up via setup-web-provider.js) sent its POST request with an invalid
+          // HTTP method instead of "POST", deterministically breaking 100% of generic
+          // browser-Cookie-auth traffic. The explicit 'POST' below restores the
+          // intended 7-arg call, matching main.js's correct call site (~line 741).
+          response = await browserClient.request(entry.baseURL, payload, headers, apiKey, profileKey, 'POST', cookieTimeoutMs);
         }
       } else {
         response = await axios.post(entry.baseURL, payload, {
@@ -1102,11 +1110,70 @@ async function probeOne(entry, { messages, rest }, signal) {
 
   const normalized = normalizeResponse(response.data);
 
+  // BUGFIX: probeOne previously accepted ANY response with status 2xx and a
+  // truthy `normalized` object as a winner, even when the upstream model
+  // returned empty content (e.g. a reasoning model that burned its entire
+  // max_tokens budget on hidden reasoning tokens and never produced visible
+  // text: content: "" / finish_reason: "length"). That empty response was
+  // then learnSuccess()'d and handed back to the caller as-is — the exact
+  // "No usable content (HTTP 200)... finish_reason: length" symptom. Guard
+  // against that here: a winner needs either non-empty text content or at
+  // least one tool_call; a finish_reason of "length" (or missing) with
+  // neither is treated as a failure so findWinner()/probeSequential()/
+  // probeParallel() fall back to the next candidate exactly as they do for
+  // any other thrown error.
   if (response.status >= 200 && response.status < 300 && normalized) {
+    const winnerMsg = normalized.choices && normalized.choices[0] && normalized.choices[0].message;
+    const winnerFinish = normalized.choices && normalized.choices[0] && normalized.choices[0].finish_reason;
+    const hasText = !!(winnerMsg && typeof winnerMsg.content === 'string' && winnerMsg.content.trim());
+    const hasToolCalls = !!(winnerMsg && Array.isArray(winnerMsg.tool_calls) && winnerMsg.tool_calls.length > 0);
+
+    if (!hasText && !hasToolCalls && (winnerFinish === 'length' || !winnerFinish)) {
+      // One in-place retry with a bumped max_tokens before giving up on this
+      // candidate entirely — this failure mode is common with reasoning
+      // models that simply ran out of budget, and often succeeds on a
+      // second attempt with more room to think.
+      const bumpedMax = Math.min(
+        (parseInt(payload.max_tokens, 10) || 1024) * 2,
+        assistantConfig.maxOutputTokens > 0 ? assistantConfig.maxOutputTokens : 8192
+      );
+      if (bumpedMax > (parseInt(payload.max_tokens, 10) || 0)) {
+        console.log(`[${entry.provider}/${entry.model}] empty completion (finish_reason=${winnerFinish || 'none'}) — retrying once with max_tokens=${bumpedMax}`);
+        try {
+          const retryPayload = { ...payload, max_tokens: bumpedMax };
+          const retryResponse = authType === 'Cookie'
+            ? await (rule0 && rule0.authToken
+                ? require('./kimi-web-client').completion({ model: entry.model, messages, refreshToken: rule0.authToken, useSearch: false, signal, timeoutMs: assistantConfig.cookieProviderTimeoutMs > 0 ? assistantConfig.cookieProviderTimeoutMs : 60000 })
+                : require('./browser-http-client').request(entry.baseURL, retryPayload, headers, apiKey, (webRules[entry.provider] && webRules[entry.provider].profileKey) || envPrefixFor(entry.provider).toLowerCase(), 'POST', assistantConfig.cookieProviderTimeoutMs > 0 ? assistantConfig.cookieProviderTimeoutMs : 60000))
+            : await axios.post(entry.baseURL, retryPayload, { headers, timeout: (assistantConfig.timeoutMs > 0 ? assistantConfig.timeoutMs : 30000), signal });
+          const retryNormalized = normalizeResponse(retryResponse.data);
+          const retryMsg = retryNormalized.choices && retryNormalized.choices[0] && retryNormalized.choices[0].message;
+          const retryHasText = !!(retryMsg && typeof retryMsg.content === 'string' && retryMsg.content.trim());
+          const retryHasToolCalls = !!(retryMsg && Array.isArray(retryMsg.tool_calls) && retryMsg.tool_calls.length > 0);
+          if (retryHasText || retryHasToolCalls) {
+            response = retryResponse;
+          } else {
+            throw new Error(`empty completion (finish_reason=${winnerFinish || 'none'}) — likely max_tokens exhausted by reasoning tokens, retry also empty`);
+          }
+        } catch (retryErr) {
+          logResponseLine(entry, response.status, elapsed, response.data, retryErr.message);
+          throw new Error(`empty completion (finish_reason=${winnerFinish || 'none'}) — likely max_tokens exhausted by reasoning tokens: ${retryErr.message}`);
+        }
+      } else {
+        logResponseLine(entry, response.status, elapsed, response.data, 'empty completion');
+        throw new Error(`empty completion (finish_reason=${winnerFinish || 'none'}) — likely max_tokens exhausted by reasoning tokens`);
+      }
+    }
+  }
+
+  // Re-normalize in case the retry above swapped in a new `response`.
+  const finalNormalized = normalizeResponse(response.data);
+
+  if (response.status >= 200 && response.status < 300 && finalNormalized) {
     const completionText = extractContent(response.data);
     recordUsage(entry, response.data, { messages, completionText });
 
-    normalized._meta = {
+    finalNormalized._meta = {
       provider: entry.provider,
       model: entry.model,
       elapsed
@@ -1114,7 +1181,7 @@ async function probeOne(entry, { messages, rest }, signal) {
 
     logResponseLine(entry, response.status, elapsed, response.data, null);
     console.log(`[${entry.provider}/${entry.model}] OK (${elapsed}ms)`);
-    return { entry, data: normalized, elapsed };
+    return { entry, data: finalNormalized, elapsed };
   }
 
   const rawSnippet = response.data
@@ -1650,5 +1717,13 @@ module.exports = {
   sendSseResponse,
   estimateMessagesTokens,
   estimateTokensFromText,
-  getAssistantConfig: () => assistantConfig
+  getAssistantConfig: () => assistantConfig,
+  // NEW: exported so non-HTTP callers (agent-controller.js) can register
+  // themselves as a "connected application" too. touchClientStart/End were
+  // previously only ever invoked from inside the Express /v1/chat/completions
+  // route handler, so the Connected Applications panel in the Proxy Control
+  // tab could never show the app's own Agent tab as a client — only external
+  // OpenAI-compatible HTTP callers were tracked.
+  touchClientStart,
+  touchClientEnd
 };

@@ -585,6 +585,8 @@ setServerStatus(false, port);
 
 const connectedAppsCount = document.getElementById('connectedAppsCount');
 const connectedAppsList = document.getElementById('connectedAppsList');
+// NEW: queue-depth visibility (Task 7).
+const queueDepthIndicator = document.getElementById('queueDepthIndicator');
 
 function renderConnectedApps(connectedApps) {
 if (!connectedAppsCount || !connectedAppsList) return;
@@ -607,10 +609,31 @@ ${c.lastActivity ? ` · Last activity: ${c.lastActivity}` : ''}
 </div>`).join('');
 }
 
+// NEW: queue-depth visibility (Task 7) — mirrors renderConnectedApps' pattern.
+// Shows the live depth of proxy-server.js's queueTracker (requests currently
+// waiting on findWinner()/acquireRequestSlot()) so the previously-invisible
+// acquireRequestSlot() gate has a visible indicator, refreshed on the same
+// pollProxyStats() interval as Connected Applications.
+function renderQueueDepth(queue) {
+if (!queueDepthIndicator) return;
+const depth = queue ? queue.depth : 0;
+if (depth === 0) {
+queueDepthIndicator.textContent = 'Queue depth: 0';
+queueDepthIndicator.title = '';
+return;
+}
+queueDepthIndicator.textContent = `Queue depth: ${depth}`;
+const waiting = (queue && queue.waitingClients) || [];
+queueDepthIndicator.title = waiting
+.map(w => `${w.appName} (waiting ${Math.round(w.waitingMs / 1000)}s on ${w.waitingOn.join(', ')})`)
+.join('\n');
+}
+
 async function pollProxyStats() {
 try {
 const stats = await window.api.getProxyStats();
 renderConnectedApps(stats && stats.connectedApps);
+renderQueueDepth(stats && stats.queue);
 } catch (err) { /* proxy not running yet, or IPC not ready — ignore */ }
 }
 pollProxyStats();

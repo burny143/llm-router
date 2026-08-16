@@ -356,6 +356,61 @@ function extractStandaloneToolCallJsonCandidates(text) {
 }
 
 // ---------------------------------------------------------------------------
+// Scan a string for one or more balanced top-level {...} JSON objects,
+// back-to-back or otherwise. Used for fenced blocks where an upstream model
+// sometimes emits multiple tool-call objects inside a single code fence
+// instead of one fence per call — JSON.parse on the whole capture would fail
+// with "Unexpected non-whitespace character after JSON" in that case.
+// ---------------------------------------------------------------------------
+function extractBalancedJsonObjects(text) {
+  const objects = [];
+  let cursor = 0;
+
+  while (cursor < text.length) {
+    const start = text.indexOf('{', cursor);
+    if (start === -1) break;
+
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+    let end = -1;
+
+    for (let i = start; i < text.length; i++) {
+      const ch = text[i];
+
+      if (inString) {
+        if (escaped) {
+          escaped = false;
+        } else if (ch === '\\') {
+          escaped = true;
+        } else if (ch === '"') {
+          inString = false;
+        }
+      } else {
+        if (ch === '"') {
+          inString = true;
+        } else if (ch === '{') {
+          depth += 1;
+        } else if (ch === '}') {
+          depth -= 1;
+          if (depth === 0) {
+            end = i;
+            break;
+          }
+        }
+      }
+    }
+
+    if (end === -1) break; // unbalanced tail — stop, nothing more to recover
+
+    objects.push(text.slice(start, end + 1));
+    cursor = end + 1;
+  }
+
+  return objects;
+}
+
+// ---------------------------------------------------------------------------
 // Parse tool calls from upstream plain-text response
 // Returns an array of parsed tool call objects or null if none found.
 //
@@ -391,11 +446,34 @@ function parseToolCallsFromText(text) {
   for (const match of fencedMatches) {
     const jsonStr = match[1];
 
+    // Try the fast path first: the whole capture is a single JSON object
+    // (the common case — one tool call per fence).
     try {
       const parsed = JSON.parse(jsonStr);
       addParsed(parsed);
+      continue;
     } catch (e) {
-      console.warn(`[tool-calling-translator] Skipped fenced tool-call block — invalid JSON: ${e.message}`);
+      // Fall through — the capture may contain multiple back-to-back JSON
+      // objects (some upstreams put several tool calls in one fence), which
+      // JSON.parse rejects as "Unexpected non-whitespace character after
+      // JSON". Recover each object individually via balanced-brace scanning
+      // before giving up on this block.
+    }
+
+    const objectsInBlock = extractBalancedJsonObjects(jsonStr);
+    let recoveredAny = false;
+
+    for (const objStr of objectsInBlock) {
+      try {
+        const parsed = JSON.parse(objStr);
+        if (addParsed(parsed)) recoveredAny = true;
+      } catch (e) {
+        // Ignore individual malformed fragments within the block.
+      }
+    }
+
+    if (!recoveredAny) {
+      console.warn('[tool-calling-translator] Skipped fenced tool-call block — no valid JSON objects found');
     }
   }
 

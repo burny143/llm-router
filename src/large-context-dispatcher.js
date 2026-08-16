@@ -353,23 +353,36 @@ async function runAssembler(proxy, candidates, userQuestion, chunkResults, rest,
 // Entry point
 // ---------------------------------------------------------------------------
 
-async function handleLargeContext(req, res, originalMessages, userQuestion, tokenCount) {
+// NEW: core dispatch logic extracted out of handleLargeContext() so it no
+// longer depends on an Express req/res pair. handleLargeContext() (the HTTP
+// route's entry point) now just unwraps req/res and delegates here; a new
+// runLargeContext() wrapper is also exported directly so non-HTTP callers —
+// specifically agent-controller.js's processChatCompletion() path, which
+// previously had NO large-context hand-off at all and always hard-failed on
+// an oversized agent context even with largeContextMode enabled — can invoke
+// the same chunk/lane/assemble pipeline and get back a plain response object
+// instead of a written HTTP response.
+//
+// Throws on failure (no lane pool, nothing to chunk, all chunks failed, or
+// assembler failure) instead of writing to a response, so callers decide how
+// to surface the error themselves.
+async function runLargeContext(originalMessages, userQuestion, tokenCount, rest) {
   // Deferred require — see the note at the top of this file.
   const proxy = require('./proxy-server');
   const assistantConfig = proxy.getAssistantConfig();
-  const { stream, ...rest } = req.body || {};
+  rest = { ...(rest || {}) };
   delete rest.messages;
   delete rest.model;
   delete rest.tools;
   delete rest.stream_options;
+  delete rest.stream;
 
   const timeoutMs = assistantConfig.largeContextTimeoutMs > 0 ? assistantConfig.largeContextTimeoutMs : 60000;
 
   const orderedEntries = proxy.orderEntries();
   const lanePool = buildLanePool(orderedEntries, assistantConfig);
   if (lanePool.length === 0) {
-    if (!res.headersSent) res.status(502).json({ error: 'Large Context Dispatcher: no models configured.' });
-    return { entry: null };
+    throw new Error('Large Context Dispatcher: no models configured.');
   }
 
   // --- chunk sizing: aim for roughly one chunk per unit of lane capacity,
@@ -387,16 +400,14 @@ async function handleLargeContext(req, res, originalMessages, userQuestion, toke
   log(`~${tokenCount} tokens -> ${chunks.length} chunk(s), target ~${targetTokensPerChunk} tokens/chunk, ${lanePool.length} lane(s) (capacity ${totalLaneCapacity})`);
 
   if (chunks.length === 0) {
-    if (!res.headersSent) res.status(400).json({ error: 'Large Context Dispatcher: nothing to summarize.' });
-    return { entry: null };
+    throw new Error('Large Context Dispatcher: nothing to summarize.');
   }
 
   const chunkResults = await runLaneDispatch(proxy, chunks, lanePool, userQuestion, timeoutMs);
   const failedCount = chunkResults.filter(r => !r.ok).length;
   if (failedCount > 0) log(`${failedCount}/${chunks.length} chunk(s) failed after retries — assembling with partial context`);
   if (failedCount === chunks.length) {
-    if (!res.headersSent) res.status(502).json({ error: 'Large Context Dispatcher: all chunks failed to process.' });
-    return { entry: null };
+    throw new Error('Large Context Dispatcher: all chunks failed to process.');
   }
 
   // Best available model for the final answer: fastest known-good that isn't
@@ -413,12 +424,25 @@ async function handleLargeContext(req, res, originalMessages, userQuestion, toke
     usage: (final.raw && final.raw.usage) || undefined
   };
 
-  if (stream) {
-    proxy.sendSseResponse(res, data, final.entry);
-  } else {
-    res.json(data);
-  }
-  return { entry: final.entry };
+  return { data, entry: final.entry };
 }
 
-module.exports = { handleLargeContext };
+async function handleLargeContext(req, res, originalMessages, userQuestion, tokenCount) {
+  const { stream, ...rest } = req.body || {};
+  const proxy = require('./proxy-server');
+  let result;
+  try {
+    result = await runLargeContext(originalMessages, userQuestion, tokenCount, rest);
+  } catch (err) {
+    if (!res.headersSent) res.status(502).json({ error: err.message });
+    return { entry: null };
+  }
+  if (stream) {
+    proxy.sendSseResponse(res, result.data, result.entry);
+  } else {
+    res.json(result.data);
+  }
+  return { entry: result.entry };
+}
+
+module.exports = { handleLargeContext, runLargeContext };

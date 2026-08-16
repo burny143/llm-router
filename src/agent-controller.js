@@ -101,6 +101,36 @@ function trimSession(key) {
   sess.messages = sess.messages.slice(cut);
 }
 
+// BUGFIX: trimSession() only ever trimmed by MESSAGE COUNT (MAX_SESSION_MESSAGES
+// = 200). A single oversized message — e.g. a large file slurped in via
+// read_project_file — can blow past maxInputTokens while the session sits well
+// under 200 messages, so the count-based trim above never engages and the same
+// context-limit failure recurs on every subsequent turn with no recovery path.
+// This trims the OUTGOING per-call message array (not the persisted session) by
+// estimated token count, dropping the oldest non-system messages first —
+// respecting the same "never start on a lone tool message" rule as
+// trimSession() — until the array fits the given budget. Returns the (possibly
+// unchanged) array; never mutates the caller's array in place, and never drops
+// the leading system message.
+function trimMessagesForTokenBudget(messagesForModel, maxInputTokens, estimateTokensFromText) {
+  if (!maxInputTokens || maxInputTokens <= 0) return messagesForModel;
+  let msgs = messagesForModel;
+  const hasSystem = msgs.length > 0 && msgs[0].role === 'system';
+  const floor = hasSystem ? 1 : 0; // never drop the system prompt, and always leave at least the newest message
+
+  let estimated = estimateTokensFromText(JSON.stringify(msgs));
+  while (estimated > maxInputTokens && msgs.length > floor + 1) {
+    let dropFrom = floor;
+    // Skip past a lone 'tool' message at the cut point so we never orphan a
+    // tool_call/tool_result pair for the model on the next turn.
+    let dropTo = dropFrom + 1;
+    while (dropTo < msgs.length && msgs[dropTo].role === 'tool') dropTo++;
+    msgs = [...msgs.slice(0, dropFrom), ...msgs.slice(dropTo)];
+    estimated = estimateTokensFromText(JSON.stringify(msgs));
+  }
+  return msgs;
+}
+
 function persistChats() {
   const obj = {};
   for (const [key, sess] of chatSessions.entries()) obj[key] = sess;
@@ -137,6 +167,23 @@ const MAX_AGENT_STEPS = 25; // guards against a runaway tool-call chain
 // retryCount, which only covers one candidate before findWinner moves on.
 const MODEL_CALL_MAX_ATTEMPTS = 3;
 const MODEL_CALL_RETRY_DELAY_MS = 1500;
+
+// BUGFIX: deterministic, non-transient errors (the input is simply too big
+// for the model's context window) were being retried MODEL_CALL_MAX_ATTEMPTS
+// times identically — the token count never changes between attempts, so all
+// 3 attempts are guaranteed to fail the same way. That produced the
+// "Model call failed (attempt 1/3)... retrying" x3 trace and wasted
+// MODEL_CALL_RETRY_DELAY_MS * (attempts-1) before ultimately failing anyway.
+// Matched against both the agent's own pre-flight "Agent context limit
+// exceeded" message and the proxy's context/token-limit errors (including
+// TOKEN_LIMIT_EXCEEDED, thrown by proxy-server.js's probeOne()).
+const NON_RETRYABLE_ERROR_PATTERN = /context limit|token limit|exceeds the proxy's (outbound|context) limit|TOKEN_LIMIT_EXCEEDED/i;
+
+function isNonRetryableModelCallError(err) {
+  if (!err) return false;
+  if (err.code === 'TOKEN_LIMIT_EXCEEDED') return true;
+  return NON_RETRYABLE_ERROR_PATTERN.test(err.message || '');
+}
 // If the model issues the exact same tool call (name + args) this many
 // times in a row, it's stuck in a loop rather than making progress —
 // interrupt with a corrective nudge instead of silently burning the whole
@@ -179,6 +226,15 @@ async function runAgentTurn(sendToRenderer, userText, uploadedFiles) {
     sendToRenderer(IPC_CHANNELS.AGENT_TOOL_LIST, { tools: tools.map((t) => t.function.name) });
     const messagesForModel = [{ role: 'system', content: buildSystemPrompt(mode) }, ...getActiveMessages()];
 
+    // NEW: synthetic headers identifying the agent itself as a "connected
+    // application" to proxy-server.js's touchClientStart/touchClientEnd
+    // tracking (see BUGFIX note at each call site below) — distinguishable
+    // from external HTTP callers in the Connected Applications panel.
+    const agentClientHeaders = {
+      'x-app-name': projectRoot ? `Agent Tab (Project: ${path.basename(projectRoot)})` : 'Agent Tab (Global)',
+      'user-agent': 'internal-agent'
+    };
+
     let stepLimit = MAX_AGENT_STEPS;
     let extensionGranted = false;
     let recentToolSignatures = [];
@@ -196,15 +252,35 @@ async function runAgentTurn(sendToRenderer, userText, uploadedFiles) {
       for (let attempt = 1; attempt <= MODEL_CALL_MAX_ATTEMPTS; attempt++) {
         if (abortRequested) break;
         try {
-          // --- Agent-side input token cap --- reject the model call before
-          // forwarding if the conversation exceeds the agent's configured
-          // context limit. Uses the proxy's token estimator (cheap heuristic).
-          const maxInputTokens = globalConfig.agentMaxInputTokens > 0 ? globalConfig.agentMaxInputTokens : 0;
+          // --- Agent-side input token cap ---
+          // BUGFIX: this used to only ever THROW when the conversation exceeded
+          // the agent's configured context limit — with no recovery path other
+          // than a full failed turn (see MODEL_CALL retry-classification fix
+          // above). Now it first tries a token-aware trim (dropping the oldest
+          // non-system messages, same rule as trimSession()'s message-count
+          // trim) and only throws if the conversation still doesn't fit even
+          // after trimming down to just the system prompt + newest message.
+          const maxInputTokens = globalConfig.agentMaxInputTokens > 0
+            ? globalConfig.agentMaxInputTokens
+            : ((proxy().getAssistantConfig && proxy().getAssistantConfig().maxInputTokens > 0) ? proxy().getAssistantConfig().maxInputTokens : 0);
           if (maxInputTokens > 0) {
             const estimateTokensFromText = proxy().estimateTokensFromText || estimateTokensFromTextFallback;
-            const estimated = estimateTokensFromText(JSON.stringify(messagesForModel));
+            let estimated = estimateTokensFromText(JSON.stringify(messagesForModel));
             if (estimated > maxInputTokens) {
-              throw new Error(`Agent context limit exceeded (~${estimated} tokens > ${maxInputTokens}). Trim history or increase the limit.`);
+              const trimmed = trimMessagesForTokenBudget(messagesForModel, maxInputTokens, estimateTokensFromText);
+              if (trimmed !== messagesForModel) {
+                const droppedCount = messagesForModel.length - trimmed.length;
+                messagesForModel.length = 0;
+                messagesForModel.push(...trimmed);
+                estimated = estimateTokensFromText(JSON.stringify(messagesForModel));
+                sendToRenderer(IPC_CHANNELS.AGENT_ERROR, {
+                  message: `Conversation exceeded the context budget — dropped ${droppedCount} older message(s) to fit (~${estimated}/${maxInputTokens} tokens).`,
+                  recoverable: true
+                });
+              }
+              if (estimated > maxInputTokens) {
+                throw new Error(`Agent context limit exceeded (~${estimated} tokens > ${maxInputTokens}) even after trimming history. Split the task into smaller steps or enable Large Context Mode.`);
+              }
             }
           }
           // Build per-call options: forward max_tokens cap (if set) and let the
@@ -213,13 +289,74 @@ async function runAgentTurn(sendToRenderer, userText, uploadedFiles) {
           const agentOpts = { tools };
           const maxOutputTokens = globalConfig.agentMaxOutputTokens > 0 ? globalConfig.agentMaxOutputTokens : 0;
           if (maxOutputTokens > 0) agentOpts.max_tokens = maxOutputTokens;
-          if (streamingEnabled) {
+
+          // BUGFIX: the Large Context Dispatcher was previously wired ONLY into
+          // the HTTP /v1/chat/completions route (proxy-server.js checks
+          // assistantConfig.largeContextMode there and hands off to
+          // large-context-dispatcher.js). processChatCompletion() — the
+          // function the agent loop actually calls — had no equivalent
+          // hand-off, so the agent could never benefit from chunking/
+          // summarization even with largeContextMode enabled; an oversized
+          // agent context always hard-failed instead of being split. Mirror
+          // the HTTP route's check here: if largeContextMode is on and this
+          // call's estimated tokens exceed the configured threshold, dispatch
+          // through the same chunk/lane/assemble pipeline instead of a normal
+          // model call.
+          const lcAssistantConfig = proxy().getAssistantConfig ? proxy().getAssistantConfig() : {};
+          const lcEstimateTokensFromText = proxy().estimateTokensFromText || estimateTokensFromTextFallback;
+          const lcTokenCount = lcEstimateTokensFromText(JSON.stringify(messagesForModel));
+          const lcThreshold = lcAssistantConfig.largeContextThreshold > 0 ? lcAssistantConfig.largeContextThreshold : Infinity;
+          let largeContextHandled = false;
+          if (lcAssistantConfig.largeContextMode && lcTokenCount > lcThreshold && !(Array.isArray(tools) && tools.length > 0)) {
+            // Large Context Mode assembles a single text answer via
+            // chunk-summarize-then-assemble — it has no concept of tool_calls,
+            // so it only makes sense for tool-less turns (mirrors the HTTP
+            // route, which likewise treats it as a plain completion path).
+            const largeContextDispatcher = require('./large-context-dispatcher');
+            const userMsg = [...messagesForModel].reverse().find((m) => m.role === 'user');
+            const userQuestion = (userMsg && (typeof userMsg.content === 'string' ? userMsg.content : JSON.stringify(userMsg.content))) || '';
+            const lcClientKey = proxy().touchClientStart ? proxy().touchClientStart(agentClientHeaders) : null;
+            try {
+              const result = await largeContextDispatcher.runLargeContext(messagesForModel, userQuestion, lcTokenCount, agentOpts);
+              if (lcClientKey && proxy().touchClientEnd) proxy().touchClientEnd(lcClientKey, { success: true, provider: result.entry && result.entry.provider, model: result.entry && result.entry.model });
+              message = result.data.choices[0].message;
+              sendToRenderer(IPC_CHANNELS.AGENT_STREAM_CHUNK, { text: message.content || '' });
+              if (result.data.usage) sendToRenderer(IPC_CHANNELS.AGENT_TOKEN_USAGE, { usage: result.data.usage });
+              largeContextHandled = true;
+            } catch (lcErr) {
+              if (lcClientKey && proxy().touchClientEnd) proxy().touchClientEnd(lcClientKey, { success: false });
+              // Fall through to a normal (likely-failing) call below rather than
+              // silently swallowing the Large Context attempt — the ordinary
+              // context-limit error path/messaging still applies as a backstop.
+              sendToRenderer(IPC_CHANNELS.AGENT_ERROR, {
+                message: `Large Context Mode dispatch failed (${lcErr.message}) — falling back to a normal model call.`,
+                recoverable: true
+              });
+            }
+          }
+
+          if (largeContextHandled) {
+            // handled above — skip the normal streaming/non-streaming call.
+          } else if (streamingEnabled) {
+            // BUGFIX: register this internal call with the proxy's Connected
+            // Applications tracking (previously only the Express HTTP route
+            // did this — see touchClientStart/touchClientEnd export note in
+            // proxy-server.js). Wrap the call so activeRequests/totalRequests/
+            // errorCount stay accurate even on a thrown error.
+            const clientKey = proxy().touchClientStart ? proxy().touchClientStart(agentClientHeaders) : null;
             sendToRenderer(IPC_CHANNELS.AGENT_STREAM_START, {});
             let fullText = '';
-            const streamResult = await proxy().processChatCompletionStream(messagesForModel, agentOpts, (token) => {
-              fullText += token;
-              sendToRenderer(IPC_CHANNELS.AGENT_STREAM_TOKEN, { token });
-            });
+            let streamResult;
+            try {
+              streamResult = await proxy().processChatCompletionStream(messagesForModel, agentOpts, (token) => {
+                fullText += token;
+                sendToRenderer(IPC_CHANNELS.AGENT_STREAM_TOKEN, { token });
+              });
+            } catch (streamErr) {
+              if (clientKey && proxy().touchClientEnd) proxy().touchClientEnd(clientKey, { success: false });
+              throw streamErr;
+            }
+            if (clientKey && proxy().touchClientEnd) proxy().touchClientEnd(clientKey, { success: true, provider: streamResult && streamResult._meta && streamResult._meta.provider, model: streamResult && streamResult._meta && streamResult._meta.model });
             message = {
               role: 'assistant',
               content: streamResult.content || fullText || null,
@@ -230,7 +367,17 @@ async function runAgentTurn(sendToRenderer, userText, uploadedFiles) {
               tool_calls: streamResult.tool_calls || null
             });
           } else {
-             const response = await proxy().processChatCompletion(messagesForModel, agentOpts);
+            // BUGFIX: same Connected Applications registration as the
+            // streaming branch above, for the non-streaming call path.
+            const clientKey = proxy().touchClientStart ? proxy().touchClientStart(agentClientHeaders) : null;
+            let response;
+            try {
+              response = await proxy().processChatCompletion(messagesForModel, agentOpts);
+            } catch (callErr) {
+              if (clientKey && proxy().touchClientEnd) proxy().touchClientEnd(clientKey, { success: false });
+              throw callErr;
+            }
+            if (clientKey && proxy().touchClientEnd) proxy().touchClientEnd(clientKey, { success: true, provider: response && response._meta && response._meta.provider, model: response && response._meta && response._meta.model });
             message = (response && response.choices && response.choices[0] && response.choices[0].message) || {};
             if (message.content) {
               // Fallback path when streaming is off: whole message in one chunk.
@@ -245,6 +392,13 @@ async function runAgentTurn(sendToRenderer, userText, uploadedFiles) {
           break;
         } catch (err) {
           lastCallError = err;
+          // BUGFIX: context/token-limit errors are deterministic — the same
+          // oversized input will fail identically on every attempt, so break
+          // out of the retry loop immediately instead of burning the
+          // remaining attempts and MODEL_CALL_RETRY_DELAY_MS sleeps.
+          if (isNonRetryableModelCallError(err)) {
+            break;
+          }
           if (attempt < MODEL_CALL_MAX_ATTEMPTS) {
             sendToRenderer(IPC_CHANNELS.AGENT_ERROR, {
               message: `Model call failed (attempt ${attempt}/${MODEL_CALL_MAX_ATTEMPTS}): ${err.message} — retrying.`,
@@ -255,7 +409,18 @@ async function runAgentTurn(sendToRenderer, userText, uploadedFiles) {
         }
       }
       if (lastCallError) {
-        sendToRenderer(IPC_CHANNELS.AGENT_ERROR, { message: lastCallError.message });
+        // BUGFIX: give a clearer, single message for the non-retryable
+        // context-limit case instead of surfacing the raw "exceed the
+        // proxy's context limit" text (which the loop above previously also
+        // repeated up to 3 times via AGENT_ERROR{recoverable:true} before
+        // this final failure).
+        if (isNonRetryableModelCallError(lastCallError)) {
+          sendToRenderer(IPC_CHANNELS.AGENT_ERROR, {
+            message: `${lastCallError.message} — try trimming the conversation history, splitting the task into smaller steps, or enabling Large Context Mode in General Config.`
+          });
+        } else {
+          sendToRenderer(IPC_CHANNELS.AGENT_ERROR, { message: lastCallError.message });
+        }
         return;
       }
       if (abortRequested) { sendToRenderer(IPC_CHANNELS.AGENT_DONE, { aborted: true }); return; }
