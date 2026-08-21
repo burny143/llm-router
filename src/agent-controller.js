@@ -22,7 +22,14 @@ const path = require('path');
 const os = require('os');
 const crypto = require('crypto');
 const { spawn, exec } = require('child_process');
-const { IPC_CHANNELS } = require('./shared-constants');
+const {
+  IPC_CHANNELS,
+  AGENT_FINISHED_SENTINEL,
+  DEFAULT_AGENT_FOLLOWUP_INTERVAL_MS,
+  DEFAULT_AGENT_MAX_FOLLOWUPS,
+  DEFAULT_AGENT_RUN_TIMEOUT_MS,
+  DEFAULT_AGENT_HEARTBEAT_INTERVAL_MS
+} = require('./shared-constants');
 const {
   loadAgentConfig,
   saveAgentConfig,
@@ -203,6 +210,54 @@ function toolCallSignature(call) {
   return `${name}:${args}`;
 }
 
+// --- NEW: agent-loop auto-continuation (FINISHED sentinel) ------------------
+// Every line logged through this reaches the proxy tab's Developer Logs panel
+// for free: main.js patches console.log/info/warn/error to forward to the
+// renderer over IPC_CHANNELS.DEV_LOG, so a plain console.log here needs no
+// dedicated IPC plumbing — same pattern proxy-server.js already relies on for
+// its own [QUEUE]/[LCD]-prefixed lines.
+function agentLog(text) {
+  const time = new Date().toTimeString().slice(0, 8); // HH:MM:SS
+  console.log(`[agent-loop][${time}] ${text}`);
+}
+
+// --- NEW: heartbeat logging ---------------------------------------------
+// Emits a periodic "still waiting" [agent-loop] line while the loop is
+// blocked on ONE long-running wait (a slow model call, or a long
+// run_command), so Developer Logs shows proof of life during a 15s+ gap
+// instead of silence between the "start" and "end" lines. Purely cosmetic —
+// it never affects timeouts, retries, or the FINISHED/follow-up logic; it
+// only logs. Returns a stop function; always call it in a finally so a
+// heartbeat can never outlive the wait it was started for (which would log
+// forever after the thing it was describing already finished).
+function startHeartbeat(label, intervalMs) {
+  if (!intervalMs || intervalMs <= 0) return () => {}; // 0 = disabled
+  const startedAt = Date.now();
+  const timer = setInterval(() => {
+    const elapsedSec = Math.round((Date.now() - startedAt) / 1000);
+    agentLog(`still_waiting ${label} elapsed_s=${elapsedSec}`);
+  }, intervalMs);
+  // Never let a heartbeat keep the Node event loop alive by itself.
+  if (timer.unref) timer.unref();
+  return () => clearInterval(timer);
+}
+
+// Detects the FINISHED sentinel as the exact, standalone LAST line of the
+// assistant's message (trailing whitespace/blank lines ignored) and strips
+// it back out for display. Anything other than an exact last-line match
+// (FINISHED mentioned mid-paragraph, "FINISHED." with punctuation, etc.)
+// does NOT count — this must be unambiguous or a model could accidentally
+// end a turn early by discussing the word itself.
+function extractFinishedSentinel(text) {
+  if (typeof text !== 'string' || !text.length) return { finished: false, cleaned: text || '' };
+  const trimmed = text.replace(/\s+$/, '');
+  const lines = trimmed.split('\n');
+  const lastLine = lines[lines.length - 1].trim();
+  if (lastLine !== AGENT_FINISHED_SENTINEL) return { finished: false, cleaned: text };
+  lines.pop();
+  return { finished: true, cleaned: lines.join('\n').replace(/\s+$/, '') };
+}
+
 async function runAgentTurn(sendToRenderer, userText, uploadedFiles) {
   if (running) throw new Error('Agent is already processing a turn.');
   running = true;
@@ -239,16 +294,65 @@ async function runAgentTurn(sendToRenderer, userText, uploadedFiles) {
     let extensionGranted = false;
     let recentToolSignatures = [];
     let finalMessage = null;
+    // --- NEW: deterministic no-op-turn guard ---
+    // The FINISHED sentinel is prompt-based, and prompt compliance isn't
+    // 100% reliable — a model can occasionally skip it even on a trivial
+    // reply (greeting, small talk) with nothing left to do. Rather than
+    // trust the model every time, track whether this run has made any real
+    // tool calls yet. If the very first step comes back with no tool calls,
+    // there is nothing "in progress" for a follow-up to continue — end the
+    // run right there regardless of whether the sentinel is present.
+    let toolCallsThisRun = 0;
+
+    // --- NEW: agent-loop auto-continuation (FINISHED sentinel) -------------
+    // followupCount / maxFollowups / followupIntervalMs / runTimeoutMs govern
+    // the "keep going until FINISHED" behavior below. All three limits are
+    // configurable per-turn (agent-config.json, saved via SAVE_AGENT_CONFIG);
+    // AGENT_FOLLOWUP_INTERVAL_MS is an env-var fallback for the interval only,
+    // per the task spec.
+    const runStartTime = Date.now();
+    let followupCount = 0;
+    const followupIntervalMs = globalConfig.agentFollowupIntervalMs > 0
+      ? globalConfig.agentFollowupIntervalMs
+      : (Number(process.env.AGENT_FOLLOWUP_INTERVAL_MS) > 0
+        ? Number(process.env.AGENT_FOLLOWUP_INTERVAL_MS)
+        : DEFAULT_AGENT_FOLLOWUP_INTERVAL_MS);
+    const maxFollowups = globalConfig.agentMaxFollowups > 0 ? globalConfig.agentMaxFollowups : DEFAULT_AGENT_MAX_FOLLOWUPS;
+    const runTimeoutMs = globalConfig.agentRunTimeoutMs > 0 ? globalConfig.agentRunTimeoutMs : DEFAULT_AGENT_RUN_TIMEOUT_MS;
+    // --- NEW: heartbeat logging --- 0 (or unset falling back to 0) disables
+    // it; any positive value is the interval between "still_waiting" lines.
+    const heartbeatIntervalMs = globalConfig.agentHeartbeatIntervalMs != null
+      ? globalConfig.agentHeartbeatIntervalMs
+      : DEFAULT_AGENT_HEARTBEAT_INTERVAL_MS;
 
     for (let step = 0; step < stepLimit; step++) {
       if (abortRequested) { sendToRenderer(IPC_CHANNELS.AGENT_DONE, { aborted: true }); return; }
 
+      // --- NEW: agent-loop auto-continuation --- overall wall-clock guard,
+      // checked at the top of every iteration (tool-call steps included) so
+      // a turn stuck doing many slow tool calls still terminates even if it
+      // never comes close to maxFollowups.
+      const elapsedSoFar = Date.now() - runStartTime;
+      if (elapsedSoFar > runTimeoutMs) {
+        agentLog(`timeout_reached elapsed_ms=${elapsedSoFar} limit_ms=${runTimeoutMs}`);
+        sendToRenderer(IPC_CHANNELS.AGENT_ERROR, {
+          message: `Agent run timed out after ${Math.round(runTimeoutMs / 1000)}s without reaching FINISHED.`
+        });
+        return;
+      }
+
       // --- NEW: streaming support ---
       const streamingEnabled = globalConfig.streamResponses !== false;
       let message;
+      let finishReasonThisStep = 'unknown';
 
       // --- NEW: retry-on-transient-error (keep-alive) ---
       let lastCallError = null;
+      // --- NEW: heartbeat logging --- spans every attempt of this step's
+      // model call (including retries) so a slow/retried call still gets
+      // periodic proof-of-life lines instead of just one at the end.
+      const stopModelCallHeartbeat = startHeartbeat(`model_call step=${step}`, heartbeatIntervalMs);
+      try {
       for (let attempt = 1; attempt <= MODEL_CALL_MAX_ATTEMPTS; attempt++) {
         if (abortRequested) break;
         try {
@@ -320,6 +424,7 @@ async function runAgentTurn(sendToRenderer, userText, uploadedFiles) {
               const result = await largeContextDispatcher.runLargeContext(messagesForModel, userQuestion, lcTokenCount, agentOpts);
               if (lcClientKey && proxy().touchClientEnd) proxy().touchClientEnd(lcClientKey, { success: true, provider: result.entry && result.entry.provider, model: result.entry && result.entry.model });
               message = result.data.choices[0].message;
+              finishReasonThisStep = (result.data.choices[0].finish_reason) || 'stop';
               sendToRenderer(IPC_CHANNELS.AGENT_STREAM_CHUNK, { text: message.content || '' });
               if (result.data.usage) sendToRenderer(IPC_CHANNELS.AGENT_TOKEN_USAGE, { usage: result.data.usage });
               largeContextHandled = true;
@@ -362,8 +467,17 @@ async function runAgentTurn(sendToRenderer, userText, uploadedFiles) {
               content: streamResult.content || fullText || null,
               ...(streamResult.tool_calls ? { tool_calls: streamResult.tool_calls } : {})
             };
+            // The simulated stream has no real provider finish_reason to
+            // report — infer it the same way the OpenAI shape would.
+            finishReasonThisStep = streamResult.tool_calls && streamResult.tool_calls.length ? 'tool_calls' : 'stop';
+            // --- NEW: agent-loop auto-continuation --- hide a trailing
+            // FINISHED sentinel line from the rendered chat bubble (it may
+            // have already flashed by token-by-token during the simulated
+            // stream, but the finalized bubble text — what's persisted in
+            // the DOM and what endStreamingBubble() renders — is clean).
+            const streamEndDisplay = extractFinishedSentinel(message.content || '').cleaned;
             sendToRenderer(IPC_CHANNELS.AGENT_STREAM_END, {
-              fullText: message.content || '',
+              fullText: streamEndDisplay,
               tool_calls: streamResult.tool_calls || null
             });
           } else {
@@ -379,9 +493,14 @@ async function runAgentTurn(sendToRenderer, userText, uploadedFiles) {
             }
             if (clientKey && proxy().touchClientEnd) proxy().touchClientEnd(clientKey, { success: true, provider: response && response._meta && response._meta.provider, model: response && response._meta && response._meta.model });
             message = (response && response.choices && response.choices[0] && response.choices[0].message) || {};
+            finishReasonThisStep = (response && response.choices && response.choices[0] && response.choices[0].finish_reason) || 'unknown';
             if (message.content) {
               // Fallback path when streaming is off: whole message in one chunk.
-              sendToRenderer(IPC_CHANNELS.AGENT_STREAM_CHUNK, { text: message.content });
+              // --- NEW: agent-loop auto-continuation --- hide a trailing
+              // FINISHED sentinel line from the rendered chunk; the raw
+              // content (with the sentinel intact) is still what gets stored
+              // in conversation history below.
+              sendToRenderer(IPC_CHANNELS.AGENT_STREAM_CHUNK, { text: extractFinishedSentinel(message.content).cleaned });
             }
             // --- NEW: task-progress panel --- emit real usage when the backend
             // attached it to the response (non-streaming path only; the
@@ -408,6 +527,12 @@ async function runAgentTurn(sendToRenderer, userText, uploadedFiles) {
           }
         }
       }
+      } finally {
+        // Always stop the heartbeat for this step's model call, whether it
+        // succeeded, failed, or was aborted — otherwise it would keep firing
+        // "still_waiting" lines describing a wait that's already over.
+        stopModelCallHeartbeat();
+      }
       if (lastCallError) {
         // BUGFIX: give a clearer, single message for the non-retryable
         // context-limit case instead of surfacing the raw "exceed the
@@ -429,77 +554,155 @@ async function runAgentTurn(sendToRenderer, userText, uploadedFiles) {
       getActiveMessages().push(message);
 
       const toolCalls = message.tool_calls;
-      if (!Array.isArray(toolCalls) || toolCalls.length === 0) {
-        finalMessage = message;
-        break;
-      }
+      const hasToolCalls = Array.isArray(toolCalls) && toolCalls.length > 0;
 
-      // --- NEW: stuck-loop detection (keep-alive) ---
-      // Track only single-tool-call steps (the common "stuck" shape); a
-      // multi-call step resets the streak since it's clearly doing
-      // something different each time.
-      if (toolCalls.length === 1) {
-        const sig = toolCallSignature(toolCalls[0]);
-        recentToolSignatures.push(sig);
-        if (recentToolSignatures.length > STUCK_LOOP_THRESHOLD) recentToolSignatures.shift();
-        const allSame = recentToolSignatures.length === STUCK_LOOP_THRESHOLD &&
-          recentToolSignatures.every((s) => s === recentToolSignatures[0]);
-        if (allSame) {
-          const nudge = {
-            role: 'user',
-            content: `[system: you've called the same tool with the same arguments ${STUCK_LOOP_THRESHOLD} times in a row without making progress. ` +
-              `Stop repeating it — either try a genuinely different approach, or if the task is actually complete, say so and stop.]`
-          };
-          messagesForModel.push(nudge);
-          getActiveMessages().push(nudge);
+      agentLog(`assistant_message_received finish_reason=${finishReasonThisStep} tool_calls=${hasToolCalls ? toolCalls.length : 0} iteration=${followupCount}`);
+
+      if (!hasToolCalls) {
+        // --- NEW: agent-loop auto-continuation (FINISHED sentinel) ---
+        // A tool-call-free response is no longer treated as "done" by
+        // itself — finish_reason=stop from the provider is not trusted on
+        // its own (per spec item 3). The run only ends here if the model's
+        // last line is the literal FINISHED sentinel; otherwise it's an
+        // auto-follow-up, bounded by maxFollowups and runTimeoutMs.
+        const { finished, cleaned } = extractFinishedSentinel(typeof message.content === 'string' ? message.content : '');
+
+        if (finished) {
+          agentLog('finished_sentinel_detected');
+          finalMessage = { ...message, content: cleaned };
+          break;
+        }
+
+        // --- NEW: deterministic no-op-turn guard ---
+        // Don't rely solely on the model remembering the sentinel. If this
+        // run has not made a single tool call yet (i.e. this is the very
+        // first step, and the model went straight to a plain-text reply),
+        // there is no in-progress work for a follow-up to continue — the
+        // reply is self-contained. End the run here regardless of the
+        // missing sentinel, instead of looping.
+        if (toolCallsThisRun === 0 && followupCount === 0) {
+          agentLog('no_op_turn_detected — ending run without requiring FINISHED sentinel');
+          finalMessage = message;
+          break;
+        }
+
+        const elapsedNow = Date.now() - runStartTime;
+        if (elapsedNow > runTimeoutMs) {
+          agentLog(`timeout_reached elapsed_ms=${elapsedNow} limit_ms=${runTimeoutMs}`);
+          sendToRenderer(IPC_CHANNELS.AGENT_ERROR, {
+            message: `Agent run timed out after ${Math.round(runTimeoutMs / 1000)}s without reaching FINISHED.`
+          });
+          return;
+        }
+        if (followupCount >= maxFollowups) {
+          agentLog(`max_followups_reached count=${followupCount} limit=${maxFollowups}`);
+          sendToRenderer(IPC_CHANNELS.AGENT_ERROR, {
+            message: `Agent reached the maximum of ${maxFollowups} auto-follow-ups without completing the task (no FINISHED sentinel detected). Send a new message to continue manually.`
+          });
+          return;
+        }
+
+        followupCount += 1;
+        // recoverable:true keeps the "sending"/working UI state active (see
+        // agent-tab.js's onAgentError) instead of ending the turn like a
+        // real error; autoFollowup/iteration/maxFollowups let the renderer
+        // show a distinct "Auto-follow-up N/M" status instead of a generic
+        // system note.
+        sendToRenderer(IPC_CHANNELS.AGENT_ERROR, {
+          message: `Auto-follow-up ${followupCount}/${maxFollowups} (no FINISHED yet) — continuing automatically.`,
+          recoverable: true,
+          autoFollowup: true,
+          iteration: followupCount,
+          maxFollowups
+        });
+        agentLog(`auto_followup_sent iteration=${followupCount} reason=no_finished`);
+
+        await sleep(followupIntervalMs);
+        if (abortRequested) { sendToRenderer(IPC_CHANNELS.AGENT_DONE, { aborted: true }); return; }
+
+        const followupMsg = {
+          role: 'user',
+          content: 'Continue from where you left off. If the task is now complete, reply with FINISHED at the end of your final message.'
+        };
+        messagesForModel.push(followupMsg);
+        getActiveMessages().push(followupMsg);
+
+        // Skip the tool-execution section below (there are no tool calls to
+        // run this step) and fall straight through to the step-limit-
+        // extension check, then loop again.
+      } else {
+        agentLog(`tool_calls_detected count=${toolCalls.length}`);
+        toolCallsThisRun += toolCalls.length;
+
+        // --- NEW: stuck-loop detection (keep-alive) ---
+        // Track only single-tool-call steps (the common "stuck" shape); a
+        // multi-call step resets the streak since it's clearly doing
+        // something different each time.
+        if (toolCalls.length === 1) {
+          const sig = toolCallSignature(toolCalls[0]);
+          recentToolSignatures.push(sig);
+          if (recentToolSignatures.length > STUCK_LOOP_THRESHOLD) recentToolSignatures.shift();
+          const allSame = recentToolSignatures.length === STUCK_LOOP_THRESHOLD &&
+            recentToolSignatures.every((s) => s === recentToolSignatures[0]);
+          if (allSame) {
+            const nudge = {
+              role: 'user',
+              content: `[system: you've called the same tool with the same arguments ${STUCK_LOOP_THRESHOLD} times in a row without making progress. ` +
+                `Stop repeating it — either try a genuinely different approach, or if the task is actually complete, say so and stop.]`
+            };
+            messagesForModel.push(nudge);
+            getActiveMessages().push(nudge);
+            recentToolSignatures = [];
+          }
+        } else {
           recentToolSignatures = [];
         }
-      } else {
-        recentToolSignatures = [];
-      }
 
-      for (const call of toolCalls) {
-        if (abortRequested) break;
-        const name = call.function && call.function.name;
-        let args = {};
-        try { args = JSON.parse((call.function && call.function.arguments) || '{}'); } catch (_) { args = {}; }
-
-        sendToRenderer(IPC_CHANNELS.AGENT_TOOL_START, { id: call.id, name, args });
-        const result = await executeTool(sendToRenderer, name, args);
-        sendToRenderer(IPC_CHANNELS.AGENT_TOOL_RESULT, { id: call.id, name, result });
-
-        const toolMsg = {
-          role: 'tool',
-          tool_call_id: call.id,
-          content: typeof result === 'string' ? result : (result.message || JSON.stringify(result))
-        };
-        messagesForModel.push(toolMsg);
-        getActiveMessages().push(toolMsg);
-      }
-
-      // If the loop above broke early due to an abort, every tool_call in this
-      // assistant message that never got a matching 'tool' response must still
-      // get one. The OpenAI-style API requires exactly one tool message per
-      // tool_call id — leaving any unanswered would corrupt this session's
-      // persisted history and break every future turn (the model call would be
-      // rejected as malformed). Backfill a synthetic "aborted" result for each
-      // tool_call id we haven't already answered.
-      if (abortRequested) {
-        const answeredIds = new Set(
-          getActiveMessages()
-            .filter((m) => m.role === 'tool')
-            .map((m) => m.tool_call_id)
-        );
         for (const call of toolCalls) {
-          if (answeredIds.has(call.id)) continue;
-          const abortedMsg = {
+          if (abortRequested) break;
+          const name = call.function && call.function.name;
+          let args = {};
+          try { args = JSON.parse((call.function && call.function.arguments) || '{}'); } catch (_) { args = {}; }
+
+          sendToRenderer(IPC_CHANNELS.AGENT_TOOL_START, { id: call.id, name, args });
+          const result = await executeTool(sendToRenderer, name, args);
+          sendToRenderer(IPC_CHANNELS.AGENT_TOOL_RESULT, { id: call.id, name, result });
+
+          const toolMsg = {
             role: 'tool',
             tool_call_id: call.id,
-            content: JSON.stringify({ ok: false, message: 'Aborted by user before this tool call executed.' })
+            content: typeof result === 'string' ? result : (result.message || JSON.stringify(result))
           };
-          messagesForModel.push(abortedMsg);
-          getActiveMessages().push(abortedMsg);
+          messagesForModel.push(toolMsg);
+          getActiveMessages().push(toolMsg);
         }
+
+        // If the loop above broke early due to an abort, every tool_call in
+        // this assistant message that never got a matching 'tool' response
+        // must still get one. The OpenAI-style API requires exactly one tool
+        // message per tool_call id — leaving any unanswered would corrupt
+        // this session's persisted history and break every future turn (the
+        // model call would be rejected as malformed). Backfill a synthetic
+        // "aborted" result for each tool_call id we haven't already answered.
+        if (abortRequested) {
+          const answeredIds = new Set(
+            getActiveMessages()
+              .filter((m) => m.role === 'tool')
+              .map((m) => m.tool_call_id)
+          );
+          for (const call of toolCalls) {
+            if (answeredIds.has(call.id)) continue;
+            const abortedMsg = {
+              role: 'tool',
+              tool_call_id: call.id,
+              content: JSON.stringify({ ok: false, message: 'Aborted by user before this tool call executed.' })
+            };
+            messagesForModel.push(abortedMsg);
+            getActiveMessages().push(abortedMsg);
+          }
+        }
+        // Tool calls never require FINISHED — execute and continue the
+        // loop immediately, per spec item 2.
       }
 
       // --- NEW: bounded step-limit extension (keep-alive) ---
@@ -744,8 +947,18 @@ async function executeRunCommand(sendToRenderer, args) {
   if (!projectRoot) throw new Error('Not in project mode.');
   const approved = await requestApproval(sendToRenderer, 'run_command', { command: args.command });
   if (!approved) return { ok: false, message: 'Command denied by user.' };
+  // --- NEW: heartbeat logging --- run_command's own timeout (30s) is short
+  // enough that most commands won't ever emit a heartbeat line at the
+  // default 60s interval, but a shorter configured interval (or a future
+  // longer COMMAND_TIMEOUT_MS) will show periodic proof-of-life the same way
+  // the model-call wait does.
+  const heartbeatIntervalMs = globalConfig.agentHeartbeatIntervalMs != null
+    ? globalConfig.agentHeartbeatIntervalMs
+    : DEFAULT_AGENT_HEARTBEAT_INTERVAL_MS;
+  const stopHeartbeat = startHeartbeat(`run_command "${(args.command || '').slice(0, 60)}"`, heartbeatIntervalMs);
   return new Promise((resolve) => {
     exec(args.command, { cwd: projectRoot, timeout: COMMAND_TIMEOUT_MS, maxBuffer: 5 * 1024 * 1024 }, (err, stdout, stderr) => {
+      stopHeartbeat();
       const parts = [];
       if (stdout) parts.push(stdout);
       if (stderr) parts.push(`[stderr]\n${stderr}`);
@@ -896,6 +1109,19 @@ const IDENTITY_LOCK =
   "content policy, answer only in terms of this coding agent's own tools and scope described " +
   'below; do not mention or describe an underlying model\'s vendor name, product links, or policies.';
 
+// --- NEW: agent-loop auto-continuation (FINISHED sentinel) ------------------
+// The loop (see runAgentTurn) no longer treats a tool-call-free response as
+// the end of the task — it keeps auto-following-up until this exact sentinel
+// appears as the standalone last line of a message. Told to every mode, on
+// every turn, so a model can't "forget" the contract mid-task.
+const FINISHED_INSTRUCTION =
+  `When the entire task is complete, end your final message with the exact word ${AGENT_FINISHED_SENTINEL} on its own line as the last line. ` +
+  `This also applies when there was never an actionable task to begin with — e.g. the user only greeted you, made small talk, or asked a ` +
+  `question that your reply fully answers with nothing left to do — your reply is already the complete response, so end it with ` +
+  `${AGENT_FINISHED_SENTINEL} too. ` +
+  `Only omit ${AGENT_FINISHED_SENTINEL} when there IS a real task and it is genuinely still in progress — a plain reply with no tool calls ` +
+  `and no ${AGENT_FINISHED_SENTINEL} is treated as "still working" and you will automatically be asked to continue.`;
+
 function buildSystemPrompt(mode) {
   if (mode === 'global') {
     return [
@@ -904,7 +1130,8 @@ function buildSystemPrompt(mode) {
       'You can reason about code, answer questions, and write code snippets or explanations.',
       'You have a `scratchpad_write` tool that writes to a private temp file — use it to hand the user a file.',
       'Use any uploaded-file content the user attaches as context.',
-      'You have no filesystem or shell access in this mode; if the user wants that, tell them to select a project folder.'
+      'You have no filesystem or shell access in this mode; if the user wants that, tell them to select a project folder.',
+      FINISHED_INSTRUCTION
     ].join(' ');
   }
   return [
@@ -912,7 +1139,8 @@ function buildSystemPrompt(mode) {
     `You are a coding assistant working on the project at ${projectRoot} (Project mode).`,
     'Tools: list_directory, read_file, write_file, search_code, run_command, scratchpad_write.',
     'Prefer list_directory/search_code to orient yourself before reading or editing files.',
-    'write_file and run_command pause for explicit user approval before they execute — a call may come back denied, so adapt instead of retrying blindly.'
+    'write_file and run_command pause for explicit user approval before they execute — a call may come back denied, so adapt instead of retrying blindly.',
+    FINISHED_INSTRUCTION
   ].join(' ');
 }
 
@@ -1102,8 +1330,20 @@ function initAgentController({ ipcMain, dialog, sendToRenderer, getMainWindow })
     // don't own (e.g. legacy globalMcpServers) so they can't sneak back in
     // and confuse the renderer. Always re-derive from DEFAULT_AGENT_CONFIG
     // shape — no MCP reconnect, there's nothing to reconnect anymore.
-     const { lastProjectPath, selectedModel, streamResponses, alwaysApproveWrites, agentTimeoutMs, agentMaxOutputTokens, agentMaxInputTokens } = globalConfig;
-     globalConfig = { lastProjectPath, selectedModel, streamResponses, alwaysApproveWrites, agentTimeoutMs, agentMaxOutputTokens, agentMaxInputTokens };
+     const {
+       lastProjectPath, selectedModel, streamResponses, alwaysApproveWrites,
+       agentTimeoutMs, agentMaxOutputTokens, agentMaxInputTokens,
+       // --- NEW: agent-loop auto-continuation (FINISHED sentinel) ---
+       agentFollowupIntervalMs, agentMaxFollowups, agentRunTimeoutMs,
+       // --- NEW: heartbeat logging ---
+       agentHeartbeatIntervalMs
+     } = globalConfig;
+     globalConfig = {
+       lastProjectPath, selectedModel, streamResponses, alwaysApproveWrites,
+       agentTimeoutMs, agentMaxOutputTokens, agentMaxInputTokens,
+       agentFollowupIntervalMs, agentMaxFollowups, agentRunTimeoutMs,
+       agentHeartbeatIntervalMs
+     };
     saveAgentConfig(globalConfig);
     return globalConfig;
   });

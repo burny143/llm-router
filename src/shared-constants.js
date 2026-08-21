@@ -23,7 +23,14 @@ const LOG_MARKERS = {
   // inbound request is queued (waiting on findWinner()/acquireRequestSlot())
   // or dequeued/dispatched, so Developer Logs shows queueing activity
   // per-app without a dedicated IPC channel.
-  QUEUE: '[QUEUE]'
+  QUEUE: '[QUEUE]',
+  // NEW: emitted by agent-controller.js's runAgentTurn() for every
+  // significant agent-loop event (assistant response received, tool calls
+  // detected, auto-follow-up sent, FINISHED sentinel detected, hard limit
+  // reached). Plain console.log calls prefixed with this marker reach the
+  // Developer Logs panel automatically via main.js's console.* patch — no
+  // dedicated IPC channel needed.
+  AGENT_LOOP: '[agent-loop]'
 };
 
 // BUGFIX (Task 9): QWEN_PROVIDER_NAME used to live here "only so the archived
@@ -88,6 +95,39 @@ const DEFAULT_PING_INTERVAL_MS = 30000;
 // DEFAULT_ASSISTANT_CONFIG.minRequestIntervalMs) — this is only the
 // fallback.
 const DEFAULT_MIN_REQUEST_INTERVAL_MS = 1000;
+
+// --- Agent-loop auto-continuation (FINISHED sentinel) ---
+// AGENT_FINISHED_SENTINEL: exact standalone last-line marker the agent's
+// system prompt instructs the model to emit once (and only once) the whole
+// task is complete. agent-controller.js's runAgentTurn() no longer treats a
+// tool-call-free response as "done" by itself (a bare finish_reason=stop
+// used to end the run even mid-task) — it only stops when this sentinel is
+// present as the literal last line of the assistant's message.
+const AGENT_FINISHED_SENTINEL = 'FINISHED';
+// Default minimum wait before agent-controller.js injects an auto-follow-up
+// "Continue from where you left off" user message after a tool-call-free,
+// non-FINISHED response. Overridable via agent-config.json's
+// agentFollowupIntervalMs, or the AGENT_FOLLOWUP_INTERVAL_MS env var as a
+// last-resort fallback default.
+const DEFAULT_AGENT_FOLLOWUP_INTERVAL_MS = 1000;
+// Hard cap on the number of auto-follow-ups in a single turn before the run
+// stops with max_followups_reached, so a model that never emits FINISHED
+// can't loop forever. Overridable via agent-config.json's agentMaxFollowups.
+const DEFAULT_AGENT_MAX_FOLLOWUPS = 20;
+// Hard wall-clock cap (ms) on a single turn's total auto-continuation time
+// (spans every tool call + auto-follow-up wait), independent of the
+// follow-up count cap, so a turn stuck doing slow tool calls without ever
+// exceeding DEFAULT_AGENT_MAX_FOLLOWUPS still terminates. Overridable via
+// agent-config.json's agentRunTimeoutMs.
+const DEFAULT_AGENT_RUN_TIMEOUT_MS = 15 * 60 * 1000;
+// Interval (ms) between "still working…" heartbeat log lines emitted while
+// the agent loop is blocked on a single long-running wait — a slow model
+// call or a long run_command — so Developer Logs shows periodic proof of
+// life instead of one line at the very start and one at the very end with
+// nothing in between for 15+ seconds. Overridable via agent-config.json's
+// agentHeartbeatIntervalMs. Purely a logging cadence; it does not affect
+// timeouts, retries, or the follow-up/FINISHED logic above.
+const DEFAULT_AGENT_HEARTBEAT_INTERVAL_MS = 60 * 1000;
 
 const IPC_CHANNELS = {
   // Proxy control
@@ -222,4 +262,18 @@ const IPC_CHANNELS = {
   AGENT_UNDO_STATE: 'agent:undo-state',
 };
 
-module.exports = { IPC_CHANNELS, LOG_MARKERS, DEFAULT_COOKIE_USER_AGENT, FILE_ROLES, BROWSER_FETCH_TIMEOUT_MS, BROWSER_FETCH_HANG_GUARD_MS, DEFAULT_PING_INTERVAL_MS, DEFAULT_MIN_REQUEST_INTERVAL_MS };
+module.exports = {
+  IPC_CHANNELS,
+  LOG_MARKERS,
+  DEFAULT_COOKIE_USER_AGENT,
+  FILE_ROLES,
+  BROWSER_FETCH_TIMEOUT_MS,
+  BROWSER_FETCH_HANG_GUARD_MS,
+  DEFAULT_PING_INTERVAL_MS,
+  DEFAULT_MIN_REQUEST_INTERVAL_MS,
+  AGENT_FINISHED_SENTINEL,
+  DEFAULT_AGENT_FOLLOWUP_INTERVAL_MS,
+  DEFAULT_AGENT_MAX_FOLLOWUPS,
+  DEFAULT_AGENT_RUN_TIMEOUT_MS,
+  DEFAULT_AGENT_HEARTBEAT_INTERVAL_MS
+};

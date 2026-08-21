@@ -65,6 +65,13 @@
   const timeoutMsInput = el('agentTimeoutMs');
   const maxOutputTokensInput = el('agentMaxOutputTokens');
   const maxInputTokensInput = el('agentMaxInputTokens');
+  // --- NEW: agent-loop auto-continuation (FINISHED sentinel) ---
+  const followupIntervalMsInput = el('agentFollowupIntervalMs');
+  const maxFollowupsInput = el('agentMaxFollowups');
+  // --- NEW: heartbeat logging ---
+  const heartbeatIntervalMsInput = el('agentHeartbeatIntervalMs');
+  // --- NEW: overall per-turn wall-clock cap ---
+  const runTimeoutMsInput = el('agentRunTimeoutMs');
 
   // --- NEW: slash commands / undo ---
   const paletteBtn = el('agentPaletteBtn');
@@ -77,6 +84,21 @@
   // --- NEW: task-progress panel ---
   const taskProgressEl = el('agentTaskProgress');
   const chatTabsEl = el('agentChatTabs');
+
+  // --- NEW: agent-loop auto-continuation status badge ---
+  const loopStatusEl = el('agentLoopStatus');
+  function setLoopStatus(text, kind) {
+    if (!loopStatusEl) return;
+    if (!text) {
+      loopStatusEl.style.display = 'none';
+      loopStatusEl.textContent = '';
+      loopStatusEl.className = 'agent-loop-status';
+      return;
+    }
+    loopStatusEl.style.display = 'inline-block';
+    loopStatusEl.textContent = text;
+    loopStatusEl.className = 'agent-loop-status' + (kind ? ' ' + kind : '');
+  }
 
   // --- Rendering helpers -------------------------------------------------------
   function scrollMessagesToBottom() {
@@ -671,6 +693,15 @@ function endStreamingBubble(fullText) {
     timeoutMsInput.value = (saved.agentTimeoutMs && saved.agentTimeoutMs > 0) ? saved.agentTimeoutMs : 60000;
     maxOutputTokensInput.value = (saved.agentMaxOutputTokens && saved.agentMaxOutputTokens > 0) ? saved.agentMaxOutputTokens : 8192;
     maxInputTokensInput.value = (saved.agentMaxInputTokens && saved.agentMaxInputTokens > 0) ? saved.agentMaxInputTokens : 128000;
+    // --- NEW: agent-loop auto-continuation (FINISHED sentinel) ---
+    followupIntervalMsInput.value = (saved.agentFollowupIntervalMs && saved.agentFollowupIntervalMs > 0) ? saved.agentFollowupIntervalMs : 1000;
+    maxFollowupsInput.value = (saved.agentMaxFollowups && saved.agentMaxFollowups > 0) ? saved.agentMaxFollowups : 20;
+    // --- NEW: heartbeat logging --- 0 is a valid, meaningful value here
+    // (disabled), so check specifically for null/undefined rather than
+    // falsy/>0 like the other fields above.
+    heartbeatIntervalMsInput.value = (saved.agentHeartbeatIntervalMs != null) ? saved.agentHeartbeatIntervalMs : 60000;
+    // --- NEW: overall per-turn wall-clock cap ---
+    runTimeoutMsInput.value = (saved.agentRunTimeoutMs && saved.agentRunTimeoutMs > 0) ? saved.agentRunTimeoutMs : 900000;
   }
 
   streamToggle.addEventListener('change', async () => {
@@ -700,6 +731,33 @@ function endStreamingBubble(fullText) {
     const val = Math.max(0, parseInt(maxInputTokensInput.value, 10) || 0);
     try { await api.saveAgentConfig({ agentMaxInputTokens: val }); }
     catch (err) { addSystemNote('Could not save max input tokens: ' + err.message, true); }
+  });
+
+  // --- NEW: agent-loop auto-continuation (FINISHED sentinel) ---
+  followupIntervalMsInput.addEventListener('change', async () => {
+    const val = Math.max(0, parseInt(followupIntervalMsInput.value, 10) || 0);
+    try { await api.saveAgentConfig({ agentFollowupIntervalMs: val }); }
+    catch (err) { addSystemNote('Could not save follow-up wait: ' + err.message, true); }
+  });
+
+  maxFollowupsInput.addEventListener('change', async () => {
+    const val = Math.max(0, parseInt(maxFollowupsInput.value, 10) || 0);
+    try { await api.saveAgentConfig({ agentMaxFollowups: val }); }
+    catch (err) { addSystemNote('Could not save max follow-ups: ' + err.message, true); }
+  });
+
+  // --- NEW: heartbeat logging ---
+  heartbeatIntervalMsInput.addEventListener('change', async () => {
+    const val = Math.max(0, parseInt(heartbeatIntervalMsInput.value, 10) || 0);
+    try { await api.saveAgentConfig({ agentHeartbeatIntervalMs: val }); }
+    catch (err) { addSystemNote('Could not save heartbeat interval: ' + err.message, true); }
+  });
+
+  // --- NEW: overall per-turn wall-clock cap ---
+  runTimeoutMsInput.addEventListener('change', async () => {
+    const val = Math.max(0, parseInt(runTimeoutMsInput.value, 10) || 0);
+    try { await api.saveAgentConfig({ agentRunTimeoutMs: val }); }
+    catch (err) { addSystemNote('Could not save run timeout: ' + err.message, true); }
   });
 
   // --- Upload files --------------------------------------------------------------
@@ -839,6 +897,7 @@ function endStreamingBubble(fullText) {
 
     setSending(true);
     currentAssistantBubble = null;
+    setLoopStatus('Working…', 'working');
 
     try {
       await api.agentSendMessage(text, filesToSend);
@@ -848,6 +907,7 @@ function endStreamingBubble(fullText) {
       inputEl.value = originalText;
       addSystemNote('Failed to send: ' + err.message, true);
       setSending(false);
+      setLoopStatus(null);
     }
   }
 
@@ -1034,8 +1094,18 @@ function endStreamingBubble(fullText) {
       addTurnSummary(data && data.stoppedReason === 'step-limit-reached'
         ? 'agent hit tool-call limit — send a follow-up to continue'
         : 'turn complete');
-      if (data && data.aborted) addSystemNote('(stopped by user)');
-      if (data && data.stoppedReason === 'step-limit-reached') addSystemNote('(agent hit its per-turn tool-call limit — send a follow-up to continue)');
+      if (data && data.aborted) {
+        setLoopStatus(null);
+        addSystemNote('(stopped by user)');
+      } else if (data && data.stoppedReason === 'step-limit-reached') {
+        setLoopStatus(null);
+        addSystemNote('(agent hit its per-turn tool-call limit — send a follow-up to continue)');
+      } else {
+        // --- NEW: agent-loop auto-continuation --- briefly show "Finished"
+        // then clear the badge, matching the spec's status-change list.
+        setLoopStatus('Finished', 'finished');
+        setTimeout(() => setLoopStatus(null), 2000);
+      }
       refreshChatTabs();
     });
   }
@@ -1048,10 +1118,17 @@ function endStreamingBubble(fullText) {
       // conversation log, but they must NOT end the "agent is working" UI
       // state the way a real fatal error does.
       if (data && data.recoverable) {
+        // --- NEW: agent-loop auto-continuation --- a distinct status badge
+        // for auto-follow-ups instead of (or in addition to) a system note,
+        // so "Auto-follow-up N/M" is visible without scrolling the chat log.
+        if (data.autoFollowup) {
+          setLoopStatus(`Auto-follow-up ${data.iteration}/${data.maxFollowups}`, 'followup');
+        }
         addSystemNote(data.message);
         return;
       }
       setSending(false);
+      setLoopStatus(null);
       addSystemNote('Error: ' + data.message, true);
     });
   }

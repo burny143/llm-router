@@ -25,6 +25,7 @@
         <div class="agent-project-indicator">
           <span id="agentModeLight" class="agent-status-light global" title="Agent mode"></span>
           <span id="agentModeLabel">Global Agent</span>
+          <span id="agentLoopStatus" class="agent-loop-status" style="display:none;"></span>
           <button id="agentSelectFolderBtn" class="agent-btn-small">Select Folder</button>
           <button id="agentClearFolderBtn" class="agent-btn-small agent-clear-btn" style="display:none;" title="Turn off this project: return to Global mode and clear its cached chat history">✕</button>
         </div>
@@ -52,6 +53,18 @@
           </label>
           <label class="agent-token-limit-label" title="Reject agent model calls if the conversation exceeds this many tokens. 0 = no limit.">
             <input type="number" id="agentMaxInputTokens" min="0" step="1000" value="128000" style="width:140px"> Max input tokens
+          </label>
+          <label class="agent-token-limit-label" title="Wait between auto-follow-ups when the model finishes a turn without the FINISHED sentinel. 0 = use default.">
+            <input type="number" id="agentFollowupIntervalMs" min="0" step="500" value="1000" style="width:110px"> Follow-up wait (ms)
+          </label>
+          <label class="agent-token-limit-label" title="Hard cap on auto-follow-ups per turn before the agent stops and surfaces an error. 0 = use default.">
+            <input type="number" id="agentMaxFollowups" min="0" step="1" value="20" style="width:90px"> Max follow-ups
+          </label>
+          <label class="agent-token-limit-label" title="Interval between 'still waiting' Developer Log lines during a single long wait (slow model call or run_command). 0 = disable heartbeat logging.">
+            <input type="number" id="agentHeartbeatIntervalMs" min="0" step="1000" value="60000" style="width:110px"> Heartbeat log (ms)
+          </label>
+          <label class="agent-token-limit-label" title="Overall wall-clock cap for one full agent turn (all model calls + tool calls + auto-follow-ups). 0 = use default.">
+            <input type="number" id="agentRunTimeoutMs" min="0" step="60000" value="900000" style="width:120px"> Run timeout (ms)
           </label>
         </div>
       </div>

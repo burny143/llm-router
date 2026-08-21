@@ -1,9 +1,13 @@
 {
-  "lastProjectPath": "C:\\__Projects\\AI Projects\\KAGGLE-AI - IMPROVED",
+  "lastProjectPath": "C:\\__Projects\\AI Projects\\llm-proxy-gui",
   "selectedModel": "Kimi::Kimi-chat",
   "streamResponses": true,
   "alwaysApproveWrites": true,
   "agentTimeoutMs": 60000,
   "agentMaxOutputTokens": 100000,
-  "agentMaxInputTokens": 200000
+  "agentMaxInputTokens": 200000,
+  "agentFollowupIntervalMs": 1000,
+  "agentMaxFollowups": 20,
+  "agentRunTimeoutMs": 900000,
+  "agentHeartbeatIntervalMs": 60000
 }

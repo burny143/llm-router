@@ -2,5 +2,9 @@
   "lastProjectPath": null,
   "selectedModel": null,
   "streamResponses": true,
-  "alwaysApproveWrites": false
+  "alwaysApproveWrites": false,
+  "agentFollowupIntervalMs": 1000,
+  "agentMaxFollowups": 20,
+  "agentRunTimeoutMs": 900000,
+  "agentHeartbeatIntervalMs": 60000
 }

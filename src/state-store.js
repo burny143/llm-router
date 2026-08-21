@@ -2,7 +2,15 @@
 // derived from __dirname, so moving this file breaks every data-file path resolution.
 const fs = require('fs');
 const path = require('path');
-const { DEFAULT_PING_INTERVAL_MS, DEFAULT_MIN_REQUEST_INTERVAL_MS, FILE_ROLES } = require('./shared-constants');
+const {
+  DEFAULT_PING_INTERVAL_MS,
+  DEFAULT_MIN_REQUEST_INTERVAL_MS,
+  FILE_ROLES,
+  DEFAULT_AGENT_FOLLOWUP_INTERVAL_MS,
+  DEFAULT_AGENT_MAX_FOLLOWUPS,
+  DEFAULT_AGENT_RUN_TIMEOUT_MS,
+  DEFAULT_AGENT_HEARTBEAT_INTERVAL_MS
+} = require('./shared-constants');
 
 // --- File registry (central "notepad" that maps each data-file role to a path) ---
 // file-registry.json is the single place that says WHICH file plays WHICH role.
@@ -324,7 +332,19 @@ const DEFAULT_AGENT_CONFIG = {
   // these before forwarding requests. (0 = use proxy/default)
   agentTimeoutMs: 60000,           // per-request timeout for the agent's model calls (ms)
   agentMaxOutputTokens: 8192,      // cap on max_tokens the agent requests from the model
-  agentMaxInputTokens: 128000      // reject agent requests whose estimated prompt exceeds this (0 = no limit)
+  agentMaxInputTokens: 128000,     // reject agent requests whose estimated prompt exceeds this (0 = no limit)
+  // --- NEW: agent-loop auto-continuation (FINISHED sentinel) ---
+  // A tool-call-free response no longer ends a turn by itself; the loop
+  // keeps auto-following-up until the model's last line is the FINISHED
+  // sentinel or one of the two hard limits below is hit.
+  agentFollowupIntervalMs: DEFAULT_AGENT_FOLLOWUP_INTERVAL_MS, // wait before each auto-follow-up (ms)
+  agentMaxFollowups: DEFAULT_AGENT_MAX_FOLLOWUPS,               // hard cap on auto-follow-ups per turn
+  agentRunTimeoutMs: DEFAULT_AGENT_RUN_TIMEOUT_MS,              // hard wall-clock cap per turn (ms)
+  // --- NEW: heartbeat logging ---
+  // Purely a Developer Logs cadence during a single long wait (slow model
+  // call or long run_command) — does not affect any timeout/retry/follow-up
+  // behavior above. 0 disables heartbeat logging entirely.
+  agentHeartbeatIntervalMs: DEFAULT_AGENT_HEARTBEAT_INTERVAL_MS
 };
 
 function saveAgentConfig(config) {
